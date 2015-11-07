@@ -10,25 +10,30 @@ import java.util.List;
  */
 public class OSMWay extends OSMEntity {
     private final static String
-            BASE_XML_TAG_FORMAT_EMPTY = " <way id=\"%d\" version=\"1\"/>\n",// user=\"$osmuser\" uid=\"$osmid\" visible=\"true\" version=\"1\">\n"];
-            BASE_XML_TAG_FORMAT_OPEN = " <way id=\"%d\" version=\"1\">\n"/* user=\"$osmuser\" uid=\"$osmid\" visible=\"true\" version=\"1\">\n"];*/,
+            BASE_XML_TAG_FORMAT_EMPTY = " <way id=\"%d\" visible=\"%s\"/>\n",
+            BASE_XML_TAG_FORMAT_EMPTY_METADATA = " <way id=\"%d\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\"/>\n",
+            BASE_XML_TAG_FORMAT_OPEN = " <way id=\"%d\" visible=\"%s\">\n",
+            BASE_XML_TAG_FORMAT_OPEN_METADATA = " <way id=\"%d\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\">\n",
             BASE_XML_TAG_FORMAT_CLOSE = " </way>\n",
             BASE_XML_TAG_FORMAT_MEMBER_NODE = "  <nd ref=\"%d\"/>\n";
     private final static OSMType type = OSMType.way;
     private final static int INITIAL_CAPACITY_NODE = 32;
 
-    public final List<OSMNode> nodes = new ArrayList<>(INITIAL_CAPACITY_NODE);
+    private final List<OSMNode> nodes = new ArrayList<>(INITIAL_CAPACITY_NODE);
 
     public static OSMWay create() {
         return new OSMWay(acquire_new_id());
     }
     public OSMWay(long id) {
-        osm_id = id;
+        super(id);
     }
-
 
     public void addNode(OSMNode node) {
         nodes.add(node);
+        boundingBox = null; //invalidate the bounding box
+    }
+    public List<OSMNode> getNodes() {
+        return nodes;
     }
 
     public void reverseNodes() {
@@ -46,12 +51,16 @@ public class OSMWay extends OSMEntity {
             return null;
         }
 
-        Region node0BoundingBox = nodes.get(0).getBoundingBox();
-        Region combinedBoundingBox = new Region(node0BoundingBox.origin, node0BoundingBox.extent);
-        for(OSMNode node: nodes) {
-            combinedBoundingBox.combinedBoxWithRegion(node.getBoundingBox());
+        if(boundingBox != null) {
+            return boundingBox;
         }
-        return combinedBoundingBox;
+
+        Region node0BoundingBox = nodes.get(0).getBoundingBox();
+        Region boundingBox = new Region(node0BoundingBox.origin, node0BoundingBox.extent);
+        for(OSMNode node: nodes) {
+            boundingBox.combinedBoxWithRegion(node.getBoundingBox());
+        }
+        return boundingBox;
     }
 
     @Override
@@ -59,7 +68,7 @@ public class OSMWay extends OSMEntity {
         Point[] wayPoints = new Point[nodes.size()];
         int i = 0;
         for(OSMNode node: nodes) {
-            wayPoints[i++] = new Point(node.lat, node.lon);
+            wayPoints[i++] = new Point(node.getLat(), node.getLon());
         }
         return Region.computeCentroid(wayPoints);
     }
@@ -68,8 +77,14 @@ public class OSMWay extends OSMEntity {
     public String toString() {
         int tagCount = tags != null ? tags.size() : 0, nodeCount = nodes.size();
         if(tagCount + nodeCount > 0) {
-            StringBuilder xml = new StringBuilder(tagCount * 16 + nodeCount * 24);
-            xml.append(String.format(BASE_XML_TAG_FORMAT_OPEN, osm_id));
+            final String openTag;
+            if(version > 0) {
+                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN_METADATA, osm_id, String.valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user));
+            } else {
+                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN, osm_id, String.valueOf(visible));
+            }
+            final StringBuilder xml = new StringBuilder(tagCount * 64 + nodeCount * 24 + openTag.length() + BASE_XML_TAG_FORMAT_CLOSE.length());
+            xml.append(openTag);
 
             //add the way's nodes
             for (OSMNode node : nodes) {
@@ -85,7 +100,11 @@ public class OSMWay extends OSMEntity {
             xml.append(BASE_XML_TAG_FORMAT_CLOSE);
             return xml.toString();
         } else {
-            return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id);
+            if(version > 0) {
+                return String.format(BASE_XML_TAG_FORMAT_EMPTY_METADATA, osm_id, String.valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user));
+            } else {
+                return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id, String.valueOf(visible));
+            }
         }
     }
 }

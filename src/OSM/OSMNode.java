@@ -7,11 +7,13 @@ import java.util.HashMap;
  */
 public class OSMNode extends OSMEntity {
     private final static String
-            BASE_XML_TAG_FORMAT_EMPTY = " <node id=\"%d\" lat=\"%.07f\" lon=\"%.07f\" version=\"1\"/>\n",// user=\"$osmuser\" uid=\"$osmid\" visible=\"true\" version=\"1\">\n"];
-            BASE_XML_TAG_FORMAT_OPEN = " <node id=\"%d\" lat=\"%.07f\" lon=\"%.07f\" version=\"1\">\n"/* user=\"$osmuser\" uid=\"$osmid\" visible=\"true\" version=\"1\">\n"];*/,
+            BASE_XML_TAG_FORMAT_EMPTY = " <node id=\"%d\" lat=\"%.07f\" lon=\"%.07f\" visible=\"%s\"/>\n",
+            BASE_XML_TAG_FORMAT_EMPTY_METADATA = " <node id=\"%d\" lat=\"%.07f\" lon=\"%.07f\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\"/>\n",
+            BASE_XML_TAG_FORMAT_OPEN = " <node id=\"%d\" lat=\"%.07f\" lon=\"%.07f\" visible=\"%s\">\n",
+            BASE_XML_TAG_FORMAT_OPEN_METADATA = " <node id=\"%d\" lat=\"%.07f\" lon=\"%.07f\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\">\n",
             BASE_XML_TAG_FORMAT_CLOSE = " </node>\n";
     private final static OSMType type = OSMType.node;
-    public double lat, lon;
+    private double lat, lon;
 
     public static OSMNode create() {
         return new OSMNode(acquire_new_id());
@@ -29,7 +31,32 @@ public class OSMNode extends OSMEntity {
         return node;
     }
     public OSMNode(long id) {
-        osm_id = id;
+        super(id);
+    }
+
+    public double getLat() {
+        return lat;
+    }
+    public double getLon() {
+        return lon;
+    }
+    public void setLat(double lat) {
+        this.lat = lat;
+        boundingBox = null; //invalidate the bounding box
+    }
+    public void setLon(double lon) {
+        this.lon = lon;
+        boundingBox = null; //invalidate the bounding box
+    }
+    public void setCoordinate(double lat, double lon) {
+        this.lat = lat;
+        this.lon = lon;
+        boundingBox = null; //invalidate the bounding box
+    }
+    public void setCoordinate(Point coordinate) {
+        this.lat = coordinate.latitude;
+        this.lon = coordinate.longitude;
+        boundingBox = null; //invalidate the bounding box
     }
 
     @Override
@@ -39,7 +66,10 @@ public class OSMNode extends OSMEntity {
 
     @Override
     public Region getBoundingBox() {
-        return new Region(lat, lon, 0.0, 0.0);
+        if(boundingBox == null) {
+            boundingBox = new Region(lat, lon, 0.0, 0.0);
+        }
+        return boundingBox;
     }
 
     @Override
@@ -50,15 +80,25 @@ public class OSMNode extends OSMEntity {
     @Override
     public String toString() {
         if(tags != null) {
-            StringBuilder xml = new StringBuilder(tags.size() * 16);
-            xml.append(String.format(BASE_XML_TAG_FORMAT_OPEN, osm_id, lat, lon));
+            final String openTag;
+            if(version > 0) {
+                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN_METADATA, osm_id, lat, lon, String.valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user));
+            } else {
+                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN, osm_id, lat, lon, String.valueOf(visible));
+            }
+            final StringBuilder xml = new StringBuilder(tags.size() * 64 + openTag.length() + BASE_XML_TAG_FORMAT_CLOSE.length());
+            xml.append(openTag);
             for (HashMap.Entry<String, String> entry : tags.entrySet()) {
                 xml.append(String.format(BASE_XML_TAG_FORMAT_TAG, escapeForXML(entry.getKey()), escapeForXML(entry.getValue())));
             }
             xml.append(BASE_XML_TAG_FORMAT_CLOSE);
             return xml.toString();
         } else {
-            return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id, lat, lon);
+            if(version > 0) {
+                return String.format(BASE_XML_TAG_FORMAT_EMPTY_METADATA, osm_id, lat, lon, String.valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user));
+            } else {
+                return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id, lat, lon, String.valueOf(visible));
+            }
         }
     }
     public void setTag(String name, String value) {

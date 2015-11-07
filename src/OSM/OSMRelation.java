@@ -4,14 +4,17 @@ import com.sun.istack.internal.NotNull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * Created by nick on 10/15/15.
  */
 public class OSMRelation extends OSMEntity {
     private final static String
-            BASE_XML_TAG_FORMAT_EMPTY = " <relation id=\"%d\" version=\"1\"/>\n",// user=\"$osmuser\" uid=\"$osmid\" visible=\"true\" version=\"1\">\n"];
-            BASE_XML_TAG_FORMAT_OPEN = " <relation id=\"%s\" version=\"1\">\n"/* user=\"$osmuser\" uid=\"$osmid\" visible=\"true\" version=\"1\">\n"];*/,
+            BASE_XML_TAG_FORMAT_EMPTY = " <relation id=\"%d\" visible=\"%s\"/>\n",
+            BASE_XML_TAG_FORMAT_EMPTY_METADATA = " <relation id=\"%d\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\"/>\n",
+            BASE_XML_TAG_FORMAT_OPEN = " <relation id=\"%s\" visible=\"%s\">\n",
+            BASE_XML_TAG_FORMAT_OPEN_METADATA = " <relation id=\"%s\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\">\n",
             BASE_XML_TAG_FORMAT_CLOSE = " </relation>\n",
             BASE_XML_TAG_FORMAT_MEMBER = "  <member type=\"%s\" ref=\"%d\" role=\"%s\"/>\n";
     private final static OSMType type = OSMType.relation;
@@ -33,7 +36,7 @@ public class OSMRelation extends OSMEntity {
     }
 
     public OSMRelation(long id) {
-        osm_id = id;
+        super(id);
     }
 
     @Override
@@ -66,8 +69,15 @@ public class OSMRelation extends OSMEntity {
         int tagCount = tags != null ? tags.size() : 0, memberCount = members.size();
 
         if(tagCount + memberCount > 0) {
-            StringBuilder xml = new StringBuilder(tagCount * 32 + memberCount * 64);
-            xml.append(String.format(BASE_XML_TAG_FORMAT_OPEN, osm_id));
+            final String openTag;
+            if(version > 0) {
+                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN_METADATA, osm_id, String.valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user));
+            } else {
+                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN, osm_id, String.valueOf(visible));
+            }
+
+            final StringBuilder xml = new StringBuilder(tagCount * 64 + memberCount * 24 + openTag.length() + BASE_XML_TAG_FORMAT_CLOSE.length());
+            xml.append(openTag);
 
             //output members
             for (OSMRelationMember member : members) {
@@ -83,10 +93,26 @@ public class OSMRelation extends OSMEntity {
             xml.append(BASE_XML_TAG_FORMAT_CLOSE);
             return xml.toString();
         } else {
-            return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id);
+            if(version > 0) {
+                return String.format(BASE_XML_TAG_FORMAT_EMPTY_METADATA, osm_id, String .valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user));
+            } else {
+                return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id, String .valueOf(visible));
+            }
         }
     }
     public void addMember(OSMEntity member, String role) {
         members.add(new OSMRelationMember(member, role));
+    }
+    public List<OSMRelationMember> getMembers() {
+        return members;
+    }
+    public List<OSMRelationMember> getMembers(final String role) {
+        ArrayList<OSMRelationMember> matchingMembers = new ArrayList<>(members.size());
+        for(OSMRelationMember member : members) {
+            if(member.role.equals(role)) {
+                matchingMembers.add(member);
+            }
+        }
+        return matchingMembers;
     }
 }
