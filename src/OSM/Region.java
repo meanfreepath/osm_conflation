@@ -6,6 +6,12 @@ package OSM;
 public class Region {
     public final Point origin, extent;
 
+    public static boolean intersects(Region region1, Region region2) {
+        return !(region1.extent.longitude < region2.origin.longitude ||
+                region1.origin.longitude > region2.extent.longitude ||
+                region1.extent.latitude < region2.origin.latitude ||
+                region1.origin.latitude > region2.extent.latitude);
+    }
     /*public static Region combinedRegionBox(Region region1, Region region2) {
         if(region1 == null) {
             if(region2 == null) {
@@ -42,6 +48,21 @@ public class Region {
         origin.longitude = Math.min(origin.longitude, otherRegion.origin.longitude);
         extent.latitude = Math.max(extent.latitude, otherRegion.extent.latitude);
         extent.longitude = Math.max(extent.longitude, otherRegion.extent.longitude);
+    }
+
+    /**
+     * Returns a region inset by the given amounts.  Negative values will expand
+     * @param bufferLat
+     * @param bufferLon
+     * @return
+     */
+    public Region regionInset(double bufferLat, double bufferLon) {
+        Region insetRegion = new Region(origin, extent);
+        insetRegion.origin.latitude += bufferLat * 0.5;
+        insetRegion.extent.latitude -= bufferLat * 0.5;
+        insetRegion.origin.longitude += bufferLon * 0.5;
+        insetRegion.extent.longitude -= bufferLon * 0.5;
+        return insetRegion;
     }
 
     public static Point computeCentroid(final Point[] vertices) {
