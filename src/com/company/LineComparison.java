@@ -19,45 +19,12 @@ public class LineComparison {
         public final WaySegments line;
         public final List<SegmentMatch> matchingSegments;
 
-        public class ConsolidatedSegmentMatch {
-            public final WaySegments line;
-            public int matchingSegments = 0;
-            public double avgDistance = 0.0, avgDotProduct = 0.0;
-
-            public ConsolidatedSegmentMatch(WaySegments line) {
-                this.line = line;
-            }
-            public void calculateAverages() {
-                avgDistance /= matchingSegments;
-                avgDotProduct /= matchingSegments;
-            }
-        }
-
         public LineMatch(WaySegments line) {
             this.line = line;
             matchingSegments = new ArrayList<>(64);
         }
         public void addMatch(SegmentMatch match) {
             matchingSegments.add(match);
-        }
-        public List<ConsolidatedSegmentMatch> getSummary() {
-            final HashMap<Long, ConsolidatedSegmentMatch> matchingWaySummary = new HashMap<>(matchingSegments.size());
-            for(SegmentMatch match : matchingSegments) {
-                ConsolidatedSegmentMatch consMatch =  matchingWaySummary.get(match.matchingSegment.parentSegments.line.osm_id);
-                if(consMatch == null) {
-                    consMatch = new ConsolidatedSegmentMatch(match.matchingSegment.parentSegments);
-                    matchingWaySummary.put(match.matchingSegment.parentSegments.line.osm_id, consMatch);
-                }
-                consMatch.avgDistance += match.orthogonalDistance;
-                consMatch.avgDotProduct += match.dotProduct;
-                consMatch.matchingSegments++;
-            }
-
-            ArrayList<ConsolidatedSegmentMatch> returnedMatches = new ArrayList<>(matchingWaySummary.size());
-            for(final ConsolidatedSegmentMatch consMatch : matchingWaySummary.values()) {
-                returnedMatches.add(consMatch);
-            }
-            return returnedMatches;
         }
     }
 
@@ -95,10 +62,6 @@ public class LineComparison {
                     //and add to the candidate list for this segment
                     mainLineSegment.candidateSegments.add(candidateSegments);
                 }
-
-                /*for(OSMWay candidateLineSegment : candidate.segments) { //TODO need to travel both ways
-                    //compareSegments(mainLineSegment, candidateLineSegment, options);
-                }*/
             }
         }
 
@@ -116,10 +79,9 @@ public class LineComparison {
                 }
                 System.out.println("segment #" + i + ": " + candidateLine.line.osm_id + ":: " + candidateLine.line.getTag("highway") + ":" + candidateLine.line.getTag("name") + "(" + candidateLine.segments.size() + " seg)");
                 for(final LineSegment candidateSegment : candidateLine.segments) {
-                    LineSegment.checkCandidateForMatch(mainSegment, candidateSegment, lineMatch);
+                    mainSegment.checkCandidateForMatch(candidateSegment, lineMatch);
                 }
             }
-            //mainSegment.chooseBestMatch();
             i++;
         }
 
