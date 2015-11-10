@@ -32,6 +32,9 @@ public abstract class OSMEntity {
     protected static long acquire_new_id() {
         return --new_id_sequence;
     }
+    public static void setIdSequence(long sequence) {
+        new_id_sequence = sequence;
+    }
     public abstract OSMType getType();
     public abstract Region getBoundingBox();
     public abstract Point getCentroid();

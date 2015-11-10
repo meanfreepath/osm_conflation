@@ -119,6 +119,7 @@ public class OSMEntitySpace {
      */
     public void loadFromXML(String fileName) throws IOException, ParserConfigurationException, SAXException {
         SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
+        long minimumEntityId = 0;
 
         parser.parse(new File(fileName), new DefaultHandler() {
             private final static String tagNode = "node", tagWay = "way", tagRelation = "relation", tagTag = "tag", tagWayNode = "nd", tagRelationMember = "member";
@@ -221,6 +222,11 @@ public class OSMEntitySpace {
             public void characters(char[] ch, int start, int length) throws SAXException {
             }*/
         });
+
+        for(OSMEntity e : allEntities) {
+            minimumEntityId = Math.min(minimumEntityId, e.osm_id);
+        }
+        OSMEntity.setIdSequence(minimumEntityId);
     }
 
     /**
