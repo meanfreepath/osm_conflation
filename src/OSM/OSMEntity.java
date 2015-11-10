@@ -40,7 +40,7 @@ public abstract class OSMEntity {
     public abstract Point getCentroid();
     public abstract String toString();
 
-    public OSMEntity(long id) {
+    public OSMEntity(final long id) {
         osm_id = id;
     }
     public void addTag(String name, String value) throws InvalidArgumentException {
@@ -54,19 +54,22 @@ public abstract class OSMEntity {
         }
         tags.put(name, value.trim());
     }
-    public void setTag(String name, String value) {
+    public void setTag(final String name, final String value) {
         if(tags == null) {
             tags = new HashMap<>();
         }
         tags.put(name, value.trim());
     }
-    public final String getTag(String name) {
+    public final String getTag(final String name) {
         if(tags == null) {
             return null;
         }
         return tags.get(name);
     }
-    public static String escapeForXML(String str){
+    public boolean hasTag(final String name) {
+        return tags != null && tags.containsKey(name);
+    }
+    public static String escapeForXML(final String str){
         final StringBuilder result = new StringBuilder();
         final StringCharacterIterator iterator = new StringCharacterIterator(str);
         char character =  iterator.current();

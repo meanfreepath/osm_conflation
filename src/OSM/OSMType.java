@@ -1,4 +1,4 @@
-package com.company.meanfreepathllc.OSM;
+package OSM;
 
 /**
  * Created by nick on 10/15/15.

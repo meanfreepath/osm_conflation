@@ -20,9 +20,9 @@ public class OSMEntitySpace {
             XML_BOUNDING_BOX = " <bounds minlat=\"%.07f\" minlon=\"%.07f\" maxlat=\"%.07f\" maxlon=\"%.07f\"/>\n",
             XML_DOCUMENT_CLOSE = "</osm>\n";
 
-    public static enum EntityMergeStrategy {
+    public enum EntityMergeStrategy {
         dontMerge, overwrite, mergeTags, mergeTagsIgnoreConflict
-    };
+    }
 
     public final List<OSMEntity> allEntities;
     public final HashMap<Long, OSMNode> allNodes;
@@ -38,9 +38,10 @@ public class OSMEntitySpace {
     private static void mergeTags(OSMEntity entity1, OSMEntity entity2, boolean overwriteConflict, List<OSMEntity> conflictingEntities) {
         for(Map.Entry<String, String> tag : entity2.tags.entrySet()) {
             final String tagKey = tag.getKey();
-            if(!entity1.tags.containsKey(tagKey) || overwriteConflict) {
+            boolean e1HasTag = entity1.hasTag(tagKey);
+            if(!e1HasTag || overwriteConflict) {
                 entity1.setTag(tagKey, tag.getValue());
-            } else if(!entity1.getTag(tagKey).equals(entity2.getTag(tagKey))) {
+            } else if(e1HasTag && entity2.hasTag(tagKey) && !entity1.getTag(tagKey).equals(entity2.getTag(tagKey))) {
                 if(conflictingEntities != null) {
                     conflictingEntities.add(entity1);
                 }

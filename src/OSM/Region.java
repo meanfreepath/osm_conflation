@@ -66,16 +66,19 @@ public class Region {
     }
 
     public static Point computeCentroid(final Point[] vertices) {
+        if(vertices.length < 2) {
+            return null;
+        }
         Point centroid = new Point(0, 0);
         double signedArea = 0.0;
-        double x0 = 0.0; // Current vertex X
-        double y0 = 0.0; // Current vertex Y
-        double x1 = 0.0; // Next vertex X
-        double y1 = 0.0; // Next vertex Y
-        double a = 0.0;  // Partial signed area
+        double x0; // Current vertex X
+        double y0; // Current vertex Y
+        double x1; // Next vertex X
+        double y1; // Next vertex Y
+        double a;  // Partial signed area
 
         // For all vertices except last
-        int i=0;
+        int i;
         for (i=0; i<vertices.length-1; ++i) {
             x0 = vertices[i].longitude;
             y0 = vertices[i].latitude;
