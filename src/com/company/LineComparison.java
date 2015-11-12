@@ -51,7 +51,7 @@ public class LineComparison {
         //first compile a list of OSM ways whose bounding boxes intersect *each segment* of the main line
         allCandidateSegments = new HashMap<>(candidateLines.size());
         for(final LineSegment mainLineSegment : mainWaySegments.segments) {
-            final Region mainBoundingBox = mainLineSegment.segmentWay.getBoundingBox().regionInset(-0.0004, -0.0004);
+            final Region mainBoundingBox = mainLineSegment.getBoundingBox().regionInset(-0.0004, -0.0004);
             for(final OSMWay candidateLine : candidateLines) {
                 //check for candidate lines whose bounding box intersects this segment
                 if(Region.intersects(mainBoundingBox, candidateLine.getBoundingBox().regionInset(-0.0004, -0.0004))) {
@@ -81,7 +81,7 @@ public class LineComparison {
                     lineMatch = new LineMatch(candidateLine);
                     wayMatches.put(candidateLine.line.osm_id, lineMatch);
                 }
-                System.out.println("segment #" + i + ": " + candidateLine.line.osm_id + ":: " + candidateLine.line.getTag("highway") + ":" + candidateLine.line.getTag("name") + "(" + candidateLine.segments.size() + " seg)");
+               // System.out.println("segment #" + i + ": " + candidateLine.line.osm_id + ":: " + candidateLine.line.getTag("highway") + ":" + candidateLine.line.getTag("name") + "(" + candidateLine.segments.size() + " seg)");
                 for(final LineSegment candidateSegment : candidateLine.segments) {
                     SegmentMatch.checkCandidateForMatch(this, mainSegment, candidateSegment, lineMatch);
                 }
