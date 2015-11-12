@@ -13,4 +13,75 @@ public class SegmentMatch {
         midPointDistance = midDistance;
         this.dotProduct = dotProduct;
     }
+    public static void checkCandidateForMatch(LineComparison comparison, final LineSegment segment1, final LineSegment segment2, LineComparison.LineMatch lineMatch) {
+        //take the dot product
+        final double dotProduct = (segment1.vectorX * segment2.vectorX + segment1.vectorY * segment2.vectorY) / (segment1.vectorMagnitude * segment2.vectorMagnitude);
+
+        //find the intersection of the orthogonal vector with the candidate segment
+        final double vecA, vecB, vecC, vecD, xInt, yInt;
+        if(segment1.vectorY == 0.0) { //i.e. segment1 is purely east-west
+            xInt = segment1.midPointX;
+            if(segment2.vectorY == 0.0) { //case where both are parallel
+                yInt = segment2.midPointY;
+            } else {
+                vecB = segment2.vectorY / segment2.vectorX;
+                vecD = segment2.midPointY - vecB * segment2.midPointX;
+                yInt = xInt * vecB + vecD;
+            }
+        } else if(segment1.vectorX == 0.0) { //i.e. segment1 is purely north-south
+            yInt = segment1.midPointY;
+            if (segment2.vectorX == 0.0) { //case where both are parallel
+                xInt = segment2.midPointX;
+            } else {
+                vecB = segment2.vectorY / segment2.vectorX;
+                vecD = segment2.midPointY - vecB * segment2.midPointX;
+                xInt = (yInt - vecD) / vecB;
+            }
+        } else if(segment2.vectorY == 0.0) { //segment2 is east-west
+            yInt = segment2.midPointY;
+            if(segment1.vectorY == 0.0) {
+                xInt = segment1.midPointX;
+            } else {
+                vecA = segment1.orthogonalVectorY / segment1.orthogonalVectorX;
+                vecC = segment1.midPointY - vecA * segment1.midPointX;
+                xInt = (yInt - vecA) / vecC;
+            }
+        } else if(segment2.vectorX == 0.0) { //segment2 is north-south
+            xInt = segment2.midPointX;
+            if(segment1.vectorX == 0.0) {
+                yInt = segment2.midPointY;
+            } else {
+                vecA = segment1.orthogonalVectorY / segment1.orthogonalVectorX;
+                vecC = segment1.midPointY - vecA * segment1.midPointX;
+                yInt = xInt * vecA + vecC;
+            }
+        } else {
+            vecA = segment1.orthogonalVectorY / segment1.orthogonalVectorX;
+            vecB = segment2.vectorY / segment2.vectorX;
+            vecC = segment1.midPointY - vecA * segment1.midPointX;
+            vecD = segment2.midPointY - vecB * segment2.midPointX;
+            xInt = (vecD - vecC) / (vecA - vecB);
+            yInt = xInt * vecA + vecC;
+        }
+
+        final double latitudeFactor = Math.cos(segment1.midPointY * Math.PI / 180.0);
+        final double oDiffX = (xInt - segment1.midPointX) * latitudeFactor, oDiffY = yInt - segment1.midPointY, mDiffX = (segment2.midPointX - segment1.midPointX) * latitudeFactor, mDiffY = (segment2.midPointY - segment1.midPointY);
+        final double orthogonalDistance = Math.sqrt(oDiffX * oDiffX + oDiffY * oDiffY) * LineSegment.DEGREE_DISTANCE_AT_EQUATOR;
+        final double midPointDistance = Math.sqrt(mDiffX * mDiffX+ mDiffY * mDiffY) * LineSegment.DEGREE_DISTANCE_AT_EQUATOR;
+
+        /*if(segment2.parentSegments.line.osm_id == 263557332){
+            //System.out.println("[" + vectorX + "," + vectorY + "]...A:" + vecA + ", B:" + vecB + ", C:" + vecC + ", D:" + vecD + "::: point:(" + midPointX + "," + midPointY + "/" + ((vecA * midPointX + vecC) + ")"));
+            System.out.println("DP MATCH: " + segment2.parentSegments.line.getTag("name") + ": " + dotProduct + ", dist: (" + oDiffX + "," + oDiffY + ") " + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
+        }*/
+
+        //if the segments meet the threshold requirements, store the match in a SegmentMatch object
+        if(Math.abs(dotProduct) >= comparison.options.getMinSegmentDotProduct() && orthogonalDistance <= comparison.options.maxSegmentOrthogonalDistance && midPointDistance <= comparison.options.maxSegmentMidPointDistance) {
+            //System.out.println("DP MATCH: " + dotProduct + ", dist:" + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
+            //System.out.println("DP MATCH: " + segment2.parentSegments.line.getTag("name") + ": " + dotProduct + ", dist:" + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
+            final SegmentMatch match = new SegmentMatch(segment1, segment2, orthogonalDistance, midPointDistance, dotProduct);
+            segment1.matchingSegments.add(match);
+            segment2.matchingSegments.add(match);
+            lineMatch.addMatch(match);
+        }
+    }
 }

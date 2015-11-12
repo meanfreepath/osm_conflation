@@ -13,6 +13,7 @@ public class LineComparison {
     public final WaySegments mainWaySegments;
     public HashMap<Long, WaySegments> allCandidateSegments;
     public final List<OSMWay> candidateLines;
+    public final ComparisonOptions options;
     public final boolean debug;
 
     public class LineMatch {
@@ -29,21 +30,24 @@ public class LineComparison {
     }
 
     public static class ComparisonOptions {
-        public double maxSegmentDistance, maxSegmentAngle;
-
-        public ComparisonOptions() {
-
+        public double maxSegmentLength = 5.0, maxSegmentOrthogonalDistance = 10.0, maxSegmentMidPointDistance = 20.0;
+        private double minSegmentDotProduct;
+        public void setMaxSegmentAngle(final double angle) {
+            minSegmentDotProduct = Math.cos(angle);
+        }
+        public double getMinSegmentDotProduct() {
+            return minSegmentDotProduct;
         }
     }
 
-    public LineComparison(final OSMWay line, final List<OSMWay> candidates, boolean debug) {
+    public LineComparison(final OSMWay line, final List<OSMWay> candidates, ComparisonOptions options, boolean debug) {
         this.debug = debug;
         mainWaySegments = new WaySegments(line, debug);
         candidateLines = candidates;
+        this.options = options;
     }
 
-    public void matchLines(ComparisonOptions options, OSMRelation relation) {
-
+    public void matchLines(OSMRelation relation) {
         //first compile a list of OSM ways whose bounding boxes intersect *each segment* of the main line
         allCandidateSegments = new HashMap<>(candidateLines.size());
         for(final LineSegment mainLineSegment : mainWaySegments.segments) {
@@ -65,7 +69,7 @@ public class LineComparison {
             }
         }
 
-        //now that we have a rough idea of the candidate ways for each segment, check
+        //now that we have a rough idea of the candidate ways for each segment, run detailed checks on their segments' distance and dot product
         int i = 0;
         final Map<Long, LineMatch> wayMatches = new HashMap<>(candidateLines.size());
         for(final LineSegment mainSegment :  mainWaySegments.segments) {
@@ -79,7 +83,7 @@ public class LineComparison {
                 }
                 System.out.println("segment #" + i + ": " + candidateLine.line.osm_id + ":: " + candidateLine.line.getTag("highway") + ":" + candidateLine.line.getTag("name") + "(" + candidateLine.segments.size() + " seg)");
                 for(final LineSegment candidateSegment : candidateLine.segments) {
-                    mainSegment.checkCandidateForMatch(candidateSegment, lineMatch);
+                    SegmentMatch.checkCandidateForMatch(this, mainSegment, candidateSegment, lineMatch);
                 }
             }
             i++;
