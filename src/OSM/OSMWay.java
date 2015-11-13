@@ -27,8 +27,20 @@ public class OSMWay extends OSMEntity {
     public OSMWay(long id) {
         super(id);
     }
-
-    public void addNode(OSMNode node) {
+    
+    /**
+     * Inserts a node at the given index
+     * @param node
+     * @param index
+     */
+    public void insertNode(OSMNode node, int index) {
+        nodes.add(index, node);
+    }
+    /**
+     * Appends a node to the end of the way
+     * @param node
+     */
+    public void appendNode(OSMNode node) {
         nodes.add(node);
         boundingBox = null; //invalidate the bounding box
     }

@@ -176,7 +176,7 @@ public class OSMEntitySpace {
                         long nodeId = Long.parseLong(attributes.getValue(keyRef));
                         OSMNode wayNode = allNodes.get(nodeId);
                         final OSMWay curWayToAdd = (OSMWay) entityStack.peek();
-                        curWayToAdd.addNode(wayNode);
+                        curWayToAdd.appendNode(wayNode);
                         break;
                     case tagRelationMember:
                         final OSMRelation relationToAdd = (OSMRelation) entityStack.peek();

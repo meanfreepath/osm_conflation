@@ -62,7 +62,7 @@ public class OverpassConverter {
                     for(int nodeIdx=0;nodeIdx<wayNodes.length();nodeIdx++) {
                         long nodeId = wayNodes.getLong(nodeIdx);
                         curNode = entitySpace.allNodes.get(nodeId);
-                        way.addNode(curNode);
+                        way.appendNode(curNode);
                     }
                     entitySpace.addEntity(way, OSMEntitySpace.EntityMergeStrategy.overwrite, null);
                 } else if(elementType.equals(OSMEntity.OSMType.relation.name())) {
