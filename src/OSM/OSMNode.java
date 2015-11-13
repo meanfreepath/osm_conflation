@@ -14,6 +14,7 @@ public class OSMNode extends OSMEntity {
             BASE_XML_TAG_FORMAT_CLOSE = " </node>\n";
     private final static OSMType type = OSMType.node;
     private double lat, lon;
+    private Point coordinate;
 
     public static OSMNode create() {
         return new OSMNode(acquire_new_id());
@@ -22,12 +23,14 @@ public class OSMNode extends OSMEntity {
         OSMNode node = new OSMNode(acquire_new_id());
         node.lat = point.latitude;
         node.lon = point.longitude;
+        node.coordinate = point;
         return node;
     }
     public static OSMNode create(double latitude, double longitude) {
         OSMNode node = new OSMNode(acquire_new_id());
         node.lat = latitude;
         node.lon = longitude;
+        node.coordinate = new Point(latitude, longitude);
         return node;
     }
     public OSMNode(long id) {
@@ -51,11 +54,13 @@ public class OSMNode extends OSMEntity {
     public void setCoordinate(double lat, double lon) {
         this.lat = lat;
         this.lon = lon;
+        coordinate = new Point(lat, lon);
         boundingBox = null; //invalidate the bounding box
     }
     public void setCoordinate(Point coordinate) {
         this.lat = coordinate.latitude;
         this.lon = coordinate.longitude;
+        this.coordinate = coordinate;
         boundingBox = null; //invalidate the bounding box
     }
 
@@ -74,7 +79,7 @@ public class OSMNode extends OSMEntity {
 
     @Override
     public Point getCentroid() {
-        return new Point(lat, lon);
+        return coordinate;
     }
 
     @Override
