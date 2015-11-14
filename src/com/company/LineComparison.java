@@ -96,7 +96,7 @@ public class LineComparison {
 
     public LineComparison(final OSMWay line, final List<OSMWay> candidates, ComparisonOptions options, boolean debug) {
         this.debug = debug;
-        mainWaySegments = new WaySegments(line, debug);
+        mainWaySegments = new WaySegments(line, options.maxSegmentLength, debug);
         candidateLines = candidates;
         this.options = options;
 
@@ -114,7 +114,7 @@ public class LineComparison {
                 if(Region.intersects(mainBoundingBox, candidateLine.getBoundingBox().regionInset(latitudeDelta, longitudeDelta))) {
                     final WaySegments candidateSegments;
                     if(!allCandidateSegments.containsKey(candidateLine.osm_id)) {
-                        candidateSegments = new WaySegments(candidateLine, debug);
+                        candidateSegments = new WaySegments(candidateLine, options.maxSegmentLength, debug);
                         allCandidateSegments.put(candidateLine.osm_id, candidateSegments);
                     } else {
                         candidateSegments = allCandidateSegments.get(candidateLine.osm_id);
@@ -145,33 +145,10 @@ public class LineComparison {
             i++;
         }
 
-        int segMatchCount;
+        //consolidate the segment match data for each matching line
         for(final LineMatch match : matchingLines.values()) {
             match.summarize();
-            segMatchCount = match.matchingSegments.size();
-
-            if(segMatchCount > 0) {
-                //System.out.println(match.line.line.osm_id + "/" + match.line.line.getTag("name") + ": " + segMatchCount + " match: " + 0.1 * Math.round(10.0 * avgDistance) + "/" + (0.01 * Math.round(100.0 * avgDotProduct)));
-                if(segMatchCount > 4 && match.getAvgDistance() < 8.0 && match.getAvgDotProduct() > 0.9) {
-                    relation.addMember(match.line.line, "");
-                }
-            }
         }
-
-        HashMap<Long, OSMWay> condensedWays = new HashMap<>(64);
-        /*for(final LineSegment seg : mainWaySegments.segments) {
-            for(final SegmentMatch matchingSeg : seg.matchingOSMSegments.values()) {
-                condensedWays.put(matchingSeg.matchingSegment.parentSegments.line.osm_id, matchingSeg.matchingSegment.parentSegments.line);
-            }
-            /*if(seg.bestMatch != null) {
-            //    condensedWays.put(seg.bestMatch.matchingSegment.parentSegments.line.osm_id, seg.bestMatch.matchingSegment.parentSegments.line);
-            }*
-        }
-        for(OSMWay way : condensedWays.values()) {
-            //System.out.println("match: " + way.getTag("name"));
-            relation.addMember(way, "");
-        }*/
-
 
         //now that each segment has been matched (or not), we need to compile the data
 

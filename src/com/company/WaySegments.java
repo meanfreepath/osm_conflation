@@ -17,7 +17,7 @@ public class WaySegments {
     public final List<LineSegment> segments;
     private final boolean debug;
 
-    public WaySegments(final OSMWay line, boolean debug) {
+    public WaySegments(final OSMWay line, final double maxSegmentLength, boolean debug) {
         this.line = line;
         this.debug = debug;
 
@@ -35,11 +35,11 @@ public class WaySegments {
             final double segmentLength = Point.distance(originNode.getCentroid(),destinationNode.getCentroid());
 
             //if less than the length threshold, add as a segment
-            if (segmentLength < LineSegment.MAX_SEGMENT_LENGTH) {
+            if (segmentLength < maxSegmentLength) {
                 final LineSegment segment = new LineSegment(this, originNode.getCentroid(), destinationNode.getCentroid(), originNode, destinationNode, segmentIndex++, nodeIndex);
                 segments.add(segment);
             } else { //otherwise, split into a number of segments, each equal to or shorter than the maximum segment length
-                final int segmentsToAdd = (int) Math.ceil(segmentLength / LineSegment.MAX_SEGMENT_LENGTH);
+                final int segmentsToAdd = (int) Math.ceil(segmentLength / maxSegmentLength);
                 OSMNode miniOriginNode = originNode;
                 Point miniOrigin = originNode.getCentroid(), miniDestination;
                 double destinationLat, destinationLon;

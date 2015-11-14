@@ -11,7 +11,6 @@ import java.util.List;
  * Created by nick on 11/9/15.
  */
 public class LineSegment {
-    public static double MAX_SEGMENT_LENGTH = 10.0;
     public Point originPoint, destinationPoint;
     public OSMNode originNode, destinationNode;
     public final WaySegments parentSegments;
