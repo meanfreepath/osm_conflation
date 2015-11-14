@@ -1,11 +1,16 @@
 package com.company;
 
+import OSM.Point;
+
 /**
  * Created by nick on 11/9/15.
  */
 public class SegmentMatch {
-    final double orthogonalDistance, midPointDistance, dotProduct;
-    final LineSegment mainSegment, matchingSegment;
+    public final double orthogonalDistance, midPointDistance, dotProduct;
+    public final LineSegment mainSegment, matchingSegment;
+    public boolean consolidated = false;
+    public int consolidatedMatches = 0;
+
     public SegmentMatch(LineSegment segment1, LineSegment segment2, double orthDistance, double midDistance, double dotProduct) {
         mainSegment = segment1;
         matchingSegment = segment2;
@@ -39,21 +44,21 @@ public class SegmentMatch {
             }
         } else if(segment2.vectorY == 0.0) { //segment2 is east-west
             yInt = segment2.midPointY;
-            if(segment1.vectorY == 0.0) {
-                xInt = segment1.midPointX;
-            } else {
+            if(segment1.vectorY != 0.0) {
                 vecA = segment1.orthogonalVectorY / segment1.orthogonalVectorX;
                 vecC = segment1.midPointY - vecA * segment1.midPointX;
                 xInt = (yInt - vecA) / vecC;
+            } else {
+                xInt = segment1.midPointX;
             }
         } else if(segment2.vectorX == 0.0) { //segment2 is north-south
             xInt = segment2.midPointX;
-            if(segment1.vectorX == 0.0) {
-                yInt = segment2.midPointY;
-            } else {
+            if(segment1.vectorX != 0.0) {
                 vecA = segment1.orthogonalVectorY / segment1.orthogonalVectorX;
                 vecC = segment1.midPointY - vecA * segment1.midPointX;
                 yInt = xInt * vecA + vecC;
+            } else {
+                yInt = segment2.midPointY;
             }
         } else {
             vecA = segment1.orthogonalVectorY / segment1.orthogonalVectorX;
@@ -66,8 +71,8 @@ public class SegmentMatch {
 
         final double latitudeFactor = Math.cos(segment1.midPointY * Math.PI / 180.0);
         final double oDiffX = (xInt - segment1.midPointX) * latitudeFactor, oDiffY = yInt - segment1.midPointY, mDiffX = (segment2.midPointX - segment1.midPointX) * latitudeFactor, mDiffY = (segment2.midPointY - segment1.midPointY);
-        final double orthogonalDistance = Math.sqrt(oDiffX * oDiffX + oDiffY * oDiffY) * LineSegment.DEGREE_DISTANCE_AT_EQUATOR;
-        final double midPointDistance = Math.sqrt(mDiffX * mDiffX+ mDiffY * mDiffY) * LineSegment.DEGREE_DISTANCE_AT_EQUATOR;
+        final double orthogonalDistance = Point.distance(oDiffY, oDiffX);
+        final double midPointDistance = Point.distance(mDiffY, mDiffX);
 
         /*if(segment2.parentSegments.line.osm_id == 263557332){
             //System.out.println("[" + vectorX + "," + vectorY + "]...A:" + vecA + ", B:" + vecB + ", C:" + vecC + ", D:" + vecD + "::: point:(" + midPointX + "," + midPointY + "/" + ((vecA * midPointX + vecC) + ")"));
