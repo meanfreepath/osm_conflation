@@ -61,12 +61,30 @@ public class Main {
 
                     //Break the candidate ways into LineSegments and match their geometries to the main route line
                     LineComparison.ComparisonOptions options = new LineComparison.ComparisonOptions();
-                    options.maxSegmentLength = 5.0;
+                    options.maxSegmentLength = 10.0;
                     options.setMaxSegmentAngle(10.0);
-                    options.maxSegmentOrthogonalDistance = LineSegment.MAX_SEGMENT_LENGTH;
-                    options.maxSegmentMidPointDistance = 2.0 * LineSegment.MAX_SEGMENT_LENGTH;
+                    options.maxSegmentOrthogonalDistance = options.maxSegmentLength;
+                    options.maxSegmentMidPointDistance = 2.0 * options.maxSegmentLength;
                     LineComparison comparison = new LineComparison(routePath, new ArrayList<>(converter.getEntitySpace().allWays.values()), options, debugEnabled);
                     comparison.matchLines(relation);
+
+                    //DEBUG: add all the matching lines to the relation
+                    int segMatchCount;
+                    for(final LineComparison.LineMatch match : comparison.matchingLines.values()) {
+                        segMatchCount = match.matchingSegments.size();
+                        if(segMatchCount > 0) {
+                            //System.out.println(match.line.line.osm_id + "/" + match.line.line.getTag("name") + ": " + segMatchCount + " match: " + 0.1 * Math.round(10.0 * avgDistance) + "/" + (0.01 * Math.round(100.0 * avgDotProduct)));
+                            if(segMatchCount > 2 && match.getAvgDistance() < 8.0 && match.getAvgDotProduct() > 0.9) {
+                                relation.addMember(match.line.line, "");
+                            }
+                        }
+                    }
+
+
+                    //TODO: run additional checks to ensure the matches are contiguous
+
+
+                    //TODO: split ways that only partially overlap the main way
 
 
                     //also, match the stops in the relation to their nearest matching way
