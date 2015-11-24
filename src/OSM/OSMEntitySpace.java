@@ -112,6 +112,24 @@ public class OSMEntitySpace {
     }
 
     /**
+     * Generates the mapping between nodes and their containing ways, in preparation for
+     * checking way intersections etc.
+     * @param clearPrevious - whether to wipe the nodes' previous containingWays value
+     */
+    public void generateWayNodeMapping(final boolean clearPrevious) {
+        if(clearPrevious) {
+            for(final OSMNode node : allNodes.values()) {
+                node.resetContainingWays();
+            }
+        }
+
+        for(final OSMWay way : allWays.values()) {
+            for(final OSMNode containedNode : way.getNodes()) {
+                containedNode.addContainingWay(way);
+            }
+        }
+    }
+    /**
      * Parses an OSM XML file into entity objects
      * @param fileName
      * @throws IOException

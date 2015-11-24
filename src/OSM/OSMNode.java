@@ -1,6 +1,8 @@
 package OSM;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * Created by nick on 10/15/15.
@@ -15,6 +17,8 @@ public class OSMNode extends OSMEntity {
     private final static OSMType type = OSMType.node;
     private double lat, lon;
     private Point coordinate;
+    public HashMap<Long, OSMWay> containingWays = null;
+    public short containingWayCount = -1;
 
     public static OSMNode create() {
         return new OSMNode(acquire_new_id());
@@ -32,6 +36,29 @@ public class OSMNode extends OSMEntity {
         node.lon = longitude;
         node.coordinate = new Point(latitude, longitude);
         return node;
+    }
+
+    /**
+     * Resets this node's containing way map
+     */
+    public void resetContainingWays() {
+        containingWays = null;
+        containingWayCount = 0;
+    }
+    /**
+     * Adds the given way to this node's containingWays array
+     * @param way
+     */
+    public void addContainingWay(final OSMWay way) {
+        if(containingWays == null) {
+            containingWays = new HashMap<>(4);
+            containingWayCount = 0;
+        }
+        if(!containingWays.containsKey(way.osm_id)) {
+            containingWays.put(way.osm_id, way);
+            containingWayCount++;
+            setTag("icount", Short.toString(containingWayCount));
+        }
     }
     public OSMNode(long id) {
         super(id);

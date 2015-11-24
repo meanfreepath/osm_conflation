@@ -30,7 +30,7 @@ public class Main {
                     List<OSMRelation.OSMRelationMember> members = relation.getMembers("");
                     OSMWay routePath = (OSMWay) members.get(0).member;
                     if(routePath.osm_id != -600) {
-                        continue;
+                        //continue;
                     }
                     //fetch all possible useful ways that intersect the route's bounding box
                     converter.fetchFromOverpass(routePath, "[\"highway\"~\"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|service|living_street\"]", 0.0004);
@@ -188,8 +188,7 @@ public class Main {
                     }
 
                     //update the primary entity space to determine all connecting ways
-                    //converter.getEntitySpace().determineIntersectingWays();
-                    converter.getEntitySpace().generateWayNodeMapping();
+                    converter.getEntitySpace().generateWayNodeMapping(false);
 
                     //now find the optimal path from the first stop to the last stop, using the provided ways
                     System.out.println("FIND PATHS");
