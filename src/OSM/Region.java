@@ -3,7 +3,7 @@ package OSM;
 /**
  * Created by nick on 10/29/15.
  */
-public class Region {
+public class Region implements Cloneable {
     public final Point origin, extent;
 
     public static boolean intersects(Region region1, Region region2) {
@@ -106,5 +106,9 @@ public class Region {
         centroid.latitude /= (6.0*signedArea);
 
         return centroid;
+    }
+    @Override
+    public Region clone() {
+        return new Region(origin.latitude, origin.longitude, extent.latitude - origin.latitude, extent.longitude - origin.longitude);
     }
 }
