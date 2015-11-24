@@ -1,9 +1,6 @@
 package OSM;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 /**
  * Created by nick on 10/15/15.
@@ -20,6 +17,7 @@ public class OSMWay extends OSMEntity {
     private final static int INITIAL_CAPACITY_NODE = 32;
 
     private final List<OSMNode> nodes = new ArrayList<>(INITIAL_CAPACITY_NODE);
+    private OSMNode firstNode = null, lastNode = null;
 
     public static OSMWay create() {
         return new OSMWay(acquire_new_id());
@@ -27,29 +25,50 @@ public class OSMWay extends OSMEntity {
     public OSMWay(long id) {
         super(id);
     }
-    
+
     /**
      * Inserts a node at the given index
      * @param node
      * @param index
      */
-    public void insertNode(OSMNode node, int index) {
+    public void insertNode(final OSMNode node, final int index) {
+        if(index == 0) {
+            firstNode = node;
+        }
+        if(index == nodes.size() - 1) {
+            lastNode = node;
+        }
         nodes.add(index, node);
+
+        boundingBox = null; //invalidate the bounding box
     }
     /**
      * Appends a node to the end of the way
      * @param node
      */
-    public void appendNode(OSMNode node) {
+    public void appendNode(final OSMNode node) {
+        if(nodes.size() == 0) {
+            firstNode = node;
+        }
+        lastNode = node;
         nodes.add(node);
         boundingBox = null; //invalidate the bounding box
     }
     public List<OSMNode> getNodes() {
         return nodes;
     }
+    public OSMNode getFirstNode() {
+        return firstNode;
+    }
+    public OSMNode getLastNode() {
+        return lastNode;
+    }
 
     public void reverseNodes() {
+        final OSMNode lastLastNode = lastNode;
         Collections.reverse(nodes);
+        firstNode = lastNode;
+        lastNode = lastLastNode;
     }
 
     @Override
