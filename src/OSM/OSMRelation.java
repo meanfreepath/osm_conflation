@@ -100,7 +100,31 @@ public class OSMRelation extends OSMEntity {
             }
         }
     }
-    public void addMember(OSMEntity member, String role) {
+    public void clearMembers() {
+        members.clear();
+    }
+
+    /**
+     * Removes the given member from this relation
+     * @param member
+     * @return TRUE if removed, FALSE if not found in relation
+     */
+    public boolean removeMember(final OSMEntity member) {
+        OSMRelationMember relationMemberToRemove = null;
+        for(final OSMRelationMember containedMember : members) {
+            if(member == containedMember.member) {
+                relationMemberToRemove = containedMember;
+                break;
+            }
+        }
+
+        if(relationMemberToRemove != null) {
+            members.remove(relationMemberToRemove);
+            return true;
+        }
+        return false;
+    }
+    public void addMember(final OSMEntity member, final String role) {
         members.add(new OSMRelationMember(member, role));
     }
     public List<OSMRelationMember> getMembers() {
