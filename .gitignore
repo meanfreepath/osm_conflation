@@ -1,3 +1,5 @@
 /out
 .idea
 .DS_Store
+cache*.txt
+*.osm
