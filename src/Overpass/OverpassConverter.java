@@ -18,13 +18,13 @@ public class OverpassConverter {
     public OSMEntitySpace getEntitySpace() {
         return entitySpace;
     }
-    public void fetchFromOverpass(OSMEntity entity, String overpassTagQuery, double boundingBoxPadding) throws InvalidArgumentException {
+    public void fetchFromOverpass(final Region boundingBox, final String overpassTagQuery, final double boundingBoxPadding) throws InvalidArgumentException {
         HashMap<String, String> apiConfig = new HashMap<>(1);
         apiConfig.put("debug", "1");
         ApiClient overpassClient = new ApiClient(null, apiConfig);
         try {
-            Region boundingBox = entity.getBoundingBox().regionInset(-boundingBoxPadding, -boundingBoxPadding);
-            String query = String.format(WAY_QUERY_FORMAT, overpassTagQuery, boundingBox.origin.latitude, boundingBox.origin.longitude, boundingBox.extent.latitude, boundingBox.extent.longitude);
+            final Region expandedBoundingBox = boundingBox.regionInset(-boundingBoxPadding, -boundingBoxPadding);
+            String query = String.format(WAY_QUERY_FORMAT, overpassTagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude);
 
             JSONArray elements = overpassClient.get(query, false);
             final int elementLength = elements.length();
