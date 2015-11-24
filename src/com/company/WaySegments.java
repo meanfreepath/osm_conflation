@@ -15,11 +15,13 @@ import java.util.List;
 public class WaySegments {
     public final OSMWay line;
     public final List<LineSegment> segments;
+    public final LineMatch matchObject;
     private final boolean debug;
 
     public WaySegments(final OSMWay line, final double maxSegmentLength, boolean debug) {
         this.line = line;
         this.debug = debug;
+        matchObject = new LineMatch(this);
 
         //generate a list of line segments out of this line
         segments = new ArrayList<>(line.getNodes().size() - 1); //TODO base on total line length, to handle the newly
@@ -77,6 +79,7 @@ public class WaySegments {
     public void insertNode(final OSMNode node, final LineSegment onSegment) {
         //create a new segment starting from the node, and ending at onSegment's destination Point
         final LineSegment insertedSegment = new LineSegment(this, node.getCentroid(), onSegment.destinationPoint, node, onSegment.destinationNode, onSegment.segmentIndex + 1, onSegment.nodeIndex + 1);
+        insertedSegment.copyMatches(onSegment);
 
         //and truncate onSegment to the new node's position
         onSegment.destinationPoint = node.getCentroid();

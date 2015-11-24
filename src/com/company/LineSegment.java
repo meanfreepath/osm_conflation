@@ -20,8 +20,9 @@ public class LineSegment {
      */
     public int nodeIndex;
     public int segmentIndex;
-    public final List<WaySegments> candidateSegments = new ArrayList<>(1024);
-    public final List<SegmentMatch> matchingSegments = new ArrayList<>(512);
+    public final List<WaySegments> candidateWaySegments = new ArrayList<>(16);
+    public final List<SegmentMatch> matchingSegments = new ArrayList<>(16);
+    public SegmentMatch bestMatch = null;
     public final double vectorX, vectorY, orthogonalVectorX, orthogonalVectorY, midPointX, midPointY;
     public final double vectorMagnitude;
 
@@ -50,6 +51,19 @@ public class LineSegment {
     }
     public double getLength() {
         return Point.distance(vectorY, vectorX);
+    }
+
+    public void chooseBestMatch() {
+        for(final SegmentMatch match : matchingSegments) {
+            if(bestMatch == null || Math.abs(match.dotProduct) >= Math.abs(bestMatch.dotProduct) && match.orthogonalDistance < bestMatch.orthogonalDistance) {
+                bestMatch = match;
+            }
+        }
+    }
+    public void copyMatches(final LineSegment fromSegment) {
+        //TODO: may be more accurate to rematch rather than copy
+        matchingSegments.addAll(fromSegment.matchingSegments);
+        bestMatch = fromSegment.bestMatch;
     }
 
     /**
