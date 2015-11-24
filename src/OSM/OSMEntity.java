@@ -43,7 +43,26 @@ public abstract class OSMEntity {
     public OSMEntity(final long id) {
         osm_id = id;
     }
-    public void addTag(String name, String value) throws InvalidArgumentException {
+
+    /**
+     * Copy the value of the given tag (if present) between entities
+     * @param from
+     * @param to
+     * @param name
+     */
+    public static void copyTag(final OSMEntity from, final OSMEntity to, final String name) {
+        final String fromValue = from.getTag(name);
+        if(fromValue != null) {
+            to.setTag(name, fromValue);
+        }
+    }
+    /**
+     * Sets the given tag on this entity, only if it doesn't already exist
+     * @param name
+     * @param value
+     * @throws InvalidArgumentException
+     */
+    public void addTag(final String name, final String value) throws InvalidArgumentException {
         if(tags == null) {
             tags = new HashMap<>();
         }
@@ -54,6 +73,12 @@ public abstract class OSMEntity {
         }
         tags.put(name, value.trim());
     }
+
+    /**
+     * Sets the given tag on this entity, replacing the previous value (if present)
+     * @param name
+     * @param value
+     */
     public void setTag(final String name, final String value) {
         if(tags == null) {
             tags = new HashMap<>();
