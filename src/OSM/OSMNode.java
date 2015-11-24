@@ -1,8 +1,6 @@
 package OSM;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
 /**
  * Created by nick on 10/15/15.
