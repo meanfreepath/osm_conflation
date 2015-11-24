@@ -27,4 +27,8 @@ public class Point {
     public static double distance(double deltaLatitude, double deltaLongitude) {
         return Math.sqrt(deltaLatitude * deltaLatitude + deltaLongitude * deltaLongitude) * DEGREE_DISTANCE_AT_EQUATOR;
     }
+    @Override
+    public String toString() {
+        return "Point[" + latitude + "," + longitude + "]";
+    }
 }
