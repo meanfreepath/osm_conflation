@@ -1,8 +1,8 @@
 package com.company;
 
-import OSM.OSMNode;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 /**
  * Created by nick on 11/10/15.
@@ -12,16 +12,18 @@ public class PathTree {
 
     public void findPaths(List<StopWayMatch> stops, HashMap<Long, WaySegments> availableLines) {
         //first find the point on the nearest way closest to the toNode and fromNode
-        final OSMNode firstStop = stops.get(0).stopPositionNode;
-        final WaySegments firstLine = stops.get(0).candidateSegment.parentSegments;
+        final StopWayMatch firstStop = stops.size() > 0 ? stops.get(0) : null;
 
-        //create the initial path segment from the way closest to the first stop
+
+        //create the initial path segment
         final PathSegment startPathSegment;
-        if(firstStop != null) {
-            startPathSegment = new PathSegment(null, firstLine, firstStop);
-        } else {
-            startPathSegment = new PathSegment(null, firstLine, null); //the path will figure out the originating node in this case
+        if(firstStop != null && firstStop.bestMatch != null) { //if a stop match is present, use the way closest to the first stop
+            startPathSegment = new PathSegment(null, firstStop.bestMatch.candidateSegment.parentSegments, firstStop.stopPositionNode);
+        } else { //otherwise, use the way closest to the start of the main route path line
+            //startPathSegment = new PathSegment(null, firstLine, null); //the path will figure out the originating node in this case
+            startPathSegment = null; //TODO
         }
+
         startPathSegment.process(availableLines, 0);
 
         //with all the path segments generated, connect them together into unique paths

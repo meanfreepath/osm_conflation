@@ -5,7 +5,8 @@ import OSM.OSMWay;
 import OSM.Point;
 import OSM.Region;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
 
 /**
  * Created by nick on 11/3/15.

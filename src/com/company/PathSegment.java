@@ -4,7 +4,10 @@ import OSM.OSMEntity;
 import OSM.OSMNode;
 import OSM.OSMWay;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ListIterator;
 
 /**
  * Created by nick on 11/10/15.
@@ -147,10 +150,12 @@ public class PathSegment {
                 //System.out.println(debugBuffer + depth + ": Skipping originating node " + containedNode.osm_id);
                 continue;
             }
+
+            //if the node is contained within 2+ ways, it's an intersection node
             if(containedNode.containingWayCount > 1) {
                 for(final OSMWay containingWay : containedNode.containingWays.values()) {
                     //add to the array if not the same as this line, and not the parent's line (i.e. no U-turns)
-                    if(containingWay.osm_id != line.line.osm_id && (parentPathSegment == null || containingWay.osm_id != parentPathSegment.line.line.osm_id)) {
+                    if(containingWay.osm_id != line.line.osm_id){// && (parentPathSegment == null || containingWay.osm_id != parentPathSegment.line.line.osm_id)) {
                         //NOTE: the intersecting way may not be part of the availableLines array if it's too far from the route's path.  This is normal
                         final WaySegments matchedLine = availableLines.get(containingWay.osm_id);
                         if(matchedLine != null) {

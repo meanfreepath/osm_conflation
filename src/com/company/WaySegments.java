@@ -73,16 +73,39 @@ public class WaySegments {
     /**
      * Inserts a node on the given segment, splitting it into two segments
      * NOTE: does not check if node lies on onSegment!
-     * @param node
-     * @param onSegment
+     * @param node The node to add
+     * @param onSegment The segment to add the node to
+     * @param tolerance The distance tolerance: if node is closer to an existing node than this distance, it's merged
+     * @return If an existing node is within the tolerance distance, that node, otherwise the input node
      */
-    public void insertNode(final OSMNode node, final LineSegment onSegment) {
+    public OSMNode insertNode(final OSMNode node, final LineSegment onSegment, final double tolerance) {
+        final Point nodePoint = node.getCentroid();
+
+        //if a tolerance is provided, check if the input node needs to be added or merged
+        if(tolerance > 0.0) {
+            double closestNodeDistance = Double.MAX_VALUE, curDistance;
+            OSMNode closestNode = null;
+
+            for(final OSMNode existingNode : line.getNodes()) {
+                curDistance = Point.distance(nodePoint, existingNode.getCentroid());
+                if(curDistance <= closestNodeDistance) {
+                    closestNodeDistance = curDistance;
+                    closestNode = existingNode;
+                }
+            }
+
+            //if the node is within the tolerance distance of an existing node, return that node
+            if(closestNode != null && closestNodeDistance <= tolerance) {
+                return closestNode;
+            }
+        }
+
         //create a new segment starting from the node, and ending at onSegment's destination Point
-        final LineSegment insertedSegment = new LineSegment(this, node.getCentroid(), onSegment.destinationPoint, node, onSegment.destinationNode, onSegment.segmentIndex + 1, onSegment.nodeIndex + 1);
+        final LineSegment insertedSegment = new LineSegment(this, nodePoint, onSegment.destinationPoint, node, onSegment.destinationNode, onSegment.segmentIndex + 1, onSegment.nodeIndex + 1);
         insertedSegment.copyMatches(onSegment);
 
         //and truncate onSegment to the new node's position
-        onSegment.destinationPoint = node.getCentroid();
+        onSegment.destinationPoint = nodePoint;
         onSegment.destinationNode = node;
 
         //increment the node index of all following segments
@@ -95,6 +118,8 @@ public class WaySegments {
 
         segments.add(insertedSegment.segmentIndex, insertedSegment);
         line.insertNode(node, insertedSegment.nodeIndex);
+
+        return node;
     }
     /**
      * Appends a node to the current segments list
