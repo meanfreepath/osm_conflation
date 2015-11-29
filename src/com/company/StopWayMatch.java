@@ -11,7 +11,7 @@ import java.util.List;
  * Created by nick on 11/19/15.
  */
 public class StopWayMatch {
-    public final static double maxDistanceFromPlatformToWay = 25.0, stopNodeTolerance = 3.0;
+    public final static double maxDistanceFromPlatformToWay = 25.0, stopNodeTolerance = 3.0, minMatchingSegmentPathDotProduct = 0.9, maxMatchingSegmentPathDistance = 10.0;
     private final static Comparator<WayMatch> comp = new Comparator<WayMatch>() {
         @Override
         public int compare(WayMatch o1, WayMatch o2) {
@@ -23,12 +23,12 @@ public class StopWayMatch {
     }
 
     public class WayMatch {
-        public final LineSegment candidateSegment;
+        public final SegmentMatch candidateSegmentMatch;
         public final MatchType matchType;
         public final double distance;
 
-        public WayMatch(final LineSegment segment, final double distance, final MatchType matchType) {
-            this.candidateSegment = segment;
+        public WayMatch(final SegmentMatch segmentMatch, final double distance, final MatchType matchType) {
+            this.candidateSegmentMatch = segmentMatch;
             this.distance = distance;
             this.matchType = matchType;
         }
@@ -43,8 +43,8 @@ public class StopWayMatch {
     public StopWayMatch(final OSMNode platform) {
         platformNode = platform;
     }
-    public void addWayMatch(final LineSegment segment, final double distance, final MatchType matchType) {
-        matches.add(new WayMatch(segment, distance, matchType));
+    public void addWayMatch(final SegmentMatch segmentMatch, final double distance, final MatchType matchType) {
+        matches.add(new WayMatch(segmentMatch, distance, matchType));
     }
     public void chooseBestMatch() {
         Collections.sort(matches, comp);
