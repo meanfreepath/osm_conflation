@@ -51,6 +51,15 @@ public class Region implements Cloneable {
     }
 
     /**
+     * Check whether the given point is inside this region (inclusive)
+     * @param point
+     * @return
+     */
+    public boolean containsPoint(final Point point) {
+        return !(point.latitude < origin.latitude || point.latitude > extent.latitude || point.longitude < origin.longitude || point.longitude > extent.longitude);
+    }
+
+    /**
      * Returns a region inset by the given amounts.  Negative values will expand
      * @param bufferLat
      * @param bufferLon
