@@ -51,13 +51,13 @@ public class ApiClient {
      * Pass in an Overpass query in Overpass QL
      */
     public JSONArray get(String query, boolean asGeoJSON) throws Exceptions.UnknownOverpassError {
-        String fullQuery = constructQLQuery(query, asGeoJSON);
+        final String fullQuery = constructQLQuery(query, asGeoJSON);
 
         File cacheFile = null;
         if(cachingEnabled) {
             try {
                 final MessageDigest md5 = MessageDigest.getInstance("MD5");
-                final byte[] digest = md5.digest(query.getBytes(Charset.forName("UTF-8")));
+                final byte[] digest = md5.digest(fullQuery.getBytes(Charset.forName("UTF-8")));
                 final String fileName = "./cache_" + Base64.getUrlEncoder().encodeToString(digest) + ".txt";
                 cacheFile = new File(fileName);
                 if (cacheFile.exists()) {

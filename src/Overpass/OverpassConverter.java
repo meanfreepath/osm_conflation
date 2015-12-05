@@ -12,21 +12,32 @@ import java.util.Iterator;
  * Created by nick on 11/5/15.
  */
 public class OverpassConverter {
+    private final static String NODE_QUERY_FORMAT = "(node%s(%.04f,%.04f,%.04f,%.04f);>);";
     private final static String WAY_QUERY_FORMAT = "(way%s(%.04f,%.04f,%.04f,%.04f);>);";
     private OSMEntitySpace entitySpace;
 
     public OSMEntitySpace getEntitySpace() {
         return entitySpace;
     }
-    public void fetchFromOverpass(final Region boundingBox, final String overpassTagQuery, final double boundingBoxPadding) throws InvalidArgumentException {
+    public String queryForBoundingBox(final String tagQuery, final Region boundingBox, final double boundingBoxPadding, final OSMEntity.OSMType entityType) {
+        final Region expandedBoundingBox = boundingBox.regionInset(-boundingBoxPadding, -boundingBoxPadding);
+        switch (entityType) {
+            case node:
+                return String.format(NODE_QUERY_FORMAT, tagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude);
+            case way:
+                return String.format(WAY_QUERY_FORMAT, tagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude);
+            case relation:
+                return null;
+        }
+        return null;
+    }
+    public void fetchFromOverpass(final String query) throws InvalidArgumentException {
         HashMap<String, String> apiConfig = new HashMap<>(1);
         apiConfig.put("debug", "1");
-        ApiClient overpassClient = new ApiClient(null, apiConfig);
+        final ApiClient overpassClient = new ApiClient(null, apiConfig);
         try {
-            final Region expandedBoundingBox = boundingBox.regionInset(-boundingBoxPadding, -boundingBoxPadding);
-            String query = String.format(WAY_QUERY_FORMAT, overpassTagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude);
 
-            JSONArray elements = overpassClient.get(query, false);
+            final JSONArray elements = overpassClient.get(query, false);
             final int elementLength = elements.length();
 
             //init the entity space to contain the fetched OSM data
