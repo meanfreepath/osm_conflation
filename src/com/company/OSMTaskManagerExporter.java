@@ -53,8 +53,8 @@ public class OSMTaskManagerExporter {
             destinationDir += "/";
         }
 
-        //get the bounding box of all the data
-        final Region boundingBox = entitySpace.getBoundingBox();
+        //get the bounding box of all the data (plus a little buffer to ensure everything's contained
+        final Region boundingBox = entitySpace.getBoundingBox().regionInset(-0.0001, -0.0001);
 
         //run a rough calculation of the number of boxes needed
         final int horizontalBoxCount = (int) Math.ceil((boundingBox.origin.longitude - boundingBox.origin.longitude) / DividedBox.BOX_SIZE);

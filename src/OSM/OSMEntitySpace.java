@@ -251,6 +251,21 @@ public class OSMEntitySpace {
     }
 
     /**
+     * Returns the combined bounding box for the entire entity space
+     * @return
+     */
+    public Region getBoundingBox() {
+        Region fileBoundingBox = null;
+        for (OSMEntity entity : allEntities) {
+            if(fileBoundingBox != null) {
+                fileBoundingBox.combinedBoxWithRegion(entity.getBoundingBox());
+            } else {
+                fileBoundingBox = entity.getBoundingBox();
+            }
+        }
+        return fileBoundingBox;
+    }
+    /**
      * Outputs the current entity space into an OSM XML file
      * @param fileName
      * @throws IOException
@@ -267,16 +282,9 @@ public class OSMEntitySpace {
         }
 
         //generate the bounding box for the file
-        Region fileBoundingBox = null;
-        for (OSMEntity entity : allEntities) {
-            if(fileBoundingBox != null) {
-                fileBoundingBox.combinedBoxWithRegion(entity.getBoundingBox());
-            } else {
-                fileBoundingBox = entity.getBoundingBox();
-            }
-        }
+        Region fileBoundingBox = getBoundingBox();
 
-        FileWriter writer = new FileWriter(fileName);
+        final FileWriter writer = new FileWriter(fileName);
         writer.write(XML_DOCUMENT_OPEN);
         if(fileBoundingBox != null) {
             writer.write(String.format(XML_BOUNDING_BOX, fileBoundingBox.origin.latitude, fileBoundingBox.origin.longitude, fileBoundingBox.extent.latitude, fileBoundingBox.extent.longitude));
