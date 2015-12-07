@@ -14,6 +14,7 @@ import java.util.List;
 public class LineComparison {
     public final WaySegments mainWaySegments;
     public final List<OSMWay> candidateWays;
+    public final HashMap<Long, WaySegments> candidateLines;
     public final HashMap<Long, WaySegments> matchingLines;
     public final ComparisonOptions options;
     public final boolean debug;
@@ -35,12 +36,13 @@ public class LineComparison {
         candidateWays = candidates;
         this.options = options;
 
+        candidateLines = new HashMap<>(candidateWays.size());
         matchingLines = new HashMap<>(candidateWays.size() / 2); //rough estimate that ~50% will match a segment bounding box
 
         LineMatch.debug = debug;
     }
 
-    public void matchLines(OSMRelation relation) {
+    public void matchLines() {
         //first compile a list of OSM ways whose bounding boxes intersect *each segment* of the main line
         final double latitudeDelta = -options.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * mainWaySegments.segments.get(0).originPoint.latitude / 180.0);
         for(final LineSegment mainLineSegment : mainWaySegments.segments) {

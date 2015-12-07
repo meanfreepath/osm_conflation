@@ -10,18 +10,29 @@ import java.util.List;
 import java.util.ListIterator;
 
 /**
+ * Represents a possible segment on a route Path.
  * Created by nick on 11/10/15.
  */
 public class PathSegment {
     private final static int INITIAL_CHILD_CAPACITY = 8;
-    public static boolean debug = true;
-    public static int maxDepth = 0, pathsProcessed = 0;
+    private final static double SCORE_FOR_DETOUR = -40.0, SCORE_FOR_STOP_ON_WAY = 1000.0, SCORE_FOR_ALIGNMENT = 1.0;
+    private enum OneWayDirection {
+        none, forward, backward
+    }
+    public final static boolean debug = false;
+    public final static long[] debugFilterIds = {6493491};
 
+    public static boolean checkDetours = true;
+    private static int idSequence = 0;
+
+    public final int id, debugDepth;
     public final WaySegments line;
     public final PathSegment parentPathSegment;
     public final List<PathSegment> childPathSegments = new ArrayList<>(INITIAL_CHILD_CAPACITY);
-    public final int oneWayDirection;
+    public final OneWayDirection oneWayDirection;
     public OSMNode originatingNode; //the node this path segment "begins" from
+
+    private double scoreSegments, scoreStops, scoreAdjust;
 
     private class LineIntersection {
         public final WaySegments intersectingLine;
@@ -32,59 +43,63 @@ public class PathSegment {
         }
     }
 
-    public PathSegment(final PathSegment parent, final WaySegments startingWay, final OSMNode originatingNode) {
+    public PathSegment(final PathSegment parent, final WaySegments startingWay, final OSMNode originatingNode, final double scoreAdjust, final int debugDepth) {
+        id = ++idSequence;
         parentPathSegment = parent;
         line = startingWay;
         this.originatingNode = originatingNode;
         oneWayDirection = determineOneWayDirection(line.line);
+        scoreSegments = scoreStops = 0.0;
+        this.scoreAdjust = scoreAdjust;
+        this.debugDepth = debugDepth;
     }
-    private static int determineOneWayDirection(OSMWay way) {
+
+    /**
+     * Maps the "oneway" tag of the way to the OneWayDirection enum
+     * @param way
+     * @return
+     */
+    private static OneWayDirection determineOneWayDirection(final OSMWay way) {
         final String oneWayTag = way.getTag("oneway");
 
         //check the oneway status of the way
         if(oneWayTag == null) {
-            return 0;
+            return OneWayDirection.none;
         } else if(oneWayTag.equals(OSMEntity.TAG_YES)) {
-            return 1;
+            return OneWayDirection.forward;
         } else if(oneWayTag.equals("-1")) {
-            return 2;
+            return OneWayDirection.backward;
         } else {
-            return 0;
+            return OneWayDirection.none;
         }
     }
-    public boolean process(final HashMap<Long, WaySegments> availableLines, int depth) {
-        /*TODO: check direction of the main way, and direction we're traveling
-        TODO: Don't add path for any of the following reasons:
-            - oneway tag on this way forbids entry
-            - the other way in question was already added to the path (i.e. a looping path)
-            -
-            - turn restriction prevents transition to way (TODO)
-        */
 
-        depth++;
-        maxDepth = Math.max(maxDepth, depth);
-        String debugBuffer = new String();
-        for(int d=0;d<depth;d++) {
-            debugBuffer += " ";
-        }
-
-        /*TODO determine which way to "walk" the current way, based on the segment matches' dot product (+ is forward, - is backward)
-          - if backward, reverse the walk direction
-          - when you reach a node, check the intersecting ways
-            - check suitability (dot product, matching segment count, score)
-          - repeat until dead-ended
-        */
+    /**
+     * Checks the validity of this segment for addition to a path of travel.
+     * @param linesInRouteBoundingBox: the ways that intersect this route's bounding box
+     * @return TRUE if this segment is valid, FALSE if not
+     */
+    public boolean process(final HashMap<Long, WaySegments> linesInRouteBoundingBox) {
 
         //determine the direction of this line relative to the direction of route travel
         final List<OSMNode> segmentNodes = new ArrayList<>(line.line.getNodes().size());
-        //final List<LineSegment> segmentList;
         boolean ourDirectionForward = line.matchObject.getAvgDotProduct() >= 0.0;
 
+        //boost the score if there's are stops on the current line segment
+        StopWayMatch lastStopOnSegment = null;
+        if(line.matchObject.stopMatches != null) {
+            for(final StopWayMatch stopMatch : line.matchObject.stopMatches) {
+                if (stopMatch.bestMatch != null) {
+                    scoreStops += SCORE_FOR_STOP_ON_WAY;
+                    lastStopOnSegment = stopMatch;
+                }
+            }
+        }
+
         final OSMNode firstNode, lastNode;
-        //TODO: check oneway status
-        if(ourDirectionForward) {
-            if(oneWayDirection == 2) { //oneway runs counter our direction of travel
-                System.out.println(debugBuffer + depth + ": PATH BLOCKS ENTRY TO " + line.line.getTag("name"));
+        if(ourDirectionForward) { //i.e. we're traveling along the natural direction of this way
+            if(oneWayDirection == OneWayDirection.backward) { //oneway runs counter our direction of travel
+                debugLog("PATH BLOCKS ENTRY TO " + line.line.getTag("name") + " (" + line.line.osm_id + ")\n");
                 return false;
             }
 
@@ -93,7 +108,7 @@ public class PathSegment {
 
             //if entering from the originating node would cause us to go counter to the oneway, also bail
             if(originatingNode == lastNode) {
-                System.out.println(debugBuffer + depth + ": 2PATH BLOCKS ENTRY TO " + line.line.getTag("name"));
+                debugLog("REVPATH BLOCKS ENTRY TO " + line.line.getTag("name") + " (" + line.line.osm_id + ")\n");
                 return false;
             }
 
@@ -102,15 +117,18 @@ public class PathSegment {
             final ListIterator<LineSegment> iterator = line.segments.listIterator();
             while (iterator.hasNext()) {
                 final LineSegment segment = iterator.next();
-                if(segment.matchingSegments.size() > 0) {
+                if(checkDetours || segment.matchingSegments.size() > 0) {
                     if(segment.destinationNode != null) {
                         segmentNodes.add(segment.destinationNode);
+                        if(segment.bestMatch != null) {
+                            scoreSegments += SCORE_FOR_ALIGNMENT * Math.abs(segment.bestMatch.dotProduct) / segment.bestMatch.midPointDistance;
+                        }
                     }
                 }
             }
-        } else {
-            if(oneWayDirection == 1) { //oneway runs counter our direction of travel
-                System.out.println(debugBuffer + depth + ": PATH BLOCKS ENTRY TO " + line.line.getTag("name") + " (" + line.line.osm_id + ")");
+        } else { //i.e. we're traveling against the natural direction of this way
+            if(oneWayDirection == OneWayDirection.forward) { //oneway runs counter our direction of travel
+                debugLog("PATH BLOCKS ENTRY TO " + line.line.getTag("name") + " (" + line.line.osm_id + ")\n");
                 return false;
             }
 
@@ -119,7 +137,7 @@ public class PathSegment {
 
             //if entering from the originating node would cause us to go counter to the oneway, also bail
             if(originatingNode == lastNode) {
-                System.out.println(debugBuffer + depth + ": 2PATH BLOCKS ENTRY TO " + line.line.getTag("name"));
+                debugLog("REVPATH BLOCKS ENTRY TO " + line.line.getTag("name") + " (" + line.line.osm_id + ")\n");
                 return false;
             }
 
@@ -128,9 +146,12 @@ public class PathSegment {
             final ListIterator<LineSegment> iterator = line.segments.listIterator(line.segments.size());
             while (iterator.hasPrevious()) {
                 final LineSegment segment = iterator.previous();
-                if(segment.matchingSegments.size() > 0) {
+                if(checkDetours || segment.matchingSegments.size() > 0) {
                     if(segment.originNode != null) {
                         segmentNodes.add(segment.originNode);
+                        if(segment.bestMatch != null) {
+                            scoreSegments += SCORE_FOR_ALIGNMENT * Math.abs(segment.bestMatch.dotProduct) / segment.bestMatch.midPointDistance;
+                        }
                     }
                 }
             }
@@ -141,51 +162,66 @@ public class PathSegment {
             originatingNode = firstNode;
         }
 
+        //if there's a stop on this path segment, and it's the last stop in the route, we're done: no need to check further connecting ways
+        if(lastStopOnSegment != null && lastStopOnSegment.isLastStop()) {
+            return true;
+        }
+
         //and generate the list of lines that intersect this line, to check for path continuation
-        //System.out.println(debugBuffer + depth + ": CHECK INT for " + line.line.getTag("name") + " (" + line.line.osm_id + ")");
-        List<LineIntersection> intersectingLines = new ArrayList<>(INITIAL_CHILD_CAPACITY);
+        //debugLog(debugPadding + depth + ": CHECK INT for " + line.line.getTag("name") + " (" + line.line.osm_id + ")");
+        final List<LineIntersection> intersectingLines = new ArrayList<>(INITIAL_CHILD_CAPACITY);
         for(final OSMNode containedNode : segmentNodes) {
-            //don't allow paths back through the originating node of this path
+            //don't allow paths back through the originating node of this path (i.e. no U-turns)
             if(containedNode == originatingNode) {
-                //System.out.println(debugBuffer + depth + ": Skipping originating node " + containedNode.osm_id);
+                debugLog("Skipping originating node " + containedNode.osm_id + "\n");
                 continue;
             }
 
             //if the node is contained within 2+ ways, it's an intersection node
             if(containedNode.containingWayCount > 1) {
                 for(final OSMWay containingWay : containedNode.containingWays.values()) {
-                    //add to the array if not the same as this line, and not the parent's line (i.e. no U-turns)
-                    if(containingWay.osm_id != line.line.osm_id){// && (parentPathSegment == null || containingWay.osm_id != parentPathSegment.line.line.osm_id)) {
-                        //NOTE: the intersecting way may not be part of the availableLines array if it's too far from the route's path.  This is normal
-                        final WaySegments matchedLine = availableLines.get(containingWay.osm_id);
-                        if(matchedLine != null) {
-                            intersectingLines.add(new LineIntersection(matchedLine, containedNode));
-                           // System.out.println(debugBuffer + depth + ": ADDED " + containingWay.getTag("name") + " (" + containingWay.osm_id + ")");
-                        } else {
-                         //   System.out.println(debugBuffer + depth + ": NO Waysegments FOR  " + containingWay.getTag("name") + " (" + containingWay.osm_id + ")???");
-                        }
+                    //skip this line (will be part of every node's containingWays array)
+                    if(containingWay.osm_id == line.line.osm_id) {
+                        //debugLog("SKIPPED " + containingWay.getTag("name") + " (" + containingWay.osm_id + ")\n");
+                        continue;
+                    }
+
+                    //check if the given way is part of the linesInRouteBoundingBox array - may not be if it's too far from the route's path (which is OK)
+                    final WaySegments matchedLine = linesInRouteBoundingBox.get(containingWay.osm_id);
+                    if(matchedLine != null) {
+                        intersectingLines.add(new LineIntersection(matchedLine, containedNode));
+                        //debugLog("ADDED " + containingWay.getTag("name") + " (" + containingWay.osm_id + ")");
                     } else {
-                       // System.out.println(debugBuffer + depth + ": SKIPPED " + containingWay.getTag("name") + " (" + containingWay.osm_id + ")");
+                       //debugLog("NO Waysegments FOR  " + containingWay.getTag("name") + " (" + containingWay.osm_id + ")");
                     }
                 }
             }
         }
 
         //if no intersecting ways, this is a dead end
-        if(intersectingLines.size() == 0) {
-            System.out.println(debugBuffer + depth + ": DEAD END at " + line.line.getTag("name") + " (" + line.line.osm_id + ")");
+        final int intersectingLineCount = intersectingLines.size();
+        if(intersectingLineCount == 0) {
+            debugLog("DEAD END at " + line.line.getTag("name") + " (" + line.line.osm_id + ")\n");
             return false;
         }
 
         PathSegment curPathSegment;
-        System.out.println(debugBuffer + depth + ":CHECK " + line.line.getTag("name") + " (" + line.line.osm_id + "): " + intersectingLines.size() + " intersecting");
-        for(final LineIntersection intersection : intersectingLines) {
-            System.out.print(debugBuffer + depth + ":WITH " +  intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")");
+        debugLog("CHECK " + line.line.getTag("name") + " (" + line.line.osm_id + "): " + intersectingLines.size() + " intersecting\n");
 
+        //now check the intersecting lines to see whether they're good segments to follow
+        for(final LineIntersection intersection : intersectingLines) {
+            debugLog("WITH " + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")");
+
+            double childScoreAdjust = 0.0;
             //if the current way doesn't contain any matching segments, skip it
             if(intersection.intersectingLine.matchObject.matchingSegmentCount == 0) {
-                System.out.println(":::NO MATCH for " + line.line.getTag("name") + "(" + line.line.osm_id + ")->" + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")");
-                continue;
+                if(!checkDetours || intersectingLineCount > 1) {
+                    debugLog(":::NO MATCH for " + line.line.getTag("name") + "(" + line.line.osm_id + ")->" + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")\n");
+                    continue;
+                } else {
+                    childScoreAdjust = SCORE_FOR_DETOUR;
+                    debugLog(":::SPUR MATCH for " + line.line.getTag("name") + "(" + line.line.osm_id + ")->" + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")\n");
+                }
             }
 
             //check the current way isn't already on the path (i.e. looping back on itself)
@@ -199,27 +235,56 @@ public class PathSegment {
                 curPathSegment = curPathSegment.parentPathSegment;
             }
             if (onPath) {
-                System.out.println(":::PREVADD " + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")");
+                debugLog(":::PREVADD " + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")");
                 continue;
             }
 
             //TODO check if a turn restriction prevents turning at this junction
 
             //if there's a path from this way to the intersecting way, add a path
-            System.out.println(":::add path " +  line.line.getTag("name") + "(" + line.line.osm_id + ")->" + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")");
-            final PathSegment childPathSegment = new PathSegment(this, intersection.intersectingLine, intersection.intersectingNode);
-            if(childPathSegment.process(availableLines, depth)) {
+            debugLog(":::add path " + line.line.getTag("name") + "(" + line.line.osm_id + ")->" + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")\n");
+            final PathSegment childPathSegment = new PathSegment(this, intersection.intersectingLine, intersection.intersectingNode, childScoreAdjust, debugDepth + 1);
+            if(childPathSegment.process(linesInRouteBoundingBox)) {
                 childPathSegments.add(childPathSegment);
             }
         }
 
         return true;
     }
-    public double calculateScore() {
-        double totalScore = 0.0;
-        for(PathSegment childPathSegment : childPathSegments) {
-            totalScore += childPathSegment.calculateScore();
+    public double getScoreSegments() {
+        return scoreSegments;
+    }
+
+    public double getScoreStops() {
+        return scoreStops;
+    }
+    public double getScoreAdjust() {
+        return scoreAdjust;
+    }
+    private void debugLog(final String message) {
+        if(debug) {
+            boolean output = false;
+            if(debugFilterIds.length > 0) {
+                for(short i=0;i<debugFilterIds.length;i++) {
+                    if(line.line.osm_id == debugFilterIds[i]) {
+                        output = true;
+                        break;
+                    }
+                }
+            } else {
+                output = true;
+            }
+
+            if(output) {
+                String debugPadding = "";
+                if(!message.startsWith(":")) {
+                    for (int d = 0; d < debugDepth; d++) {
+                        debugPadding += " ";
+                    }
+                    debugPadding += debugDepth + ": ";
+                }
+                System.out.print(debugPadding + message);
+            }
         }
-        return totalScore;
     }
 }

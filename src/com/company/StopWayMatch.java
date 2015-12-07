@@ -34,14 +34,29 @@ public class StopWayMatch {
         }
     }
 
+    /**
+     * The index of this stop on the route
+     */
+    public final int stopIndex;
+
+    /**
+     * The total number of stops on the route
+     */
+    public final int stopCount;
+
+    /**
+     * Pointer to the actual OSM node of the stop's platform
+     */
     public final OSMNode platformNode;
     public final List<WayMatch> matches = new ArrayList<>(16);
 
     public OSMNode stopPositionNode = null;
     public WayMatch bestMatch = null;
 
-    public StopWayMatch(final OSMNode platform) {
+    public StopWayMatch(final OSMNode platform, int index, int count) {
         platformNode = platform;
+        stopIndex = index;
+        stopCount = count;
     }
     public void addWayMatch(final SegmentMatch segmentMatch, final double distance, final MatchType matchType) {
         matches.add(new WayMatch(segmentMatch, distance, matchType));
@@ -59,5 +74,11 @@ public class StopWayMatch {
             //the next-best match is the closest way
             bestMatch = otherMatch;
         }
+    }
+    public boolean isFirstStop() {
+        return stopIndex == 0;
+    }
+    public boolean isLastStop() {
+        return stopIndex == stopCount - 1;
     }
 }

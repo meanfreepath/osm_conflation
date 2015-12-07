@@ -19,8 +19,8 @@ public class LineMatch {
     public final WaySegments parentLine;
     public final List<SegmentMatch> matchingSegments;
     public int matchingSegmentCount = -1;
-    public final List<StopWayMatch.WayMatch> stopMatches = new ArrayList<>(4);
-    private double avgDotProduct, avgDistance, score = 0.0;
+    public List<StopWayMatch> stopMatches = null;
+    private double avgDotProduct, avgDistance;
 
     public LineMatch(final WaySegments parentLine) {
         this.parentLine = parentLine;
@@ -59,9 +59,6 @@ public class LineMatch {
             avgDistance /= matchingSegmentCount;
             avgDotProduct /= matchingSegmentCount;
         }
-
-        //calculate a match score for this line
-        score = 100 * stopMatches.size() + matchingSegmentCount * 10 + Math.abs(avgDotProduct);
     }
     public double getAvgDotProduct() {
         return avgDotProduct;
@@ -69,7 +66,15 @@ public class LineMatch {
     public double getAvgDistance() {
         return avgDistance;
     }
-    public double getScore(){
-        return score;
+
+    /**
+     * Adds the given StopWayMatch to this object
+     * @param stopMatch
+     */
+    public void addStopMatch(final StopWayMatch stopMatch) {
+        if(stopMatches == null) {
+            stopMatches = new ArrayList<>(4);
+        }
+        stopMatches.add(stopMatch);
     }
 }
