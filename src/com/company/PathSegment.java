@@ -4,6 +4,8 @@ import OSM.OSMEntity;
 import OSM.OSMNode;
 import OSM.OSMWay;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,12 +17,13 @@ import java.util.ListIterator;
  */
 public class PathSegment {
     private final static int INITIAL_CHILD_CAPACITY = 8;
-    private final static double SCORE_FOR_DETOUR = -40.0, SCORE_FOR_STOP_ON_WAY = 1000.0, SCORE_FOR_ALIGNMENT = 1.0;
+    private final static double SCORE_FOR_DETOUR = -40.0, SCORE_FOR_STOP_ON_WAY = 100.0, SCORE_FOR_ALIGNMENT = 1.0;
     private enum OneWayDirection {
         none, forward, backward
     }
-    public final static boolean debug = false;
-    public final static long[] debugFilterIds = {6493491};
+    public final static boolean debug = true;
+    private final static FileWriter debugFileWriter;
+    public final static long[] debugFilterIds = {};
 
     public static boolean checkDetours = true;
     private static int idSequence = 0;
@@ -33,6 +36,29 @@ public class PathSegment {
     public OSMNode originatingNode; //the node this path segment "begins" from
 
     private double scoreSegments, scoreStops, scoreAdjust;
+
+    static {
+        if(debug) {
+            FileWriter writer = null;
+            try {
+                writer = new FileWriter("pathDebug");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            debugFileWriter = writer;
+        } else {
+            debugFileWriter = null;
+        }
+    }
+    public static void closeWriter() {
+        if(debugFileWriter != null) {
+            try {
+                debugFileWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     private class LineIntersection {
         public final WaySegments intersectingLine;
@@ -92,6 +118,7 @@ public class PathSegment {
                 if (stopMatch.bestMatch != null) {
                     scoreStops += SCORE_FOR_STOP_ON_WAY;
                     lastStopOnSegment = stopMatch;
+                    debugLog("HAS MATCHING TRANSIT STOP (id " + stopMatch.stopPositionNode.osm_id + ")\n");
                 }
             }
         }
@@ -168,7 +195,7 @@ public class PathSegment {
         }
 
         //and generate the list of lines that intersect this line, to check for path continuation
-        //debugLog(debugPadding + depth + ": CHECK INT for " + line.line.getTag("name") + " (" + line.line.osm_id + ")");
+        debugLog("CHECK INTERSECTION for " + line.line.getTag("name") + " (" + line.line.osm_id + "):\n");
         final List<LineIntersection> intersectingLines = new ArrayList<>(INITIAL_CHILD_CAPACITY);
         for(final OSMNode containedNode : segmentNodes) {
             //don't allow paths back through the originating node of this path (i.e. no U-turns)
@@ -182,7 +209,7 @@ public class PathSegment {
                 for(final OSMWay containingWay : containedNode.containingWays.values()) {
                     //skip this line (will be part of every node's containingWays array)
                     if(containingWay.osm_id == line.line.osm_id) {
-                        //debugLog("SKIPPED " + containingWay.getTag("name") + " (" + containingWay.osm_id + ")\n");
+                        //debugLog("SKIPPED " + containingWay.getTag("name") + " (" + containingWay.osm_id + ") at node " + containedNode.osm_id + "\n");
                         continue;
                     }
 
@@ -190,9 +217,9 @@ public class PathSegment {
                     final WaySegments matchedLine = linesInRouteBoundingBox.get(containingWay.osm_id);
                     if(matchedLine != null) {
                         intersectingLines.add(new LineIntersection(matchedLine, containedNode));
-                        //debugLog("ADDED " + containingWay.getTag("name") + " (" + containingWay.osm_id + ")");
+                        debugLog("ADDED " + containingWay.getTag("name") + " (" + containingWay.osm_id + ") at node " + containedNode.osm_id + "\n");
                     } else {
-                       //debugLog("NO Waysegments FOR  " + containingWay.getTag("name") + " (" + containingWay.osm_id + ")");
+                       debugLog("NO Waysegments FOR  " + containingWay.getTag("name") + " (" + containingWay.osm_id + ") at node " + containedNode.osm_id + "\n");
                     }
                 }
             }
@@ -205,10 +232,9 @@ public class PathSegment {
             return false;
         }
 
-        PathSegment curPathSegment;
-        debugLog("CHECK " + line.line.getTag("name") + " (" + line.line.osm_id + "): " + intersectingLines.size() + " intersecting\n");
-
         //now check the intersecting lines to see whether they're good segments to follow
+        PathSegment curPathSegment;
+        debugLog("NOW CHECK " + line.line.getTag("name") + " (" + line.line.osm_id + "): " + intersectingLines.size() + " intersecting\n");
         for(final LineIntersection intersection : intersectingLines) {
             debugLog("WITH " + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")");
 
@@ -284,6 +310,11 @@ public class PathSegment {
                     debugPadding += debugDepth + ": ";
                 }
                 System.out.print(debugPadding + message);
+                try {
+                    debugFileWriter.write(debugPadding + message);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
