@@ -18,6 +18,7 @@ public class Path implements Cloneable {
     public int segmentCount = 0;
     public double scoreSegments = 0.0, scoreStops = 0.0, scoreAdjust = 0.0, scoreTotal = 0.0;
     public StopWayMatch firstStopOnPath = null, lastStopOnPath = null;
+    public int stopsOnPath = 0;
 
     public Path() {
         id = ++idSequence;
@@ -62,8 +63,11 @@ public class Path implements Cloneable {
                     lastStopOnPath = stopMatch;
 
                     //check if the current stop comes directly after the previous stop
-                    if(stopMatch.bestMatch != null && stopMatch.stopIndex != lastStopIndex + 1) {
-                        stopsInOrder = false;
+                    if(stopMatch.bestMatch != null) {
+                        stopsOnPath++;
+                        if(stopMatch.stopIndex != lastStopIndex + 1) {
+                            stopsInOrder = false;
+                        }
                     }
                     lastStopIndex = stopMatch.stopIndex;
                 }
@@ -74,12 +78,11 @@ public class Path implements Cloneable {
             scoreAdjust += segment.getScoreAdjust();
         }
 
-        //if the path contains the stops *in order*, give it a big bonus
-        if(lastStopOnPath != null && stopsInOrder) {
-            scoreStops *= 10.0;
-
-            //and a further bonus if it contains the first and last stops
-            if(firstStopOnPath.isFirstStop() && lastStopOnPath.isLastStop()) {
+        //if the path contains the first and last stops of the route, it gets a bonus
+        if(lastStopOnPath != null && firstStopOnPath.isFirstStop() && lastStopOnPath.isLastStop()) {
+            scoreStops *= 2.0;
+            //and a further bonus if it contains the stops *in order*, give it a further bonus
+            if(stopsInOrder) {
                 scoreStops *= 2.0;
             }
         }
@@ -134,7 +137,9 @@ public class Path implements Cloneable {
         final StringBuilder output = new StringBuilder(pathSegments.size() * 128);
         for(final PathSegment segment : pathSegments) {
             output.append(segment.line.line.getTag(OSMEntity.KEY_NAME));
-            output.append(": ");
+            output.append(" (");
+            output.append(segment.line.line.osm_id);
+            output.append("): ");
             output.append(format.format(segment.getScoreSegments()));
             output.append("/");
             output.append(format.format(segment.getScoreStops()));

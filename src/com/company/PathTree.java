@@ -1,7 +1,10 @@
 package com.company;
 
 import OSM.OSMEntity;
+import OSM.OSMRelation;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -13,8 +16,22 @@ import java.util.List;
 public class PathTree {
     public Path bestPath = null;
     public final static boolean debug = true;
+    private final FileWriter debugFileWriter;
 
-    public void findPaths(List<StopWayMatch> stops, HashMap<Long, WaySegments> availableLines) {
+    public PathTree(final OSMRelation relation) {
+        if(debug) {
+            FileWriter writer = null;
+            try {
+                writer = new FileWriter("pathDebug" + relation.osm_id);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            debugFileWriter = writer;
+        } else {
+            debugFileWriter = null;
+        }
+    }
+    public void findPaths(final List<StopWayMatch> stops, final HashMap<Long, WaySegments> availableLines) {
         //first find the point on the nearest way closest to the toNode and fromNode
         final StopWayMatch firstStop = stops.size() > 0 ? stops.get(0) : null;
 
@@ -22,7 +39,7 @@ public class PathTree {
         //create the initial path segment
         final PathSegment startPathSegment;
         if(firstStop != null && firstStop.bestMatch != null) { //if a stop match is present, use the way closest to the first stop
-            startPathSegment = new PathSegment(null, firstStop.bestMatch.candidateSegmentMatch.matchingSegment.parentSegments, firstStop.stopPositionNode, 0.0, 0);
+            startPathSegment = new PathSegment(this, null, firstStop.bestMatch.candidateSegmentMatch.matchingSegment.parentSegments, firstStop.stopPositionNode, 0.0, 0);
         } else { //otherwise, use the way closest to the start of the main route path line
             //startPathSegment = new PathSegment(null, firstLine, null); //the path will figure out the originating node in this case
             startPathSegment = null; //TODO
@@ -47,7 +64,7 @@ public class PathTree {
         }
 
         if(debug) {
-            final double scoreThreshold = 0.95 * bestPath.scoreTotal;
+            /*final double scoreThreshold = 0.95 * bestPath.scoreTotal;
             final List<Path> goodPaths = new ArrayList<>(128);
             for(final Path path : allPaths) {
                 if(path.scoreTotal >= scoreThreshold) {
@@ -65,17 +82,19 @@ public class PathTree {
                 }
             });
 
-            int segIdx = 0;
-            for(final PathSegment segment : bestPath.pathSegments) {
-                segment.line.line.setTag("segID", String.valueOf(segment.id));
-                segment.line.line.setTag("segidx", String.valueOf(segIdx++));
-            }
-
             for(final Path path : goodPaths) {
              //   System.out.print("GOOD PATH (" + path.segmentCount + " segs): SCORE (out of " + allPaths.size() + "): #" + path.id + ", score (" + path.scoreSegments + "/" + path.scoreStops + "/" + path.scoreAdjust + ") = " + path.scoreTotal + ", first/last stop " + bestPath.lastStopOnPath.platformNode.getTag("name") + ":" + Boolean.toString(bestPath.firstStopOnPath.isFirstStop()) + "/" + Boolean.toString(bestPath.lastStopOnPath.isLastStop()) + "\nSEGMENTS: " + path.toString());
-            }
-            System.out.println("BEST PATH SCORE (out of " + allPaths.size() + "): #" + bestPath.id + ", score (" + bestPath.scoreSegments + "/" + bestPath.scoreStops + "/" + bestPath.scoreAdjust + ") = " + bestPath.scoreTotal + ", first/last stop:" + (bestPath.firstStopOnPath != null ? Boolean.toString(bestPath.firstStopOnPath.isFirstStop()) : "NULL") + "/" + (bestPath.lastStopOnPath != null ? Boolean.toString(bestPath.lastStopOnPath.isLastStop()) : "NULL") + "\nSEGMENTS: " + bestPath.toString());
+            }*/
+            System.out.println("BEST PATH SCORE (out of " + allPaths.size() + "): #" + bestPath.id + ", score (" + bestPath.scoreSegments + "/" + bestPath.scoreStops + "/" + bestPath.scoreAdjust + ") = " + bestPath.scoreTotal + ", stops: " + bestPath.stopsOnPath + "/" + stops.size() + ", first/last stop:" + (bestPath.firstStopOnPath != null ? Boolean.toString(bestPath.firstStopOnPath.isFirstStop()) : "NULL") + "/" + (bestPath.lastStopOnPath != null ? Boolean.toString(bestPath.lastStopOnPath.isLastStop()) : "NULL") + "\nSEGMENTS: " + bestPath.toString());
             System.out.print(bestPath.scoreSummary());
+        }
+
+        if(debugFileWriter != null) {
+            try {
+                debugFileWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
     private void compileChildren(final Path path, final ArrayList<Path> allPaths) {
@@ -106,8 +125,15 @@ public class PathTree {
                     compileChildren(newPath, allPaths);
                 }
             }
-        } else { //if the last segment has no child segments, it's done: just calculate the its score
+        } else { //if the last segment has no child segments, it's done: just calculate its score
             path.calculateScore();
+        }
+    }
+    public void writeDebug(final String logMsg) {
+        try {
+            debugFileWriter.write(logMsg);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }

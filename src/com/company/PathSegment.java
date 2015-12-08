@@ -21,13 +21,13 @@ public class PathSegment {
     private enum OneWayDirection {
         none, forward, backward
     }
-    public final static boolean debug = true;
-    private final static FileWriter debugFileWriter;
+
     public final static long[] debugFilterIds = {};
 
     public static boolean checkDetours = true;
     private static int idSequence = 0;
 
+    private final PathTree parentPathTree;
     public final int id, debugDepth;
     public final WaySegments line;
     public final PathSegment parentPathSegment;
@@ -36,29 +36,6 @@ public class PathSegment {
     public OSMNode originatingNode; //the node this path segment "begins" from
 
     private double scoreSegments, scoreStops, scoreAdjust;
-
-    static {
-        if(debug) {
-            FileWriter writer = null;
-            try {
-                writer = new FileWriter("pathDebug");
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            debugFileWriter = writer;
-        } else {
-            debugFileWriter = null;
-        }
-    }
-    public static void closeWriter() {
-        if(debugFileWriter != null) {
-            try {
-                debugFileWriter.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
 
     private class LineIntersection {
         public final WaySegments intersectingLine;
@@ -69,8 +46,9 @@ public class PathSegment {
         }
     }
 
-    public PathSegment(final PathSegment parent, final WaySegments startingWay, final OSMNode originatingNode, final double scoreAdjust, final int debugDepth) {
+    public PathSegment(final PathTree parentPathTree, final PathSegment parent, final WaySegments startingWay, final OSMNode originatingNode, final double scoreAdjust, final int debugDepth) {
         id = ++idSequence;
+        this.parentPathTree = parentPathTree;
         parentPathSegment = parent;
         line = startingWay;
         this.originatingNode = originatingNode;
@@ -147,9 +125,9 @@ public class PathSegment {
                 if(checkDetours || segment.matchingSegments.size() > 0) {
                     if(segment.destinationNode != null) {
                         segmentNodes.add(segment.destinationNode);
-                        if(segment.bestMatch != null) {
-                            scoreSegments += SCORE_FOR_ALIGNMENT * Math.abs(segment.bestMatch.dotProduct) / segment.bestMatch.midPointDistance;
-                        }
+                    }
+                    if(segment.bestMatch != null) {
+                        scoreSegments += SCORE_FOR_ALIGNMENT * Math.abs(segment.bestMatch.dotProduct) / segment.bestMatch.midPointDistance;
                     }
                 }
             }
@@ -269,7 +247,7 @@ public class PathSegment {
 
             //if there's a path from this way to the intersecting way, add a path
             debugLog(":::add path " + line.line.getTag("name") + "(" + line.line.osm_id + ")->" + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")\n");
-            final PathSegment childPathSegment = new PathSegment(this, intersection.intersectingLine, intersection.intersectingNode, childScoreAdjust, debugDepth + 1);
+            final PathSegment childPathSegment = new PathSegment(parentPathTree, this, intersection.intersectingLine, intersection.intersectingNode, childScoreAdjust, debugDepth + 1);
             if(childPathSegment.process(linesInRouteBoundingBox)) {
                 childPathSegments.add(childPathSegment);
             }
@@ -288,7 +266,7 @@ public class PathSegment {
         return scoreAdjust;
     }
     private void debugLog(final String message) {
-        if(debug) {
+        if(PathTree.debug) {
             boolean output = false;
             if(debugFilterIds.length > 0) {
                 for(short i=0;i<debugFilterIds.length;i++) {
@@ -309,12 +287,8 @@ public class PathSegment {
                     }
                     debugPadding += debugDepth + ": ";
                 }
-                System.out.print(debugPadding + message);
-                try {
-                    debugFileWriter.write(debugPadding + message);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                //System.out.print(debugPadding + message);
+                parentPathTree.writeDebug(debugPadding + message);
             }
         }
     }
