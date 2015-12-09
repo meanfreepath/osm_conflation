@@ -1,11 +1,14 @@
 package OSM;
 
+import com.sun.javaws.exceptions.InvalidArgumentException;
+
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by nick on 10/15/15.
  */
-public class OSMNode extends OSMEntity {
+public class OSMNode extends OSMEntity implements Cloneable {
     private final static String
             BASE_XML_TAG_FORMAT_EMPTY = " <node id=\"%d\" lat=\"%.07f\" lon=\"%.07f\" visible=\"%s\"/>\n",
             BASE_XML_TAG_FORMAT_EMPTY_METADATA = " <node id=\"%d\" lat=\"%.07f\" lon=\"%.07f\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\"/>\n",
@@ -21,14 +24,14 @@ public class OSMNode extends OSMEntity {
     public static OSMNode create() {
         return new OSMNode(acquire_new_id());
     }
-    public static OSMNode create(Point point) {
+    public static OSMNode create(final Point point) {
         OSMNode node = new OSMNode(acquire_new_id());
         node.lat = point.latitude;
         node.lon = point.longitude;
-        node.coordinate = point;
+        node.coordinate = new Point(point.latitude, point.longitude);
         return node;
     }
-    public static OSMNode create(double latitude, double longitude) {
+    public static OSMNode create(final double latitude, final double longitude) {
         OSMNode node = new OSMNode(acquire_new_id());
         node.lat = latitude;
         node.lon = longitude;
@@ -142,6 +145,30 @@ public class OSMNode extends OSMEntity {
             default:
                 super.setTag(name, value);
                 break;
+        }
+    }
+    @Override
+    public void copyFrom(final OSMEntity otherEntity, final boolean copyTags, final boolean copyMetadata) throws InvalidArgumentException {
+        if(!(otherEntity instanceof OSMNode)) {
+            String[] errMsg = {"Can only copy data from other nodes"};
+            throw new InvalidArgumentException(errMsg);
+        }
+        super.copyFrom(otherEntity, copyTags, copyMetadata);
+
+        //also copy the location of the node
+        final OSMNode otherNode = (OSMNode) otherEntity;
+        setLat(otherNode.lat);
+        setLon(otherNode.lon);
+    }
+    @Override
+    public OSMNode clone() {
+        final OSMNode newEntity = OSMNode.create(getCentroid());
+        try {
+            newEntity.copyFrom(this, true, false);
+        } catch (InvalidArgumentException e) {
+            //Won't happen
+        } finally {
+            return newEntity;
         }
     }
 }

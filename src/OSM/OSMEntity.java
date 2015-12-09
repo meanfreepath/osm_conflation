@@ -5,11 +5,12 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by nick on 10/15/15.
  */
-public abstract class OSMEntity {
+public abstract class OSMEntity implements Cloneable {
     public final static String KEY_LATITUDE = "lat", KEY_LONGITUDE = "lon", KEY_OSMID = "osm_id", KEY_FROM = "from", KEY_VIA = "via", KEY_TO = "to", KEY_OPERATOR = "operator", KEY_ROUTE = "route", KEY_ROUTE_MASTER = "route_master", KEY_NAME = "name", KEY_REF = "ref", KEY_LOCAL_REF = "local_ref", KEY_DESCRIPTION = "description", KEY_WEBSITE = "website", KEY_TYPE = "type", KEY_PUBLIC_TRANSPORT_VERSION = "public_transport:version", KEY_COLOUR = "colour", KEY_AMENITY = "amenity", KEY_WHEELCHAIR = "wheelchair";
     public final static String TAG_ROUTE = "route", TAG_ROUTE_MASTER = "route_master", TAG_BUS = "bus", TAG_LIGHT_RAIL = "light_rail", TAG_TRAM = "tram", TAG_SUBWAY = "subway", TAG_TRAIN = "train", TAG_FERRY = "ferry", TAG_AERIALWAY = "aerialway", TAG_YES = "yes", TAG_NO = "no";
 
@@ -22,9 +23,9 @@ public abstract class OSMEntity {
     public final long osm_id;
 
     //Metadata (not required)
-    public int uid, version, changeset;
+    public int uid = -1, version = -1, changeset = -1;
     public boolean visible = true;
-    public String user, timestamp;
+    public String user = null, timestamp = null;
     protected Region boundingBox;
 
     protected HashMap<String,String> tags;
@@ -85,19 +86,35 @@ public abstract class OSMEntity {
         }
         tags.put(name, value.trim());
     }
-    public final String getTag(final String name) {
+
+    /**
+     * Get the value of the current tag
+     * @param key
+     * @return
+     */
+    public final String getTag(final String key) {
         if(tags == null) {
             return null;
         }
-        return tags.get(name);
+        return tags.get(key);
+    }
+    /**
+     * Gets the full list of tags for this entity
+     * @return
+     */
+    public final Map<String, String> getTags() {
+        if(tags == null) {
+            return null;
+        }
+        return tags;
     }
     public boolean hasTag(final String name) {
         return tags != null && tags.containsKey(name);
     }
     public static String escapeForXML(final String str){
-        final StringBuilder result = new StringBuilder();
+        final StringBuilder result = new StringBuilder(str.length());
         final StringCharacterIterator iterator = new StringCharacterIterator(str);
-        char character =  iterator.current();
+        char character = iterator.current();
         while (character != CharacterIterator.DONE ){
             if (character == '<') {
                 result.append("&lt;");
@@ -123,4 +140,30 @@ public abstract class OSMEntity {
         }
         return result.toString();
     }
+
+    /**
+     * Copy the data from the given entity into this entity
+     * @param otherEntity
+     * @param copyTags
+     * @param copyMetadata
+     */
+    public void copyFrom(final OSMEntity otherEntity, final boolean copyTags, final boolean copyMetadata) throws InvalidArgumentException {
+        if(copyTags) {
+            for(final Map.Entry<String, String> tag : otherEntity.tags.entrySet()) {
+                setTag(tag.getKey(), tag.getValue());
+            }
+        }
+
+        //copy metadata only if none present for this node
+        if(copyMetadata && version >= 0) {
+            //osm_id = otherEntity.osm_id;
+            uid = otherEntity.uid;
+            version = otherEntity.version;
+            changeset = otherEntity.changeset;
+            user = otherEntity.user;
+            timestamp = otherEntity.timestamp;
+        }
+    }
+    @Override
+    public abstract OSMEntity clone();
 }

@@ -112,7 +112,9 @@ public class OSMEntitySpace {
         }
         allEntities.add(entity);
     }
-
+    public void mergeEntities(final OSMEntity theEntity, final OSMEntity withEntity) throws InvalidArgumentException {
+        theEntity.copyFrom(withEntity, true, true);
+    }
     /**
      * Generates the mapping between nodes and their containing ways, in preparation for
      * checking way intersections etc.

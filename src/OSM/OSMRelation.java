@@ -1,9 +1,11 @@
 package OSM;
 
 import com.sun.istack.internal.NotNull;
+import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -138,5 +140,24 @@ public class OSMRelation extends OSMEntity {
             }
         }
         return matchingMembers;
+    }
+    @Override
+    public void copyFrom(final OSMEntity otherEntity, final boolean copyTags, final boolean copyMetadata) throws InvalidArgumentException {
+        if(!(otherEntity instanceof OSMRelation)) {
+            String[] errMsg = {"Can only copy data from other relations"};
+            throw new InvalidArgumentException(errMsg);
+        }
+        super.copyFrom(otherEntity, copyTags, copyMetadata);
+    }
+    @Override
+    public OSMRelation clone() {
+        final OSMRelation newEntity = OSMRelation.create();
+        try {
+            newEntity.copyFrom(this, true, false);
+        } catch (InvalidArgumentException e) {
+            //Won't happen
+        } finally {
+            return newEntity;
+        }
     }
 }

@@ -1,9 +1,8 @@
 package OSM;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import com.sun.javaws.exceptions.InvalidArgumentException;
+
+import java.util.*;
 
 /**
  * Created by nick on 10/15/15.
@@ -139,6 +138,37 @@ public class OSMWay extends OSMEntity {
             } else {
                 return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id, String.valueOf(visible));
             }
+        }
+    }
+    @Override
+    public void copyFrom(final OSMEntity otherEntity, final boolean copyTags, final boolean copyMetadata) throws InvalidArgumentException {
+        if(!(otherEntity instanceof OSMWay)) {
+            String[] errMsg = {"Can only copy data from other ways"};
+            throw new InvalidArgumentException(errMsg);
+        }
+        super.copyFrom(otherEntity, copyTags, copyMetadata);
+
+        //also copy the location of the nodes in this way
+        final OSMWay otherWay = (OSMWay) otherEntity;
+        final Iterator<OSMNode> otherWayNodeIterator = otherWay.nodes.listIterator();
+        for(final OSMNode node : nodes) {
+            if(otherWayNodeIterator.hasNext()) {
+                node.copyFrom(otherWayNodeIterator.next(), true, true);
+            } else {
+                appendNode(node); //TODO: need to make the EntitySpace aware of this!!
+                break;
+            }
+        }
+    }
+    @Override
+    public OSMWay clone() {
+        final OSMWay newEntity = OSMWay.create();
+        try {
+            newEntity.copyFrom(this, true, false);
+        } catch (InvalidArgumentException e) {
+            //Won't happen
+        } finally {
+            return newEntity;
         }
     }
 }
