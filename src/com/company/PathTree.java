@@ -17,12 +17,14 @@ public class PathTree {
     public Path bestPath = null;
     public final static boolean debug = true;
     private final FileWriter debugFileWriter;
+    public final OSMRelation routeRelation;
 
-    public PathTree(final OSMRelation relation) {
+    public PathTree(final OSMRelation routeRelation) {
+        this.routeRelation = routeRelation;
         if(debug) {
             FileWriter writer = null;
             try {
-                writer = new FileWriter("pathDebug" + relation.osm_id);
+                writer = new FileWriter("pathDebug" + routeRelation.osm_id);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -43,6 +45,8 @@ public class PathTree {
         } else { //otherwise, use the way closest to the start of the main route path line
             //startPathSegment = new PathSegment(null, firstLine, null); //the path will figure out the originating node in this case
             startPathSegment = null; //TODO
+            System.out.println("ERROR: first stop for " + routeRelation.getTag("name") + " is not near a road or railway!");
+            return;
         }
 
         startPathSegment.process(availableLines);
