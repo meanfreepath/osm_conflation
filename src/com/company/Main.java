@@ -77,6 +77,9 @@ public class Main {
                        // continue;
                     }
 
+                    //fetch all existing stops in the route's bounding box
+                    //conflateStops(relation, relationSpace, combinedBoundingBox, 20.0);
+
                     //Break the candidate ways into LineSegments and match their geometries to the main route line
                     final LineComparison.ComparisonOptions options = new LineComparison.ComparisonOptions();
                     options.boundingBoxSize = 50.0;
@@ -327,5 +330,68 @@ public class Main {
         }
         segmentSpace.outputXml("segments" + comparison.mainLine.way.osm_id + ".osm");
     }
+    private static void conflateStops(final OSMRelation routeRelation, final OSMEntitySpace importSpace, final Region inRegion, final double conflictDistance) throws InvalidArgumentException {
+        //fetch all possible useful ways that intersect the route's combined bounding box
+        final OverpassConverter converter = new OverpassConverter();
+        try {
+            final String query = converter.queryForBoundingBox("[\"highway\"=\"bus_stop\"]", inRegion, 0.0004, OSMEntity.OSMType.node);
+            converter.fetchFromOverpass(query);
+        } catch (InvalidArgumentException e) {
+            e.printStackTrace();
+            return;
+        }
 
+        final OSMEntitySpace existingSpace = converter.getEntitySpace(); //TODO merge with ways' entity space
+
+        //generate a list of the stop nodes we want to import
+        final List<OSMRelation.OSMRelationMember> routeStops = routeRelation.getMembers("platform");
+        final List<OSMNode> stopsToImport = new ArrayList<>(routeStops.size());
+        for(final OSMRelation.OSMRelationMember member : routeStops) {
+            stopsToImport.add((OSMNode) member.member); //GTFS stops are always nodes
+            importSpace.addEntity(member.member, OSMEntitySpace.EntityMergeStrategy.dontMerge, null);
+        }
+
+        //and compare them to the existing OSM data
+        for(final OSMNode importStop : stopsToImport) {
+            final String importGtfsId = importStop.getTag("gtfs:stop_id");
+            final String importRefTag = importStop.getTag(OSMEntity.KEY_REF);
+            double importRefTagNumeric;
+            try {
+                assert importRefTag != null;
+                importRefTagNumeric = Double.parseDouble(importRefTag);
+            } catch(NumberFormatException e) {
+                importRefTagNumeric = Double.MAX_VALUE;
+            }
+
+            for(final OSMNode existingStop : existingSpace.allNodes.values()) {
+                final String existingGtfsId = existingStop.getTag("gtfs:stop_id");
+                assert importGtfsId != null;
+                if(importGtfsId.equals(existingGtfsId)) {
+                    //merge the existing stop with the import stop's data
+                    importSpace.mergeEntities(importStop, existingStop);
+                } else if(existingStop.hasTag(OSMEntity.KEY_REF)) { //try matching by ref if no importer id
+                    final String existingRefTag = existingStop.getTag(OSMEntity.KEY_REF);
+                    assert existingRefTag != null;
+                    if(existingRefTag.trim().equals(importRefTag)) { //string match
+                        importSpace.mergeEntities(importStop, existingStop);
+                    } else if(importRefTagNumeric != Double.MAX_VALUE) { //try doing a basic numeric match if strings don't match (special case for already-imported King County metro data)
+                        try {
+                            final double existingRefTagNumeric = Double.parseDouble(existingRefTag);
+                            if(existingRefTagNumeric == importRefTagNumeric) {
+                                importSpace.mergeEntities(importStop, existingStop);
+                            }
+                        } catch(NumberFormatException e) {
+                            //do nothing
+                        }
+                    }
+                } else { //if no tag matches, check that the import data doesn't conflict with existing stops
+                    final double stopDistance = Point.distance(importStop.getCentroid(), existingStop.getCentroid());
+                    if(stopDistance < conflictDistance) {
+                        System.out.println("Within distance! " + existingStop.getTag(OSMEntity.KEY_REF));
+                        importStop.setTag("gtfsconflict", "yes");
+                    }
+                }
+            }
+        }
+    }
 }
