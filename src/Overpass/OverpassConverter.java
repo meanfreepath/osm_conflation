@@ -50,7 +50,7 @@ public class OverpassConverter {
                 curElement = elements.getJSONObject(elemIdx);
                 final String elementType = curElement.getString("type");
                 if(elementType.equals(OSMEntity.OSMType.node.name())) {
-                    OSMNode node = new OSMNode(curElement.getLong(keyId));
+                    final OSMNode node = new OSMNode(curElement.getLong(keyId));
                     node.setCoordinate(curElement.getDouble("lat"), curElement.getDouble("lon"));
 
                     if(curElement.has(keyTags)) {
@@ -61,7 +61,7 @@ public class OverpassConverter {
                     }
                     entitySpace.addEntity(node, OSMEntitySpace.EntityMergeStrategy.overwrite, null);
                 } else if(elementType.equals(OSMEntity.OSMType.way.name())) {
-                    OSMWay way = new OSMWay(curElement.getLong(keyId));
+                    final OSMWay way = new OSMWay(curElement.getLong(keyId));
                     if(curElement.has(keyTags)) {
                         addTags(curElement, way);
                     }
@@ -77,8 +77,7 @@ public class OverpassConverter {
                     }
                     entitySpace.addEntity(way, OSMEntitySpace.EntityMergeStrategy.overwrite, null);
                 } else if(elementType.equals(OSMEntity.OSMType.relation.name())) {
-                    System.out.println(curElement.toString());
-                    OSMRelation relation = new OSMRelation(curElement.getLong(keyId));
+                    final OSMRelation relation = new OSMRelation(curElement.getLong(keyId));
                     if(curElement.has(keyTags)) {
                         addTags(curElement, relation);
                     }
@@ -99,19 +98,19 @@ public class OverpassConverter {
                                 case "node":
                                     memberEntity = entitySpace.allNodes.get(memberId);
                                     if(memberEntity == null) {
-                                        memberEntity = OSMNode.create();
+                                        System.out.println("Node #" + memberId + " not in entity space");
                                     }
                                     break;
                                 case "way":
                                     memberEntity = entitySpace.allWays.get(memberId);
                                     if(memberEntity == null) {
-                                        memberEntity = OSMWay.create();
+                                        System.out.println("Way #" + memberId + " not in entity space");
                                     }
                                     break;
                                 case "relation":
                                     memberEntity = entitySpace.allRelations.get(memberId);
                                     if(memberEntity == null) {
-                                        memberEntity = OSMRelation.create();
+                                        System.out.println("Relation #" + memberId + " not in entity space");
                                     }
                                     break;
                             }
