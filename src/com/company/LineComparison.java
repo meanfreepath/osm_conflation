@@ -1,6 +1,5 @@
 package com.company;
 
-import OSM.OSMRelation;
 import OSM.OSMWay;
 import OSM.Point;
 import OSM.Region;
@@ -12,10 +11,9 @@ import java.util.List;
  * Created by nick on 11/3/15.
  */
 public class LineComparison {
-    public final WaySegments mainWaySegments;
-    public final List<OSMWay> candidateWays;
+    public final WaySegments mainLine;
+    private final List<OSMWay> candidateWays;
     public final HashMap<Long, WaySegments> candidateLines;
-    public final HashMap<Long, WaySegments> matchingLines;
     public final ComparisonOptions options;
     public final boolean debug;
 
@@ -30,32 +28,36 @@ public class LineComparison {
         }
     }
 
-    public LineComparison(final OSMWay line, final List<OSMWay> candidates, ComparisonOptions options, boolean debug) {
+    public LineComparison(final OSMWay line, final List<OSMWay> candidates, final ComparisonOptions options, final boolean debug) {
         this.debug = debug;
-        mainWaySegments = new WaySegments(line, options.maxSegmentLength, debug);
+        mainLine = new WaySegments(line, options.maxSegmentLength, debug);
         candidateWays = candidates;
         this.options = options;
 
         candidateLines = new HashMap<>(candidateWays.size());
-        matchingLines = new HashMap<>(candidateWays.size() / 2); //rough estimate that ~50% will match a segment bounding box
 
         LineMatch.debug = debug;
     }
 
     public void matchLines() {
         //first compile a list of OSM ways whose bounding boxes intersect *each segment* of the main line
-        final double latitudeDelta = -options.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * mainWaySegments.segments.get(0).originPoint.latitude / 180.0);
-        for(final LineSegment mainLineSegment : mainWaySegments.segments) {
+        final double latitudeDelta = -options.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * mainLine.segments.get(0).originPoint.latitude / 180.0);
+        for(final LineSegment mainLineSegment : mainLine.segments) {
             final Region mainBoundingBox = mainLineSegment.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
             for(final OSMWay candidateWay : candidateWays) {
+                //don't match against any lines that have been marked as "ethereal", such as other gtfs shape lines
+                if(candidateWay.hasTag("gtfs:ethereal")) {
+                    continue;
+                }
+
                 //check for candidate lines whose bounding box intersects this segment
                 if(Region.intersects(mainBoundingBox, candidateWay.getBoundingBox().regionInset(latitudeDelta, longitudeDelta))) {
                     final WaySegments candidateSegments;
-                    if(!matchingLines.containsKey(candidateWay.osm_id)) {
+                    if(!candidateLines.containsKey(candidateWay.osm_id)) {
                         candidateSegments = new WaySegments(candidateWay, options.maxSegmentLength, debug);
-                        matchingLines.put(candidateWay.osm_id, candidateSegments);
+                        candidateLines.put(candidateWay.osm_id, candidateSegments);
                     } else {
-                        candidateSegments = matchingLines.get(candidateWay.osm_id);
+                        candidateSegments = candidateLines.get(candidateWay.osm_id);
                     }
 
                     //and add to the candidate list for this segment
@@ -65,7 +67,7 @@ public class LineComparison {
         }
 
         //now that we have a rough idea of the candidate ways for each segment, run detailed checks on their segments' distance and dot product
-        for(final LineSegment mainSegment : mainWaySegments.segments) {
+        for(final LineSegment mainSegment : mainLine.segments) {
             for(final WaySegments candidateLine : mainSegment.candidateWaySegments) {
                 for(final LineSegment candidateSegment : candidateLine.segments) {
                     SegmentMatch.checkCandidateForMatch(this, mainSegment, candidateSegment, candidateLine.matchObject);
@@ -74,7 +76,7 @@ public class LineComparison {
         }
 
         //consolidate the segment match data for each matching line
-        for(final WaySegments line : matchingLines.values()) {
+        for(final WaySegments line : candidateLines.values()) {
             line.matchObject.summarize();
         }
 

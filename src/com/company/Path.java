@@ -3,7 +3,6 @@ package com.company;
 import OSM.OSMEntity;
 import OSM.OSMNode;
 
-import javax.swing.text.NumberFormatter;
 import java.text.DecimalFormat;
 import java.util.*;
 
@@ -106,9 +105,9 @@ public class Path implements Cloneable {
     public String toString() {
         final StringBuilder pathStr = new StringBuilder(pathSegments.size() * 32);
         for(final PathSegment pathSegment : pathSegments) {
-            pathStr.append(pathSegment.line.line.getTag("name"));
+            pathStr.append(pathSegment.line.way.getTag("name"));
             pathStr.append(":");
-            pathStr.append(pathSegment.line.line.osm_id);
+            pathStr.append(pathSegment.line.way.osm_id);
             pathStr.append("->");
         }
         pathStr.replace(pathStr.length() - 2, pathStr.length(), "\n");
@@ -117,13 +116,13 @@ public class Path implements Cloneable {
     public boolean containsEntity(final long osm_id, final OSMEntity.OSMType type) {
         if(type == OSMEntity.OSMType.way) {
             for (final PathSegment pathSegment : pathSegments) {
-                if (pathSegment.line.line.osm_id == osm_id) {
+                if (pathSegment.line.way.osm_id == osm_id) {
                     return true;
                 }
             }
         } else if(type == OSMEntity.OSMType.node) {
             for(final PathSegment pathSegment : pathSegments) {
-                for(final OSMNode node : pathSegment.line.line.getNodes()) {
+                for(final OSMNode node : pathSegment.line.way.getNodes()) {
                     if(node.osm_id == osm_id) {
                         return true;
                     }
@@ -136,9 +135,9 @@ public class Path implements Cloneable {
         final DecimalFormat format = new DecimalFormat("0.00");
         final StringBuilder output = new StringBuilder(pathSegments.size() * 128);
         for(final PathSegment segment : pathSegments) {
-            output.append(segment.line.line.getTag(OSMEntity.KEY_NAME));
+            output.append(segment.line.way.getTag(OSMEntity.KEY_NAME));
             output.append(" (");
-            output.append(segment.line.line.osm_id);
+            output.append(segment.line.way.osm_id);
             output.append("): ");
             output.append(format.format(segment.getScoreSegments()));
             output.append("/");

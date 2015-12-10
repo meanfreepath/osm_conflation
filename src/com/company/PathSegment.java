@@ -4,8 +4,6 @@ import OSM.OSMEntity;
 import OSM.OSMNode;
 import OSM.OSMWay;
 
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +50,7 @@ public class PathSegment {
         parentPathSegment = parent;
         line = startingWay;
         this.originatingNode = originatingNode;
-        oneWayDirection = determineOneWayDirection(line.line);
+        oneWayDirection = determineOneWayDirection(line.way);
         scoreSegments = scoreStops = 0.0;
         this.scoreAdjust = scoreAdjust;
         this.debugDepth = debugDepth;
@@ -86,7 +84,7 @@ public class PathSegment {
     public boolean process(final HashMap<Long, WaySegments> linesInRouteBoundingBox) {
 
         //determine the direction of this line relative to the direction of route travel
-        final List<OSMNode> segmentNodes = new ArrayList<>(line.line.getNodes().size());
+        final List<OSMNode> segmentNodes = new ArrayList<>(line.way.getNodes().size());
         boolean ourDirectionForward = line.matchObject.getAvgDotProduct() >= 0.0;
 
         //boost the score if there's are stops on the current line segment
@@ -104,7 +102,7 @@ public class PathSegment {
         final OSMNode firstNode, lastNode;
         if(ourDirectionForward) { //i.e. we're traveling along the natural direction of this way
             if(oneWayDirection == OneWayDirection.backward) { //oneway runs counter our direction of travel
-                debugLog("PATH BLOCKS ENTRY TO " + line.line.getTag("name") + " (" + line.line.osm_id + ")\n");
+                debugLog("PATH BLOCKS ENTRY TO " + line.way.getTag("name") + " (" + line.way.osm_id + ")\n");
                 return false;
             }
 
@@ -113,7 +111,7 @@ public class PathSegment {
 
             //if entering from the originating node would cause us to go counter to the oneway, also bail
             if(originatingNode == lastNode) {
-                debugLog("REVPATH BLOCKS ENTRY TO " + line.line.getTag("name") + " (" + line.line.osm_id + ")\n");
+                debugLog("REVPATH BLOCKS ENTRY TO " + line.way.getTag("name") + " (" + line.way.osm_id + ")\n");
                 return false;
             }
 
@@ -133,7 +131,7 @@ public class PathSegment {
             }
         } else { //i.e. we're traveling against the natural direction of this way
             if(oneWayDirection == OneWayDirection.forward) { //oneway runs counter our direction of travel
-                debugLog("PATH BLOCKS ENTRY TO " + line.line.getTag("name") + " (" + line.line.osm_id + ")\n");
+                debugLog("PATH BLOCKS ENTRY TO " + line.way.getTag("name") + " (" + line.way.osm_id + ")\n");
                 return false;
             }
 
@@ -142,7 +140,7 @@ public class PathSegment {
 
             //if entering from the originating node would cause us to go counter to the oneway, also bail
             if(originatingNode == lastNode) {
-                debugLog("REVPATH BLOCKS ENTRY TO " + line.line.getTag("name") + " (" + line.line.osm_id + ")\n");
+                debugLog("REVPATH BLOCKS ENTRY TO " + line.way.getTag("name") + " (" + line.way.osm_id + ")\n");
                 return false;
             }
 
@@ -173,7 +171,7 @@ public class PathSegment {
         }
 
         //and generate the list of lines that intersect this line, to check for path continuation
-        debugLog("CHECK INTERSECTION for " + line.line.getTag("name") + " (" + line.line.osm_id + "):\n");
+        debugLog("CHECK INTERSECTION for " + line.way.getTag("name") + " (" + line.way.osm_id + "):\n");
         final List<LineIntersection> intersectingLines = new ArrayList<>(INITIAL_CHILD_CAPACITY);
         for(final OSMNode containedNode : segmentNodes) {
             //don't allow paths back through the originating node of this path (i.e. no U-turns)
@@ -186,7 +184,7 @@ public class PathSegment {
             if(containedNode.containingWayCount > 1) {
                 for(final OSMWay containingWay : containedNode.containingWays.values()) {
                     //skip this line (will be part of every node's containingWays array)
-                    if(containingWay.osm_id == line.line.osm_id) {
+                    if(containingWay.osm_id == line.way.osm_id) {
                         //debugLog("SKIPPED " + containingWay.getTag("name") + " (" + containingWay.osm_id + ") at node " + containedNode.osm_id + "\n");
                         continue;
                     }
@@ -206,25 +204,25 @@ public class PathSegment {
         //if no intersecting ways, this is a dead end
         final int intersectingLineCount = intersectingLines.size();
         if(intersectingLineCount == 0) {
-            debugLog("DEAD END at " + line.line.getTag("name") + " (" + line.line.osm_id + ")\n");
+            debugLog("DEAD END at " + line.way.getTag("name") + " (" + line.way.osm_id + ")\n");
             return false;
         }
 
         //now check the intersecting lines to see whether they're good segments to follow
         PathSegment curPathSegment;
-        debugLog("NOW CHECK " + line.line.getTag("name") + " (" + line.line.osm_id + "): " + intersectingLines.size() + " intersecting\n");
+        debugLog("NOW CHECK " + line.way.getTag("name") + " (" + line.way.osm_id + "): " + intersectingLines.size() + " intersecting\n");
         for(final LineIntersection intersection : intersectingLines) {
-            debugLog("WITH " + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")");
+            debugLog("WITH " + intersection.intersectingLine.way.getTag("name") + " (" + intersection.intersectingLine.way.osm_id + ")");
 
             double childScoreAdjust = 0.0;
             //if the current way doesn't contain any matching segments, skip it
             if(intersection.intersectingLine.matchObject.matchingSegmentCount == 0) {
                 if(!checkDetours || intersectingLineCount > 1) {
-                    debugLog(":::NO MATCH for " + line.line.getTag("name") + "(" + line.line.osm_id + ")->" + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")\n");
+                    debugLog(":::NO MATCH for " + line.way.getTag("name") + "(" + line.way.osm_id + ")->" + intersection.intersectingLine.way.getTag("name") + " (" + intersection.intersectingLine.way.osm_id + ")\n");
                     continue;
                 } else {
                     childScoreAdjust = SCORE_FOR_DETOUR;
-                    debugLog(":::SPUR MATCH for " + line.line.getTag("name") + "(" + line.line.osm_id + ")->" + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")\n");
+                    debugLog(":::SPUR MATCH for " + line.way.getTag("name") + "(" + line.way.osm_id + ")->" + intersection.intersectingLine.way.getTag("name") + " (" + intersection.intersectingLine.way.osm_id + ")\n");
                 }
             }
 
@@ -232,21 +230,21 @@ public class PathSegment {
             boolean onPath = false;
             curPathSegment = this;
             while (curPathSegment.parentPathSegment != null) {
-                if (curPathSegment.line.line.osm_id == intersection.intersectingLine.line.osm_id) {
+                if (curPathSegment.line.way.osm_id == intersection.intersectingLine.way.osm_id) {
                     onPath = true;
                     break;
                 }
                 curPathSegment = curPathSegment.parentPathSegment;
             }
             if (onPath) {
-                debugLog(":::PREVADD " + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")");
+                debugLog(":::PREVADD " + intersection.intersectingLine.way.getTag("name") + " (" + intersection.intersectingLine.way.osm_id + ")");
                 continue;
             }
 
             //TODO check if a turn restriction prevents turning at this junction
 
             //if there's a path from this way to the intersecting way, add a path
-            debugLog(":::add path " + line.line.getTag("name") + "(" + line.line.osm_id + ")->" + intersection.intersectingLine.line.getTag("name") + " (" + intersection.intersectingLine.line.osm_id + ")\n");
+            debugLog(":::add path " + line.way.getTag("name") + "(" + line.way.osm_id + ")->" + intersection.intersectingLine.way.getTag("name") + " (" + intersection.intersectingLine.way.osm_id + ")\n");
             final PathSegment childPathSegment = new PathSegment(parentPathTree, this, intersection.intersectingLine, intersection.intersectingNode, childScoreAdjust, debugDepth + 1);
             if(childPathSegment.process(linesInRouteBoundingBox)) {
                 childPathSegments.add(childPathSegment);
@@ -270,7 +268,7 @@ public class PathSegment {
             boolean output = false;
             if(debugFilterIds.length > 0) {
                 for(short i=0;i<debugFilterIds.length;i++) {
-                    if(line.line.osm_id == debugFilterIds[i]) {
+                    if(line.way.osm_id == debugFilterIds[i]) {
                         output = true;
                         break;
                     }

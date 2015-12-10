@@ -13,21 +13,21 @@ import java.util.List;
  * Created by nick on 11/9/15.
  */
 public class WaySegments {
-    public final OSMWay line;
+    public final OSMWay way;
     public final List<LineSegment> segments;
     public final LineMatch matchObject;
     private final boolean debug;
 
-    public WaySegments(final OSMWay line, final double maxSegmentLength, boolean debug) {
-        this.line = line;
+    public WaySegments(final OSMWay way, final double maxSegmentLength, boolean debug) {
+        this.way = way;
         this.debug = debug;
         matchObject = new LineMatch(this);
 
         //generate a list of line segments out of this line
-        segments = new ArrayList<>(line.getNodes().size() - 1); //TODO base on total line length, to handle the newly
-        OSMNode originNode = line.getNodes().get(0);
+        segments = new ArrayList<>(way.getNodes().size() - 1); //TODO base on total line length, to handle the newly
+        OSMNode originNode = way.getNodes().get(0);
         int nodeIndex = 0, segmentIndex = 0;
-        for(final OSMNode destinationNode: line.getNodes()) {
+        for(final OSMNode destinationNode: way.getNodes()) {
             if (destinationNode == originNode) { //skip the first iteration
                 continue;
             }
@@ -86,7 +86,7 @@ public class WaySegments {
             double closestNodeDistance = Double.MAX_VALUE, curDistance;
             OSMNode closestNode = null;
 
-            for(final OSMNode existingNode : line.getNodes()) {
+            for(final OSMNode existingNode : way.getNodes()) {
                 curDistance = Point.distance(nodePoint, existingNode.getCentroid());
                 if(curDistance <= closestNodeDistance) {
                     closestNodeDistance = curDistance;
@@ -117,7 +117,7 @@ public class WaySegments {
         }
 
         segments.add(insertedSegment.segmentIndex, insertedSegment);
-        line.insertNode(node, insertedSegment.nodeIndex);
+        way.insertNode(node, insertedSegment.nodeIndex);
 
         return node;
     }
@@ -137,6 +137,6 @@ public class WaySegments {
         //the new segment starts from the last segment's destinationPoint
         final LineSegment newSegment = new LineSegment(this, lastSegment.destinationPoint, node.getCentroid(), lastSegment.destinationNode, node, lastSegment.segmentIndex + 1, lastSegment.nodeIndex + 1);
         segments.add(newSegment);
-        line.appendNode(node);
+        way.appendNode(node);
     }
 }

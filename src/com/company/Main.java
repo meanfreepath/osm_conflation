@@ -88,14 +88,14 @@ public class Main {
                     comparison.matchLines();
 
                     //also, match the stops in the relation to their nearest matching way
-                    final List<StopWayMatch> allStopMatches = matchStopsToWays(relation, comparison.matchingLines.values(), existingDataSpace);
+                    final List<StopWayMatch> allStopMatches = matchStopsToWays(relation, comparison.candidateLines.values(), existingDataSpace);
 
                     //update the primary entity space to determine all connecting ways
                     existingDataSpace.generateWayNodeMapping(false);
 
                     //now find the optimal path from the first stop to the last stop, using the provided ways
                     final PathTree pathList = new PathTree(relation);
-                    pathList.findPaths(allStopMatches, comparison.matchingLines);
+                    pathList.findPaths(allStopMatches, comparison.candidateLines);
 
                     //TODO: split ways that only partially overlap the main way
 
@@ -104,7 +104,7 @@ public class Main {
                     //relation.removeMember(routePath);
                     if(pathList.bestPath != null) {
                         for (final PathSegment pathSegment : pathList.bestPath.pathSegments) {
-                            relation.addMember(pathSegment.line.line, "");
+                            relation.addMember(pathSegment.line.way, "");
                         }
                     }
 
@@ -159,7 +159,7 @@ public class Main {
             final Point platformCentroid = stopPlatform.getCentroid();
             for(final WaySegments matchingLine : candidateLines) {
                 //check the line's bounding box intersects
-                if(!Region.intersects(matchingLine.line.getBoundingBox(), searchRegion)) {
+                if(!Region.intersects(matchingLine.way.getBoundingBox(), searchRegion)) {
                     continue;
                 }
 
@@ -190,7 +190,7 @@ public class Main {
                 //also try matching based on the stop name and way names, preferring the stop's first name component
                 boolean matchedByName = false;
                 if(stopName != null) {
-                    final String wayName = matchingLine.line.getTag(OSMEntity.KEY_NAME);
+                    final String wayName = matchingLine.way.getTag(OSMEntity.KEY_NAME);
                     if (wayName != null) { //if the name matches use this way
                         if (stopStreetNames[0].equals(wayName)) {
                             wayMatch.addWayMatch(nearestSegmentMatch, minDistance, StopWayMatch.MatchType.primaryStreet);
@@ -258,7 +258,7 @@ public class Main {
 
         //output the route's shape segments
         OSMNode originNode = null, lastNode;
-        for(final LineSegment mainSegment : comparison.mainWaySegments.segments) {
+        for(final LineSegment mainSegment : comparison.mainLine.segments) {
             final OSMWay segmentWay = segmentSpace.createWay(null, null);
             if(originNode == null) {
                 if(mainSegment.originNode != null) {
@@ -274,16 +274,16 @@ public class Main {
             }
             segmentWay.appendNode(originNode);
             segmentWay.appendNode(lastNode);
-            segmentWay.setTag(OSMEntity.KEY_REF, comparison.mainWaySegments.line.getTag(OSMEntity.KEY_NAME));
+            segmentWay.setTag(OSMEntity.KEY_REF, comparison.mainLine.way.getTag(OSMEntity.KEY_NAME));
             segmentWay.setTag(OSMEntity.KEY_NAME, mainSegment.getDebugName());
-            OSMEntity.copyTag(comparison.mainWaySegments.line, segmentWay, "highway");
-            OSMEntity.copyTag(comparison.mainWaySegments.line, segmentWay, "railway");
+            OSMEntity.copyTag(comparison.mainLine.way, segmentWay, "highway");
+            OSMEntity.copyTag(comparison.mainLine.way, segmentWay, "railway");
             //OSMEntity.copyTag(mai, segmentWay, OSMEntity.KEY_NAME);
             originNode = lastNode;
         }
 
         //output the segments matching the main route path
-        for (final WaySegments matchingLine : comparison.matchingLines.values()) {
+        for (final WaySegments matchingLine : comparison.candidateLines.values()) {
             OSMNode matchOriginNode = null, matchLastNode;
             for(final LineSegment matchingSegment : matchingLine.segments) {
                 if(matchingSegment.bestMatch == null) { //skip non-matching segments
@@ -306,9 +306,9 @@ public class Main {
                 final OSMWay matchingSegmentWay = segmentSpace.createWay(null, null);
                 matchingSegmentWay.appendNode(matchOriginNode);
                 matchingSegmentWay.appendNode(matchLastNode);
-                OSMEntity.copyTag(matchingSegment.parentSegments.line, matchingSegmentWay, "highway");
-                OSMEntity.copyTag(matchingSegment.parentSegments.line, matchingSegmentWay, "railway");
-                OSMEntity.copyTag(matchingSegment.parentSegments.line, matchingSegmentWay, OSMEntity.KEY_NAME);
+                OSMEntity.copyTag(matchingSegment.parentSegments.way, matchingSegmentWay, "highway");
+                OSMEntity.copyTag(matchingSegment.parentSegments.way, matchingSegmentWay, "railway");
+                OSMEntity.copyTag(matchingSegment.parentSegments.way, matchingSegmentWay, OSMEntity.KEY_NAME);
                 if(matchingSegment.bestMatch != null) {
                     matchingSegmentWay.setTag("note", "With: " + matchingSegment.bestMatch.mainSegment.getDebugName() + ", DP: " + format.format(matchingSegment.bestMatch.dotProduct) + ", DIST: " + format.format(matchingSegment.bestMatch.orthogonalDistance));
                 } else {
@@ -325,7 +325,7 @@ public class Main {
 
 
         }
-        segmentSpace.outputXml("segments" + comparison.mainWaySegments.line.osm_id + ".osm");
+        segmentSpace.outputXml("segments" + comparison.mainLine.way.osm_id + ".osm");
     }
 
 }
