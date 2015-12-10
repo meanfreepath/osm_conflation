@@ -21,10 +21,7 @@ public class OSMWay extends OSMEntity {
     private final List<OSMNode> nodes = new ArrayList<>(INITIAL_CAPACITY_NODE);
     private OSMNode firstNode = null, lastNode = null;
 
-    public static OSMWay create() {
-        return new OSMWay(acquire_new_id());
-    }
-    public OSMWay(long id) {
+    public OSMWay(final long id) {
         super(id);
     }
 
@@ -138,37 +135,6 @@ public class OSMWay extends OSMEntity {
             } else {
                 return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id, String.valueOf(visible));
             }
-        }
-    }
-    @Override
-    public void copyFrom(final OSMEntity otherEntity, final boolean copyTags, final boolean copyMetadata) throws InvalidArgumentException {
-        if(!(otherEntity instanceof OSMWay)) {
-            String[] errMsg = {"Can only copy data from other ways"};
-            throw new InvalidArgumentException(errMsg);
-        }
-        super.copyFrom(otherEntity, copyTags, copyMetadata);
-
-        //also copy the location of the nodes in this way
-        final OSMWay otherWay = (OSMWay) otherEntity;
-        final Iterator<OSMNode> otherWayNodeIterator = otherWay.nodes.listIterator();
-        for(final OSMNode node : nodes) {
-            if(otherWayNodeIterator.hasNext()) {
-                node.copyFrom(otherWayNodeIterator.next(), true, true);
-            } else {
-                appendNode(node); //TODO: need to make the EntitySpace aware of this!!
-                break;
-            }
-        }
-    }
-    @Override
-    public OSMWay clone() {
-        final OSMWay newEntity = OSMWay.create();
-        try {
-            newEntity.copyFrom(this, true, false);
-        } catch (InvalidArgumentException e) {
-            //Won't happen
-        } finally {
-            return newEntity;
         }
     }
 }

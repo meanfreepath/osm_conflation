@@ -10,7 +10,7 @@ import java.util.Map;
 /**
  * Created by nick on 10/15/15.
  */
-public abstract class OSMEntity implements Cloneable {
+public abstract class OSMEntity {
     public final static String KEY_LATITUDE = "lat", KEY_LONGITUDE = "lon", KEY_OSMID = "osm_id", KEY_FROM = "from", KEY_VIA = "via", KEY_TO = "to", KEY_OPERATOR = "operator", KEY_ROUTE = "route", KEY_ROUTE_MASTER = "route_master", KEY_NAME = "name", KEY_REF = "ref", KEY_LOCAL_REF = "local_ref", KEY_DESCRIPTION = "description", KEY_WEBSITE = "website", KEY_TYPE = "type", KEY_PUBLIC_TRANSPORT_VERSION = "public_transport:version", KEY_COLOUR = "colour", KEY_AMENITY = "amenity", KEY_WHEELCHAIR = "wheelchair";
     public final static String TAG_ROUTE = "route", TAG_ROUTE_MASTER = "route_master", TAG_BUS = "bus", TAG_LIGHT_RAIL = "light_rail", TAG_TRAM = "tram", TAG_SUBWAY = "subway", TAG_TRAIN = "train", TAG_FERRY = "ferry", TAG_AERIALWAY = "aerialway", TAG_YES = "yes", TAG_NO = "no";
 
@@ -19,7 +19,6 @@ public abstract class OSMEntity implements Cloneable {
     }
 
     protected final static String BASE_XML_TAG_FORMAT_TAG = "  <tag k=\"%s\" v=\"%s\"/>\n";
-    protected static long new_id_sequence = 0;
     public final long osm_id;
 
     //Metadata (not required)
@@ -30,12 +29,6 @@ public abstract class OSMEntity implements Cloneable {
 
     protected HashMap<String,String> tags;
 
-    protected static long acquire_new_id() {
-        return --new_id_sequence;
-    }
-    public static void setIdSequence(long sequence) {
-        new_id_sequence = sequence;
-    }
     public abstract OSMType getType();
     public abstract Region getBoundingBox();
     public abstract Point getCentroid();
@@ -140,30 +133,4 @@ public abstract class OSMEntity implements Cloneable {
         }
         return result.toString();
     }
-
-    /**
-     * Copy the data from the given entity into this entity
-     * @param otherEntity
-     * @param copyTags
-     * @param copyMetadata
-     */
-    public void copyFrom(final OSMEntity otherEntity, final boolean copyTags, final boolean copyMetadata) throws InvalidArgumentException {
-        if(copyTags) {
-            for(final Map.Entry<String, String> tag : otherEntity.tags.entrySet()) {
-                setTag(tag.getKey(), tag.getValue());
-            }
-        }
-
-        //copy metadata only if none present for this node
-        if(copyMetadata && version >= 0) {
-            //osm_id = otherEntity.osm_id;
-            uid = otherEntity.uid;
-            version = otherEntity.version;
-            changeset = otherEntity.changeset;
-            user = otherEntity.user;
-            timestamp = otherEntity.timestamp;
-        }
-    }
-    @Override
-    public abstract OSMEntity clone();
 }
