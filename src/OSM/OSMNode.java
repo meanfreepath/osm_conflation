@@ -15,8 +15,8 @@ public class OSMNode extends OSMEntity {
     private final static OSMType type = OSMType.node;
     private double lat, lon;
     private Point coordinate;
-    public HashMap<Long, OSMWay> containingWays = null;
-    public short containingWayCount = -1;
+    public final HashMap<Long, OSMWay> containingWays = new HashMap<>(4);
+    public short containingWayCount = 0;
 
     public OSMNode(final long id) {
         super(id);
@@ -26,31 +26,30 @@ public class OSMNode extends OSMEntity {
      * Copy constructor
      * @param nodeToCopy
      */
-    public OSMNode(final OSMNode nodeToCopy) {
-        super(nodeToCopy);
+    public OSMNode(final OSMNode nodeToCopy, final Long idOverride) {
+        super(nodeToCopy, idOverride);
         setCoordinate(nodeToCopy.coordinate);
     }
-
     /**
-     * Resets this node's containing way map
-     */
-    public void resetContainingWays() {
-        containingWays = null;
-        containingWayCount = 0;
-    }
-    /**
-     * Adds the given way to this node's containingWays array
+     * Notifies this node it's been added to the given way's node list
      * @param way
      */
-    public void addContainingWay(final OSMWay way) {
-        if(containingWays == null) {
-            containingWays = new HashMap<>(4);
-            containingWayCount = 0;
-        }
+    protected void didAddToWay(final OSMWay way) {
         if(!containingWays.containsKey(way.osm_id)) {
             containingWays.put(way.osm_id, way);
             containingWayCount++;
-            setTag("icount", Short.toString(containingWayCount));
+        }
+        setTag("wcount", Short.toString(containingWayCount));
+    }
+    /**
+     * Notifies this node it's been removed from the given way's node list
+     * @param way
+     */
+    protected void didRemoveFromWay(final OSMWay way) {
+        if(containingWays.containsKey(way.osm_id)) {
+            containingWays.remove(way.osm_id);
+            containingWayCount--;
+            setTag("wcount", Short.toString(containingWayCount));
         }
     }
 

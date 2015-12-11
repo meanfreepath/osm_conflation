@@ -31,23 +31,29 @@ public class OSMWay extends OSMEntity {
      * @param wayToCopy
      * @param nodeCopyStrategy
      */
-    public OSMWay(final OSMWay wayToCopy, final MemberCopyStrategy nodeCopyStrategy) {
-        super(wayToCopy);
+    public OSMWay(final OSMWay wayToCopy, final Long idOverride, final MemberCopyStrategy nodeCopyStrategy) {
+        super(wayToCopy, idOverride);
 
         //add the nodes
         switch (nodeCopyStrategy) {
             case deep: //if deep copying, individually copy the nodes as well
                 for(final OSMNode node : wayToCopy.nodes) {
-                    appendNode(new OSMNode(node));
+                    appendNode(new OSMNode(node, null));
                 }
                 break;
             case shallow:
                 nodes.addAll(wayToCopy.nodes);
+                for(final OSMNode addedNode : nodes) {
+                    addedNode.didAddToWay(this);
+                }
                 break;
             case none:
                 break;
         }
 
+        updateFirstAndLastNodes();
+    }
+    private void updateFirstAndLastNodes() {
         if(nodes.size() > 0) {
             firstNode = nodes.get(0);
             lastNode = nodes.get(nodes.size() - 1);
@@ -60,13 +66,9 @@ public class OSMWay extends OSMEntity {
      * @param index
      */
     public void insertNode(final OSMNode node, final int index) {
-        if(index == 0) {
-            firstNode = node;
-        }
-        if(index == nodes.size() - 1) {
-            lastNode = node;
-        }
         nodes.add(index, node);
+        node.didAddToWay(this);
+        updateFirstAndLastNodes();
 
         boundingBox = null; //invalidate the bounding box
     }
@@ -75,12 +77,44 @@ public class OSMWay extends OSMEntity {
      * @param node
      */
     public void appendNode(final OSMNode node) {
-        if(nodes.size() == 0) {
-            firstNode = node;
-        }
-        lastNode = node;
         nodes.add(node);
+        node.didAddToWay(this);
+        updateFirstAndLastNodes();
         boundingBox = null; //invalidate the bounding box
+    }
+    public boolean removeNode(final OSMNode node) {
+        return replaceNode(node, null);
+    }
+    /**
+     * Replace the old node with the new node
+     * @param oldNode
+     * @param newNode
+     * @return TRUE if the node was found and replaced
+     */
+    public boolean replaceNode(final OSMNode oldNode, final OSMNode newNode) {
+        final int nodeIndex = nodes.indexOf(oldNode);
+        if(nodeIndex >= 0) {
+            if(newNode != null) {
+                nodes.set(nodeIndex, newNode);
+                newNode.didAddToWay(this);
+            } else {
+                nodes.remove(nodeIndex);
+            }
+            oldNode.didRemoveFromWay(this);
+            updateFirstAndLastNodes();
+            boundingBox = null; //invalidate the bounding box
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Checks whether the given node is a member of this way
+     * @param node
+     * @return
+     */
+    public boolean containsNode(final OSMNode node) {
+        return nodes.indexOf(node) >= 0;
     }
     public List<OSMNode> getNodes() {
         return nodes;
@@ -114,8 +148,8 @@ public class OSMWay extends OSMEntity {
             return boundingBox;
         }
 
-        Region node0BoundingBox = nodes.get(0).getBoundingBox();
-        Region boundingBox = new Region(node0BoundingBox.origin, node0BoundingBox.extent);
+        final Region node0BoundingBox = firstNode.getBoundingBox();
+        final Region boundingBox = new Region(node0BoundingBox.origin, node0BoundingBox.extent);
         for(OSMNode node: nodes) {
             boundingBox.combinedBoxWithRegion(node.getBoundingBox());
         }

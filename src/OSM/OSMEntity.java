@@ -13,6 +13,7 @@ import java.util.Map;
 public abstract class OSMEntity {
     public final static String KEY_LATITUDE = "lat", KEY_LONGITUDE = "lon", KEY_OSMID = "osm_id", KEY_FROM = "from", KEY_VIA = "via", KEY_TO = "to", KEY_OPERATOR = "operator", KEY_ROUTE = "route", KEY_ROUTE_MASTER = "route_master", KEY_NAME = "name", KEY_REF = "ref", KEY_LOCAL_REF = "local_ref", KEY_DESCRIPTION = "description", KEY_WEBSITE = "website", KEY_TYPE = "type", KEY_PUBLIC_TRANSPORT_VERSION = "public_transport:version", KEY_COLOUR = "colour", KEY_AMENITY = "amenity", KEY_WHEELCHAIR = "wheelchair";
     public final static String TAG_ROUTE = "route", TAG_ROUTE_MASTER = "route_master", TAG_BUS = "bus", TAG_LIGHT_RAIL = "light_rail", TAG_TRAM = "tram", TAG_SUBWAY = "subway", TAG_TRAIN = "train", TAG_FERRY = "ferry", TAG_AERIALWAY = "aerialway", TAG_YES = "yes", TAG_NO = "no";
+    protected final static String BASE_XML_TAG_FORMAT_TAG = "  <tag k=\"%s\" v=\"%s\"/>\n";
 
     public enum OSMType {
         node, way, relation
@@ -20,8 +21,10 @@ public abstract class OSMEntity {
     public enum MemberCopyStrategy {
         none, shallow, deep
     }
+    public enum TagMergeStrategy {
+        keepTags, replaceTags, copyTags, copyNonexistentTags, mergeTags
+    }
 
-    protected final static String BASE_XML_TAG_FORMAT_TAG = "  <tag k=\"%s\" v=\"%s\"/>\n";
     public final long osm_id;
 
     //Metadata (not required)
@@ -31,6 +34,8 @@ public abstract class OSMEntity {
     protected Region boundingBox;
 
     protected HashMap<String,String> tags;
+    public final HashMap<Long, OSMRelation> containingRelations = new HashMap<>(4);
+    public short containingRelationCount = 0;
 
     public abstract OSMType getType();
     public abstract Region getBoundingBox();
@@ -44,9 +49,14 @@ public abstract class OSMEntity {
     /**
      * Copy constructor
      * @param entityToCopy
+     * @param idOverride: if specified, will use this id instead of entityToCopy's OSM id
      */
-    public OSMEntity(final OSMEntity entityToCopy) {
-        osm_id = entityToCopy.osm_id;
+    public OSMEntity(final OSMEntity entityToCopy, final Long idOverride) {
+        if(idOverride == null) {
+            osm_id = entityToCopy.osm_id;
+        } else {
+            osm_id = idOverride;
+        }
         uid = entityToCopy.uid;
         version = entityToCopy.version;
         changeset = entityToCopy.changeset;
@@ -70,6 +80,14 @@ public abstract class OSMEntity {
         if(fromValue != null) {
             to.setTag(name, fromValue);
         }
+    }
+    public static void copyMetadata(final OSMEntity from, final OSMEntity to) {
+        to.uid = from.uid;
+        to.version = from.version;
+        to.changeset = from.changeset;
+        to.user = from.user;
+        to.timestamp = from.timestamp;
+        to.boundingBox = from.boundingBox;
     }
     /**
      * Sets the given tag on this entity, only if it doesn't already exist
@@ -100,32 +118,45 @@ public abstract class OSMEntity {
         }
         tags.put(name, value.trim());
     }
-
     /**
      *
      * @param otherEntity
-     * @param clearTags
+     * @param mergeStrategy
      * @return Any tags that conflict (if checkForConflicts is TRUE), null otherwise
      */
-    public Map<String, String> copyTagsFrom(final OSMEntity otherEntity, final boolean clearTags, final boolean checkForConflicts) {
+    public Map<String, String> copyTagsFrom(final OSMEntity otherEntity, final TagMergeStrategy mergeStrategy) {
         if(tags == null) {
             tags = new HashMap<>();
-        } else if(clearTags) {
-            tags.clear();
         }
 
-        if(checkForConflicts) {
-            HashMap<String, String> conflictingTags = new HashMap<>(4);
-            for(Map.Entry<String, String> tag : otherEntity.tags.entrySet()) {
-                if(tags.containsKey(tag.getKey()) && !tags.get(tag.getKey()).equals(tag.getValue())) {
-                    conflictingTags.put(tag.getKey(), tag.getValue());
+        HashMap<String, String> conflictingTags = null;
+        switch (mergeStrategy) {
+            case keepTags:
+                break;
+            case replaceTags:
+                tags = new HashMap<>(otherEntity.tags);
+                break;
+            case copyTags:
+                tags.putAll(otherEntity.tags);
+                break;
+            case copyNonexistentTags:
+                for(Map.Entry<String, String> tag : otherEntity.tags.entrySet()) {
+                    if(!tags.containsKey(tag.getKey())) {
+                        tags.put(tag.getKey(), tag.getValue());
+                    }
                 }
-            }
-            return conflictingTags.size() > 0 ? conflictingTags : null;
-        } else {
-            tags.putAll(otherEntity.tags);
+                break;
+            case mergeTags:
+                conflictingTags = new HashMap<>(4);
+                for(Map.Entry<String, String> tag : otherEntity.tags.entrySet()) {
+                    if(tags.containsKey(tag.getKey()) && !tags.get(tag.getKey()).equals(tag.getValue())) {
+                        conflictingTags.put(tag.getKey(), tag.getValue());
+                    }
+                }
+                break;
         }
-        return null;
+
+        return conflictingTags != null && conflictingTags.size() > 0 ? conflictingTags : null;
     }
 
     /**
@@ -151,6 +182,29 @@ public abstract class OSMEntity {
     }
     public boolean hasTag(final String name) {
         return tags != null && tags.containsKey(name);
+    }
+
+    /**
+     * Notifies this entity it's been added to the given relation's member list
+     * @param relation
+     */
+    protected void didAddToRelation(final OSMRelation relation) {
+        if(!containingRelations.containsKey(relation.osm_id)) {
+            containingRelations.put(relation.osm_id, relation);
+            containingRelationCount++;
+        }
+        setTag("rcount", Short.toString(containingRelationCount));
+    }
+    /**
+     * Notifies this entity it's been removed from the given relation's member list
+     * @param relation
+     */
+    protected void didRemoveFromRelation(final OSMRelation relation) {
+        if(containingRelations.containsKey(relation.osm_id)) {
+            containingRelations.remove(relation.osm_id);
+            containingRelationCount--;
+            setTag("rcount", Short.toString(containingRelationCount));
+        }
     }
     public static String escapeForXML(final String str){
         final StringBuilder result = new StringBuilder(str.length());

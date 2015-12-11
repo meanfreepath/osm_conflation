@@ -40,8 +40,8 @@ public class OSMRelation extends OSMEntity {
      * @param relationToCopy
      * @param memberCopyStrategy
      */
-    public OSMRelation(final OSMRelation relationToCopy, final MemberCopyStrategy memberCopyStrategy) {
-        super(relationToCopy);
+    public OSMRelation(final OSMRelation relationToCopy, final Long idOverride, final MemberCopyStrategy memberCopyStrategy) {
+        super(relationToCopy, idOverride);
 
         //add the nodes
         switch (memberCopyStrategy) {
@@ -49,11 +49,11 @@ public class OSMRelation extends OSMEntity {
                 for(final OSMRelationMember member : relationToCopy.members) {
                     final OSMEntity clonedMember;
                     if(member.member instanceof OSMNode) {
-                        clonedMember = new OSMNode((OSMNode) member.member);
+                        clonedMember = new OSMNode((OSMNode) member.member, null);
                     } else if(member.member instanceof OSMWay) {
-                        clonedMember = new OSMWay((OSMWay) member.member, memberCopyStrategy);
+                        clonedMember = new OSMWay((OSMWay) member.member, null, memberCopyStrategy);
                     } else {
-                        clonedMember = new OSMRelation((OSMRelation) member.member, memberCopyStrategy);
+                        clonedMember = new OSMRelation((OSMRelation) member.member, null, memberCopyStrategy);
                     }
                     addMember(clonedMember, member.role);
                 }
@@ -131,6 +131,25 @@ public class OSMRelation extends OSMEntity {
         members.clear();
     }
 
+    private int indexOfMember(final OSMEntity entity) {
+        int index = 0;
+        for(final OSMRelationMember member : members) {
+            if(member.member == entity) {
+                return index;
+            }
+            index++;
+        }
+        return -1;
+    }
+    /**
+     * Checks whether the given node is a member of this way
+     * @param entity
+     * @return
+     */
+    public boolean containsMember(final OSMEntity entity) {
+        return indexOfMember(entity) >= 0;
+    }
+
     /**
      * Removes the given member from this relation
      * @param member
@@ -147,12 +166,32 @@ public class OSMRelation extends OSMEntity {
 
         if(relationMemberToRemove != null) {
             members.remove(relationMemberToRemove);
+            relationMemberToRemove.member.didRemoveFromRelation(this);
             return true;
         }
         return false;
     }
     public void addMember(final OSMEntity member, final String role) {
         members.add(new OSMRelationMember(member, role));
+        member.didAddToRelation(this);
+    }
+    /**
+     * Replace the old member with the new member
+     * @param oldEntity
+     * @param newEntity
+     */
+    public void replaceMember(final OSMEntity oldEntity, final OSMEntity newEntity) {
+        final int memberIndex = indexOfMember(oldEntity);
+        if(memberIndex >= 0) {
+            final OSMRelationMember oldMember = members.get(memberIndex);
+            final OSMRelationMember newMember = new OSMRelationMember(newEntity, oldMember.role);
+            members.set(memberIndex, newMember);
+
+            oldMember.member.didRemoveFromRelation(this);
+            newMember.member.didAddToRelation(this);
+
+            boundingBox = null; //invalidate the bounding box
+        }
     }
     public List<OSMRelationMember> getMembers() {
         return members;
