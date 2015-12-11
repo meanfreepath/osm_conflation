@@ -1,12 +1,10 @@
 package com.company;
 
-import OSM.OSMEntity;
 import OSM.OSMRelation;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
@@ -89,8 +87,12 @@ public class PathTree {
             for(final Path path : goodPaths) {
              //   System.out.print("GOOD PATH (" + path.segmentCount + " segs): SCORE (out of " + allPaths.size() + "): #" + path.id + ", score (" + path.scoreSegments + "/" + path.scoreStops + "/" + path.scoreAdjust + ") = " + path.scoreTotal + ", first/last stop " + bestPath.lastStopOnPath.platformNode.getTag("name") + ":" + Boolean.toString(bestPath.firstStopOnPath.isFirstStop()) + "/" + Boolean.toString(bestPath.lastStopOnPath.isLastStop()) + "\nSEGMENTS: " + path.toString());
             }*/
-            System.out.println("BEST PATH SCORE (out of " + allPaths.size() + "): #" + bestPath.id + ", score (" + bestPath.scoreSegments + "/" + bestPath.scoreStops + "/" + bestPath.scoreAdjust + ") = " + bestPath.scoreTotal + ", stops: " + bestPath.stopsOnPath + "/" + stops.size() + ", first/last stop:" + (bestPath.firstStopOnPath != null ? Boolean.toString(bestPath.firstStopOnPath.isFirstStop()) : "NULL") + "/" + (bestPath.lastStopOnPath != null ? Boolean.toString(bestPath.lastStopOnPath.isLastStop()) : "NULL") + "\nSEGMENTS: " + bestPath.toString());
-            System.out.print(bestPath.scoreSummary());
+            if(bestPath != null) {
+                System.out.println("BEST PATH SCORE (out of " + allPaths.size() + "): #" + bestPath.id + ", score (" + bestPath.scoreSegments + "/" + bestPath.scoreStops + "/" + bestPath.scoreAdjust + ") = " + bestPath.scoreTotal + ", stops: " + bestPath.stopsOnPath + "/" + stops.size() + ", first/last stop:" + (bestPath.firstStopOnPath != null ? Boolean.toString(bestPath.firstStopOnPath.isFirstStop()) : "NULL") + "/" + (bestPath.lastStopOnPath != null ? Boolean.toString(bestPath.lastStopOnPath.isLastStop()) : "NULL") + "\nSEGMENTS: " + bestPath.toString());
+                System.out.print(bestPath.scoreSummary());
+            } else {
+                System.out.println("NO BEST PATH");
+            }
         }
 
         if(debugFileWriter != null) {

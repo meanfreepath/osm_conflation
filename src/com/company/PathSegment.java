@@ -94,7 +94,7 @@ public class PathSegment {
                 if (stopMatch.bestMatch != null) {
                     scoreStops += SCORE_FOR_STOP_ON_WAY;
                     lastStopOnSegment = stopMatch;
-                    debugLog("HAS MATCHING TRANSIT STOP (id " + stopMatch.stopPositionNode.osm_id + ")\n");
+                    debugLog("HAS MATCHING TRANSIT STOP (id " + stopMatch.stopPositionNode.osm_id + ", ref " + stopMatch.stopPositionNode.getTag("ref") + ")\n");
                 }
             }
         }

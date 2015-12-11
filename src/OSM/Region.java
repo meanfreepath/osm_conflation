@@ -6,11 +6,60 @@ package OSM;
 public class Region implements Cloneable {
     public final Point origin, extent;
 
-    public static boolean intersects(Region region1, Region region2) {
+    /**
+     * Determines whether the regions intersect
+     * @param region1
+     * @param region2
+     * @return
+     */
+    public static boolean intersects(final Region region1, final Region region2) {
         return !(region1.extent.longitude < region2.origin.longitude ||
                 region1.origin.longitude > region2.extent.longitude ||
                 region1.extent.latitude < region2.origin.latitude ||
                 region1.origin.latitude > region2.extent.latitude);
+    }
+
+    /**
+     * Determines whether region1 contains region2
+     * @param region1
+     * @param region2
+     * @return
+     */
+    public static boolean contains(final Region region1, final Region region2) {
+        return region1.origin.latitude <= region2.origin.latitude &&
+                region1.extent.latitude >= region2.extent.latitude &&
+                region1.origin.longitude <= region2.origin.longitude &&
+                region1.extent.longitude >= region2.extent.longitude;
+    }
+
+    /**
+     * Generate the union box of the given regions
+     * @param region1
+     * @param region2
+     * @return
+     */
+    public static Region union(final Region region1, final Region region2) {
+        final Point unionOrigin = new Point(Math.min(region1.origin.latitude, region2.origin.latitude), Math.min(region1.origin.longitude, region2.origin.longitude));
+        final Point unionExtent = new Point(Math.max(region1.extent.latitude, region2.extent.latitude), Math.max(region1.extent.longitude, region2.extent.longitude));
+        return new Region(unionOrigin, unionExtent);
+    }
+    /**
+     * Get the intersection box of the given regions
+     * @param region1
+     * @param region2
+     * @return
+     */
+    public static Region intersection(final Region region1, final Region region2) {
+        final double xmin = Math.max(region1.origin.latitude, region2.origin.latitude);
+        final double xmax = Math.min(region1.extent.latitude, region2.extent.latitude);
+        if (xmax > xmin) {
+            final double ymin = Math.max(region1.origin.longitude, region2.origin.longitude);
+            final double ymax = Math.min(region1.extent.longitude, region2.extent.longitude);
+            if (ymax > ymin) {
+                return new Region(xmin, ymin, xmax - xmin, ymax - ymin);
+            }
+        }
+        return null;
     }
     /*public static Region combinedRegionBox(Region region1, Region region2) {
         if(region1 == null) {
@@ -32,15 +81,47 @@ public class Region implements Cloneable {
         maxLon = Math.max(region1.extent.longitude, region2.extent.longitude);
         return new Region(new Point(minLat, minLon), new Point(maxLat, maxLon));
     }*/
-    public Region(Point origin, Point extent) {
+    public Region(final Point origin, final Point extent) {
         this.origin = new Point(origin.latitude, origin.longitude);
         this.extent = new Point(extent.latitude, extent.longitude);
     }
-    public Region(double latitude, double longitude, double latitudeDelta, double longitudeDelta) {
+    public Region(final double latitude, final double longitude, final double latitudeDelta, final double longitudeDelta) {
         origin = new Point(latitude, longitude);
         extent = new Point(latitude + latitudeDelta, longitude + longitudeDelta);
     }
-    public void combinedBoxWithRegion(Region otherRegion) {
+    public Region(final Point[] includedPoints) {
+        final Point point1 = includedPoints[0], point2 = includedPoints[1];
+        origin = new Point(Math.min(point1.latitude, point2.latitude), Math.min(point1.longitude, point2.longitude));
+        extent = new Point(Math.max(point1.latitude, point2.latitude), Math.max(point1.longitude, point2.longitude));
+        for(int p=2;p<includedPoints.length;p++) {
+            includePoint(includedPoints[p]);
+        }
+    }
+
+    /**
+     * Expand this region to include the given point
+     * @param point
+     */
+    public void includePoint(final Point point) {
+        if(containsPoint(point)) { //bail if the point's already included within the region
+            return;
+        }
+
+        //expand the region to contain the point
+        if(point.longitude < origin.longitude) {
+            origin.longitude = point.longitude;
+        }
+        if(point.latitude < origin.latitude) {
+            origin.latitude = point.latitude;
+        }
+        if(point.longitude > extent.longitude) {
+            extent.longitude = point.longitude;
+        }
+        if(point.latitude > extent.latitude) {
+            extent.latitude = point.latitude;
+        }
+    }
+    public void combinedBoxWithRegion(final Region otherRegion) {
         if(otherRegion == null) {
             return;
         }
@@ -50,6 +131,15 @@ public class Region implements Cloneable {
         extent.longitude = Math.max(extent.longitude, otherRegion.extent.longitude);
     }
 
+    /**
+     * Calculate the area of the region, in square meters
+     * @return
+     */
+    public double area() {
+        final double dLat = extent.latitude - origin.latitude, dY = dLat * Point.DEGREE_DISTANCE_AT_EQUATOR, latFactor = Math.cos((origin.latitude + 0.5 * dLat) * Math.PI / 180.0);
+        final double dX = (extent.longitude - origin.longitude) * latFactor * Point.DEGREE_DISTANCE_AT_EQUATOR;
+        return dX * dY;
+    }
     /**
      * Check whether the given point is inside this region (inclusive)
      * @param point
@@ -114,5 +204,9 @@ public class Region implements Cloneable {
     @Override
     public Region clone() {
         return new Region(origin.latitude, origin.longitude, extent.latitude - origin.latitude, extent.longitude - origin.longitude);
+    }
+    @Override
+    public String toString() {
+        return String.format("Region({%.03f,%.03f}{%.03f,%.03f})", origin.latitude, origin.longitude, extent.latitude, extent.longitude);
     }
 }

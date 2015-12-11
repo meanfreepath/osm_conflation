@@ -94,7 +94,7 @@ public class OSMTaskManagerExporter {
         for(final DividedBox box : subBoxes) {
             final OSMEntitySpace boxSpace = new OSMEntitySpace(box.containedNodes.size());
             for(final OSMNode node : box.containedNodes) {
-                boxSpace.addEntity(node, OSMEntitySpace.EntityMergeStrategy.dontMerge, null);
+                boxSpace.addEntity(node, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
             }
 
             try {

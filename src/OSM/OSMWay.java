@@ -1,8 +1,9 @@
 package OSM;
 
-import com.sun.javaws.exceptions.InvalidArgumentException;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 
 /**
  * Created by nick on 10/15/15.
@@ -23,6 +24,34 @@ public class OSMWay extends OSMEntity {
 
     public OSMWay(final long id) {
         super(id);
+    }
+
+    /**
+     * Copy constructor
+     * @param wayToCopy
+     * @param nodeCopyStrategy
+     */
+    public OSMWay(final OSMWay wayToCopy, final MemberCopyStrategy nodeCopyStrategy) {
+        super(wayToCopy);
+
+        //add the nodes
+        switch (nodeCopyStrategy) {
+            case deep: //if deep copying, individually copy the nodes as well
+                for(final OSMNode node : wayToCopy.nodes) {
+                    appendNode(new OSMNode(node));
+                }
+                break;
+            case shallow:
+                nodes.addAll(wayToCopy.nodes);
+                break;
+            case none:
+                break;
+        }
+
+        if(nodes.size() > 0) {
+            firstNode = nodes.get(0);
+            lastNode = nodes.get(nodes.size() - 1);
+        }
     }
 
     /**

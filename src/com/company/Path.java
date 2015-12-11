@@ -4,7 +4,8 @@ import OSM.OSMEntity;
 import OSM.OSMNode;
 
 import java.text.DecimalFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by nick on 11/23/15.

@@ -1,11 +1,9 @@
 package OSM;
 
 import com.sun.istack.internal.NotNull;
-import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -35,6 +33,37 @@ public class OSMRelation extends OSMEntity {
 
     public OSMRelation(final long id) {
         super(id);
+    }
+
+    /**
+     * Copy constructor
+     * @param relationToCopy
+     * @param memberCopyStrategy
+     */
+    public OSMRelation(final OSMRelation relationToCopy, final MemberCopyStrategy memberCopyStrategy) {
+        super(relationToCopy);
+
+        //add the nodes
+        switch (memberCopyStrategy) {
+            case deep: //if deep copying, individually copy the members as well
+                for(final OSMRelationMember member : relationToCopy.members) {
+                    final OSMEntity clonedMember;
+                    if(member.member instanceof OSMNode) {
+                        clonedMember = new OSMNode((OSMNode) member.member);
+                    } else if(member.member instanceof OSMWay) {
+                        clonedMember = new OSMWay((OSMWay) member.member, memberCopyStrategy);
+                    } else {
+                        clonedMember = new OSMRelation((OSMRelation) member.member, memberCopyStrategy);
+                    }
+                    addMember(clonedMember, member.role);
+                }
+                break;
+            case shallow:
+                members.addAll(relationToCopy.getMembers());
+                break;
+            case none:
+                break;
+        }
     }
 
     @Override

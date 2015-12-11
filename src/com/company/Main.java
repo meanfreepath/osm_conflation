@@ -8,10 +8,7 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 public class Main {
 
@@ -20,6 +17,15 @@ public class Main {
         final boolean debugEnabled = true;
 
         final OSMEntitySpace mainSpace = new OSMEntitySpace(1024);
+
+        //define the options for the LineComparison routines
+        final LineComparison.ComparisonOptions options = new LineComparison.ComparisonOptions();
+        options.boundingBoxSize = 50.0;
+        options.maxSegmentLength = 10.0;
+        options.setMaxSegmentAngle(10.0);
+        options.maxSegmentOrthogonalDistance = 1.0 * options.maxSegmentLength;
+        options.maxSegmentMidPointDistance = 4.0 * options.maxSegmentLength;
+
         try {
             mainSpace.loadFromXML("routes.osm");
 
@@ -49,56 +55,74 @@ public class Main {
                 final List<OSMRelation> routeMasterSubRoutes = new ArrayList<>(masterMembers.size());
                 Region combinedBoundingBox = null;
                 String memberType;
+
+                final List<OSMWay> routePaths = new ArrayList<>(masterMembers.size());
                 for(final OSMRelation.OSMRelationMember member : masterMembers) {
                     memberType = member.member.getTag(OSMEntity.KEY_TYPE);
                     if(memberType != null && memberType.equals(OSMEntity.TAG_ROUTE)) {
-                        routeMasterSubRoutes.add((OSMRelation) member.member);
+                        final OSMRelation curRoute = (OSMRelation) member.member;
+                        routeMasterSubRoutes.add(curRoute);
                         if(combinedBoundingBox == null) {
                             combinedBoundingBox = member.member.getBoundingBox().clone();
                         } else {
                             combinedBoundingBox.combinedBoxWithRegion(member.member.getBoundingBox());
                         }
+
+                        routePaths.add((OSMWay) curRoute.getMembers("").get(0).member);
                     }
                 }
 
                 final OSMEntitySpace relationSpace = new OSMEntitySpace(65536);
 
                 //fetch all possible useful ways that intersect the route's combined bounding box
-                final OverpassConverter converter = new OverpassConverter();
+                /*final OverpassConverter converter = new OverpassConverter();
                 final String query = converter.queryForBoundingBox("[\"highway\"~\"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|service|living_street\"]", combinedBoundingBox, 0.0004, OSMEntity.OSMType.way);
                 converter.fetchFromOverpass(query);
                 final OSMEntitySpace existingDataSpace = converter.getEntitySpace();
+                existingDataSpace.outputXml("origdl.osm");//*/
+
+
+                OSMEntitySpace existingDataSpace = new OSMEntitySpace(65536);
+                final List<Region> downloadRegions = generateCombinedDownloadRegions(routePaths, options.boundingBoxSize);
+                for(final Region downloadRegion : downloadRegions) {
+                    final OverpassConverter converter = new OverpassConverter();
+                    final String query = converter.queryForBoundingBox("[\"highway\"~\"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|service|living_street\"]", downloadRegion, 0.0, OSMEntity.OSMType.way);
+                    converter.fetchFromOverpass(query);
+                    existingDataSpace.mergeWithSpace(converter.getEntitySpace(), OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
+                }//*/
+                System.out.println("Processing with " + existingDataSpace.allWays.size() + " ways");
+
 
                 for(final OSMRelation relation : routeMasterSubRoutes) {
                     final List<OSMRelation.OSMRelationMember> members = relation.getMembers("");
                     final OSMWay routePath = (OSMWay) members.get(0).member;
                     routePath.setTag("gtfs:ethereal", "yes");
-                    if (routePath.osm_id != -464) {
-                       // continue;
+                    if (routePath.osm_id != -924) {
+                        //continue;
                     }
 
                     //fetch all existing stops in the route's bounding box
                     //conflateStops(relation, relationSpace, combinedBoundingBox, 20.0);
 
                     //Break the candidate ways into LineSegments and match their geometries to the main route line
-                    final LineComparison.ComparisonOptions options = new LineComparison.ComparisonOptions();
-                    options.boundingBoxSize = 50.0;
-                    options.maxSegmentLength = 10.0;
-                    options.setMaxSegmentAngle(10.0);
-                    options.maxSegmentOrthogonalDistance = 1.0 * options.maxSegmentLength;
-                    options.maxSegmentMidPointDistance = 4.0 * options.maxSegmentLength;
+                    final long timeStartLineComparison = new Date().getTime();
                     final LineComparison comparison = new LineComparison(routePath, new ArrayList<>(existingDataSpace.allWays.values()), options, debugEnabled);
                     comparison.matchLines();
+                    System.out.println("Matched lines in " + (new Date().getTime() - timeStartLineComparison) + "ms");
 
                     //also, match the stops in the relation to their nearest matching way
+                    final long timeStartStopMatching = new Date().getTime();
                     final List<StopWayMatch> allStopMatches = matchStopsToWays(relation, comparison.candidateLines.values(), existingDataSpace);
+                    System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
 
                     //update the primary entity space to determine all connecting ways
                     existingDataSpace.generateWayNodeMapping(false);
 
                     //now find the optimal path from the first stop to the last stop, using the provided ways
+                    final long timeStartPathfinding = new Date().getTime();
                     final PathTree pathList = new PathTree(relation);
                     pathList.findPaths(allStopMatches, comparison.candidateLines);
+                    System.out.println("Found paths in " + (new Date().getTime() - timeStartPathfinding) + "ms");
 
                     //TODO: split ways that only partially overlap the main way
 
@@ -109,16 +133,35 @@ public class Main {
                         for (final PathSegment pathSegment : pathList.bestPath.pathSegments) {
                             relation.addMember(pathSegment.line.way, "");
                         }
+                    } else { //debug: if no matched path, output the best candidates instead
+                        for (final WaySegments line : comparison.candidateLines.values()) {
+                            if(line.matchObject.matchingSegments.size() > 2 && line.matchObject.getAvgDotProduct() >= 0.9) {
+                                relation.addMember(line.way, "");
+                            }
+                        }
                     }
-
-                    List<OSMEntity> conflictingEntities = new ArrayList<>(16);
-                    existingDataSpace.addEntity(relation, OSMEntitySpace.EntityMergeStrategy.mergeTags, conflictingEntities);
-                    existingDataSpace.outputXml("newresult" + routePath.osm_id + ".osm");
-                    relationSpace.addEntity(relation, OSMEntitySpace.EntityMergeStrategy.dontMerge, null);
 
                     if (debugEnabled) {
-                        debugOutputSegments(converter.getEntitySpace(), comparison);
+                        for(final Region r : downloadRegions) {
+                            List<OSMNode> rNodes = new ArrayList<>(5);
+                            rNodes.add(existingDataSpace.createNode(r.origin.latitude, r.origin.longitude, null));
+                            rNodes.add(existingDataSpace.createNode(r.origin.latitude, r.extent.longitude, null));
+                            rNodes.add(existingDataSpace.createNode(r.extent.latitude, r.extent.longitude, null));
+                            rNodes.add(existingDataSpace.createNode(r.extent.latitude, r.origin.longitude, null));
+                            rNodes.add(existingDataSpace.createNode(r.origin.latitude, r.origin.longitude, null));
+                            final OSMWay regionWay = existingDataSpace.createWay(null, rNodes);
+                            regionWay.setTag("landuse", "construction");
+                            regionWay.setTag("gtfs:ethereal", "yes");
+                            System.out.println(r.toString());
+                        }
+                        debugOutputSegments(existingDataSpace, comparison);
                     }
+
+                    //add the completed relation to its own separate file
+                    List<OSMEntity> conflictingEntities = new ArrayList<>(16);
+                    relationSpace.addEntity(relation, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
+                    existingDataSpace.addEntity(relation, OSMEntitySpace.EntityTagMergeStrategy.mergeTags, conflictingEntities);
+                    existingDataSpace.outputXml("newresult" + routePath.osm_id + ".osm");
                 }
 
                 relationSpace.outputXml("relation.osm");
@@ -128,6 +171,111 @@ public class Main {
             e.printStackTrace();
         }
 
+    }
+
+    /**
+     * Generates a set of rectangular regions which roughly corresponds with the download area for the given ways
+     * TODO: improve algorithm to reduce overlap etc
+     * @param ways
+     * @param expansionAmount
+     * @return
+     */
+    private static List<Region> generateCombinedDownloadRegions(final List<OSMWay> ways, final double expansionAmount) {
+        final List<Region> combinedRegions = new ArrayList<>(ways.size() * 8);
+        for(final OSMWay way : ways) {
+            combinedRegions.addAll(generateDownloadRegionsForWay(way, expansionAmount));
+        }
+
+        //combine significantly-overlapping regions
+        final double minAreaOverlap = 0.8;
+        final List<Region> downloadRegions = new ArrayList<>(combinedRegions.size()), processedRegions = new ArrayList<>(combinedRegions.size());
+        for(final Region region1 : combinedRegions) {
+            if(processedRegions.contains(region1)) { //skip if this region was de-duplicated in a previous pass
+                continue;
+            }
+
+            final double region1Area = region1.area();
+            boolean didCombine = false;
+            for(final Region region2 : combinedRegions) {
+                if(region1 == region2) {
+                    continue;
+                }
+
+                //if region1 contains region2, just use region1
+                if(Region.contains(region1, region2)) {
+                    downloadRegions.add(region1);
+                    processedRegions.add(region2);
+                    didCombine = true;
+                    break;
+                }
+
+                //check if the regions significantly overlap
+                final Region intersectionRegion = Region.intersection(region1, region2);
+                if(intersectionRegion != null) {
+                    final double intersectionArea = intersectionRegion.area();
+                    if (intersectionArea / region1Area >= minAreaOverlap && intersectionArea / region2.area() >= minAreaOverlap) {
+                        //if so, add the union of the two regions
+                        final Region unionRegion = Region.union(region1, region2);
+                        System.out.println("OVERLAPPED " + region1 + " and " + region2 + ", union: " + unionRegion);
+                        downloadRegions.add(unionRegion);
+                        processedRegions.add(region2);
+                        didCombine = true;
+                        break;
+                    }
+                }
+            }
+
+            //if the region wasn't processed in the last pass, it's a standalone region.  Add it
+            if(!didCombine) {
+                downloadRegions.add(region1);
+            }
+        }
+        return downloadRegions;
+    }
+    private static List<Region> generateDownloadRegionsForWay(final OSMWay way, final double boundingBoxSize) {
+        final double maxRectArea = 5000000.0;
+        final Region wayBoundingBox = way.getBoundingBox();
+        final double latitudeDelta = -boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * (wayBoundingBox.origin.latitude + wayBoundingBox.extent.latitude) / 360.0);
+
+        final List<Region> regions = new ArrayList<>((int) Math.ceil(way.getBoundingBox().area() / maxRectArea));
+        final OSMNode firstNodeInWay = way.getFirstNode(), lastNodeInWay = way.getLastNode();
+        OSMNode lastNode = null;
+        Region curRegion = null;
+        boolean virginRegion = true;
+        for(final OSMNode node : way.getNodes()) {
+            if(node == firstNodeInWay) { //don't until we get 2+ nodes
+                lastNode = node;
+                continue;
+            }
+
+            if(virginRegion) { //init the region
+                assert lastNode != null;
+                final Point points[] = {lastNode.getCentroid(), node.getCentroid()};
+                curRegion = new Region(points);
+            }
+
+            //create a copy of the region to test its properties
+            Region testRegion = curRegion.clone();
+            if(!virginRegion) {
+                testRegion.includePoint(node.getCentroid());
+            }
+            testRegion = testRegion.regionInset(latitudeDelta, longitudeDelta);
+
+            //check if the test region's area is within the max value
+            if(node == lastNodeInWay || testRegion.area() > maxRectArea) { //if not
+                regions.add(testRegion); //add to the regions list
+
+                //and create a new region with the last and current nodes
+                final Point points[] = {lastNode.getCentroid(), node.getCentroid()};
+                curRegion = new Region(points);
+            } else { //otherwise, just include the current point
+                curRegion.includePoint(node.getCentroid());
+            }
+
+            virginRegion = false;
+            lastNode = node;
+        }
+        return regions;
     }
     private static List<StopWayMatch> matchStopsToWays(final OSMRelation routeRelation, final Collection<WaySegments> candidateLines, final OSMEntitySpace existingEntitySpace) {
         final List<OSMRelation.OSMRelationMember> routeStops = routeRelation.getMembers("platform");
@@ -265,13 +413,13 @@ public class Main {
             final OSMWay segmentWay = segmentSpace.createWay(null, null);
             if(originNode == null) {
                 if(mainSegment.originNode != null) {
-                    originNode = segmentSpace.cloneNode(mainSegment.originNode);
+                    originNode = (OSMNode) segmentSpace.addEntity(mainSegment.originNode, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
                 } else {
                     originNode = segmentSpace.createNode(mainSegment.originPoint.latitude, mainSegment.originPoint.longitude, null);
                 }
             }
             if(mainSegment.destinationNode != null) {
-                lastNode = segmentSpace.cloneNode(mainSegment.destinationNode);
+                lastNode = (OSMNode) segmentSpace.addEntity(mainSegment.destinationNode, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
             } else {
                 lastNode = segmentSpace.createNode(mainSegment.destinationPoint.latitude, mainSegment.destinationPoint.longitude, null);
             }
@@ -295,13 +443,13 @@ public class Main {
 
                 if(matchOriginNode == null) { //i.e. first node on line
                     if(matchingSegment.originNode != null && entitySpace.allNodes.containsKey(matchingSegment.originNode.osm_id)) {
-                        matchOriginNode = segmentSpace.cloneNode(entitySpace.allNodes.get(matchingSegment.originNode.osm_id));
+                        matchOriginNode = (OSMNode) segmentSpace.addEntity(entitySpace.allNodes.get(matchingSegment.originNode.osm_id), OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
                     } else {
                         matchOriginNode = segmentSpace.createNode(matchingSegment.originPoint.latitude, matchingSegment.originPoint.longitude, null);
                     }
                 }
                 if(matchingSegment.destinationNode != null && entitySpace.allNodes.containsKey(matchingSegment.destinationNode.osm_id)) {
-                    matchLastNode = segmentSpace.cloneNode(entitySpace.allNodes.get(matchingSegment.destinationNode.osm_id));
+                    matchLastNode = (OSMNode) segmentSpace.addEntity(entitySpace.allNodes.get(matchingSegment.destinationNode.osm_id), OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
                 } else {
                     matchLastNode = segmentSpace.createNode(matchingSegment.destinationPoint.latitude, matchingSegment.destinationPoint.longitude, null);
                 }
@@ -322,7 +470,7 @@ public class Main {
             }
                         /*for(WaySegments otherSegments : comparison.allCandidateSegments.values()) {
                             for(LineSegment otherSegment : otherSegments.segments) {
-                                segmentSpace.addEntity(otherSegment.segmentWay, OSMEntitySpace.EntityMergeStrategy.dontMerge, null);
+                                segmentSpace.addEntity(otherSegment.segmentWay, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
                             }
                         }*/
 
