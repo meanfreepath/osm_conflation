@@ -11,10 +11,10 @@ import java.util.List;
  * Created by nick on 11/19/15.
  */
 public class StopWayMatch {
-    public final static double maxDistanceFromPlatformToWay = 25.0, stopNodeTolerance = 3.0, minMatchingSegmentPathDotProduct = 0.9, maxMatchingSegmentPathDistance = 10.0;
+    public final static double maxDistanceFromPlatformToWay = 25.0, stopNodeTolerance = 3.0, minMatchingSegmentPathDotProduct = 0.7, maxMatchingSegmentPathDistance = 10.0;
     private final static Comparator<WayMatch> comp = new Comparator<WayMatch>() {
         @Override
-        public int compare(WayMatch o1, WayMatch o2) {
+        public int compare(final WayMatch o1, final WayMatch o2) {
             return o1.distance < o2.distance ? -1 : 1;
         }
     };
