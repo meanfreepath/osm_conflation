@@ -26,6 +26,34 @@ public class OSMWay extends OSMEntity {
     }
 
     /**
+     * Copy constructor
+     * @param wayToCopy
+     * @param nodeCopyStrategy
+     */
+    public OSMWay(final OSMWay wayToCopy, final MemberCopyStrategy nodeCopyStrategy) {
+        super(wayToCopy);
+
+        //add the nodes
+        switch (nodeCopyStrategy) {
+            case deep: //if deep copying, individually copy the nodes as well
+                for(final OSMNode node : wayToCopy.nodes) {
+                    appendNode(new OSMNode(node));
+                }
+                break;
+            case shallow:
+                nodes.addAll(wayToCopy.nodes);
+                break;
+            case none:
+                break;
+        }
+
+        if(nodes.size() > 0) {
+            firstNode = nodes.get(0);
+            lastNode = nodes.get(nodes.size() - 1);
+        }
+    }
+
+    /**
      * Inserts a node at the given index
      * @param node
      * @param index

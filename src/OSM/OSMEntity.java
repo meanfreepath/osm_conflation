@@ -17,6 +17,9 @@ public abstract class OSMEntity {
     public enum OSMType {
         node, way, relation
     }
+    public enum MemberCopyStrategy {
+        none, shallow, deep
+    }
 
     protected final static String BASE_XML_TAG_FORMAT_TAG = "  <tag k=\"%s\" v=\"%s\"/>\n";
     public final long osm_id;
@@ -36,6 +39,24 @@ public abstract class OSMEntity {
 
     public OSMEntity(final long id) {
         osm_id = id;
+    }
+
+    /**
+     * Copy constructor
+     * @param entityToCopy
+     */
+    public OSMEntity(final OSMEntity entityToCopy) {
+        osm_id = entityToCopy.osm_id;
+        uid = entityToCopy.uid;
+        version = entityToCopy.version;
+        changeset = entityToCopy.changeset;
+        user = entityToCopy.user;
+        timestamp = entityToCopy.timestamp;
+        boundingBox = entityToCopy.boundingBox;
+
+        if(entityToCopy.tags != null) {
+            tags = new HashMap<>(entityToCopy.tags);
+        }
     }
 
     /**
@@ -78,6 +99,33 @@ public abstract class OSMEntity {
             tags = new HashMap<>();
         }
         tags.put(name, value.trim());
+    }
+
+    /**
+     *
+     * @param otherEntity
+     * @param clearTags
+     * @return Any tags that conflict (if checkForConflicts is TRUE), null otherwise
+     */
+    public Map<String, String> copyTagsFrom(final OSMEntity otherEntity, final boolean clearTags, final boolean checkForConflicts) {
+        if(tags == null) {
+            tags = new HashMap<>();
+        } else if(clearTags) {
+            tags.clear();
+        }
+
+        if(checkForConflicts) {
+            HashMap<String, String> conflictingTags = new HashMap<>(4);
+            for(Map.Entry<String, String> tag : otherEntity.tags.entrySet()) {
+                if(tags.containsKey(tag.getKey()) && !tags.get(tag.getKey()).equals(tag.getValue())) {
+                    conflictingTags.put(tag.getKey(), tag.getValue());
+                }
+            }
+            return conflictingTags.size() > 0 ? conflictingTags : null;
+        } else {
+            tags.putAll(otherEntity.tags);
+        }
+        return null;
     }
 
     /**

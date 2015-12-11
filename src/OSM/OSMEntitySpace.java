@@ -25,8 +25,8 @@ public class OSMEntitySpace {
             XML_BOUNDING_BOX = " <bounds minlat=\"%.07f\" minlon=\"%.07f\" maxlat=\"%.07f\" maxlon=\"%.07f\"/>\n",
             XML_DOCUMENT_CLOSE = "</osm>\n";
 
-    public enum EntityMergeStrategy {
-        dontMerge, overwrite, mergeTags, mergeTagsIgnoreConflict
+    public enum EntityTagMergeStrategy {
+        keepTags, replaceTags, mergeTags, mergeTagsIgnoreConflict
     }
 
     /**
@@ -59,8 +59,7 @@ public class OSMEntitySpace {
                 newNode.setTag(tag.getKey(), tag.getValue());
             }
         }
-        addEntity(newNode, EntityMergeStrategy.dontMerge, null);
-        return newNode;
+        return (OSMNode) addEntity(newNode, EntityTagMergeStrategy.keepTags, null);
     }
 
     /**
@@ -82,8 +81,7 @@ public class OSMEntitySpace {
                 newWay.appendNode(node);
             }
         }
-        addEntity(newWay, EntityMergeStrategy.dontMerge, null);
-        return newWay;
+        return (OSMWay) addEntity(newWay, EntityTagMergeStrategy.keepTags, null);
     }
 
     /**
@@ -105,71 +103,7 @@ public class OSMEntitySpace {
                 newRelation.addMember(member.member, member.role);
             }
         }
-        addEntity(newRelation, EntityMergeStrategy.dontMerge, null);
-        return newRelation;
-    }
-    /**
-     * Create a copy of the given Node and add it to this space
-     * @param node
-     * @return
-     */
-    public OSMNode cloneNode(final OSMNode node) {
-        return createNode(node.getLat(), node.getLon(), node.tags);
-    }
-
-    /**
-     * Create a copy of the given Way (including contained Nodes) and add it to this space
-     * @param way
-     * @return
-     */
-    public OSMWay cloneWay(final OSMWay way) {
-        final OSMWay newWay = createWay(way.getTags(), null);
-
-        for(final OSMNode containedNode : way.getNodes()) {
-            //get a handle on OUR copy of the node, if any
-            OSMNode nodeToAdd = allNodes.get(containedNode.osm_id);
-            if(nodeToAdd == null) { //if not in this space, clone it to this space
-                nodeToAdd = cloneNode(containedNode);
-            }
-            newWay.appendNode(nodeToAdd);
-        }
-        return newWay;
-    }
-
-    /**
-     * Create a copy of the given Relation (including contained Members) and add it to this space
-     * @param relation
-     * @return
-     */
-    public OSMRelation cloneRelation(final OSMRelation relation) {
-        final OSMRelation newRelation = createRelation(relation.getTags(), null);
-
-        for(final OSMRelation.OSMRelationMember containedMember : relation.members) {
-            //get a handle on OUR copy of the member, if any
-            OSMEntity entityToAdd = null;
-            switch (containedMember.member.getType()) {
-                case node:
-                    entityToAdd = allNodes.get(containedMember.member.osm_id);
-                    if(entityToAdd == null) {
-                        entityToAdd = cloneNode((OSMNode) containedMember.member);
-                    }
-                    break;
-                case way:
-                    entityToAdd = allWays.get(containedMember.member.osm_id);
-                    if(entityToAdd == null) {
-                        entityToAdd = cloneWay((OSMWay) containedMember.member);
-                    }
-                    break;
-                case relation:
-                    entityToAdd = allRelations.get(containedMember.member.osm_id);
-                    if(entityToAdd == null) {
-                        entityToAdd = cloneRelation((OSMRelation) containedMember.member);
-                    }
-                    break;
-            }
-            newRelation.addMember(entityToAdd, containedMember.role);
-        }
-        return newRelation;
+        return (OSMRelation) addEntity(newRelation, EntityTagMergeStrategy.keepTags, null);
     }
 
     /**
@@ -182,45 +116,27 @@ public class OSMEntitySpace {
         allWays = new HashMap<>(capacity);
         allRelations = new HashMap<>(capacity);
     }
-    private static void mergeTags(OSMEntity entity1, OSMEntity entity2, boolean overwriteConflict, List<OSMEntity> conflictingEntities) {
-        for(Map.Entry<String, String> tag : entity2.tags.entrySet()) {
-            final String tagKey = tag.getKey();
-            boolean e1HasTag = entity1.hasTag(tagKey);
-            if(!e1HasTag || overwriteConflict) {
-                entity1.setTag(tagKey, tag.getValue());
-            } else if(e1HasTag && entity2.hasTag(tagKey) && !entity1.getTag(tagKey).equals(entity2.getTag(tagKey))) {
-                if(conflictingEntities != null) {
-                    conflictingEntities.add(entity1);
-                }
-            }
-        }
-    }
-    private boolean handleMerge(final OSMEntity entity, final EntityMergeStrategy mergeStrategy, final HashMap<Long, ? extends OSMEntity> entityList, List<OSMEntity> conflictingEntities) {
-        boolean shouldAddEntity = false;
-        final OSMEntity existingEntity;
+    private static boolean handleMerge(final OSMEntity entity, final OSMEntity existingEntity, final EntityTagMergeStrategy mergeStrategy, final HashMap<Long, ? extends OSMEntity> entityList, List<OSMEntity> conflictingEntities) {
+        boolean shouldAddEntity = existingEntity == null;
         switch(mergeStrategy) {
-            case dontMerge:
-                if(!entityList.containsKey(entity.osm_id)) {
-                    shouldAddEntity = true;
-                }
+            case keepTags:
                 break;
-            case overwrite:
-                shouldAddEntity = true;
+            case replaceTags:
+                if(!shouldAddEntity) {
+                    existingEntity.copyTagsFrom(entity, true, false);
+                }
                 break;
             case mergeTags:
-                existingEntity = entityList.get(entity.osm_id);
-                if(existingEntity == null) {
-                    shouldAddEntity = true;
-                } else {
-                    mergeTags(existingEntity, entity, false, conflictingEntities);
+                if(!shouldAddEntity) {
+                    Map<String, String> conflictingTags = existingEntity.copyTagsFrom(entity, false, true);
+                    if(conflictingTags != null) { //add the conflict to the list for processing
+                        conflictingEntities.add(existingEntity);
+                    }
                 }
                 break;
             case mergeTagsIgnoreConflict:
-                existingEntity = entityList.get(entity.osm_id);
-                if(existingEntity == null) {
-                    shouldAddEntity = true;
-                } else {
-                    mergeTags(existingEntity, entity, true, conflictingEntities);
+                if(!shouldAddEntity) {
+                    existingEntity.copyTagsFrom(entity, false, false);
                 }
                 break;
         }
@@ -229,33 +145,55 @@ public class OSMEntitySpace {
     /**
      * Add the given OSM entity to the space, as well as any entities it contains
      * @param entity
+     * @return
      */
-    public void addEntity(final OSMEntity entity, final EntityMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
-
+    public OSMEntity addEntity(final OSMEntity entity, final EntityTagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
+        final OSMEntity resultEntity;
+        final OSMEntity existingEntity;
         if(entity instanceof OSMNode) {
-            if(handleMerge(entity, mergeStrategy, allNodes, conflictingEntities)) {
-                allNodes.put(entity.osm_id, (OSMNode) entity);
+            existingEntity = allNodes.get(entity.osm_id);
+            final OSMNode nodeToAdd;
+            if(handleMerge(entity, existingEntity, mergeStrategy, allNodes, conflictingEntities)) {
+                nodeToAdd = new OSMNode((OSMNode) entity); //create an exact copy of the node
+                allNodes.put(nodeToAdd.osm_id, nodeToAdd);
+                allEntities.add(nodeToAdd);
+                return nodeToAdd;
             }
+            return existingEntity;
         } else if(entity instanceof OSMWay) {
-            if(handleMerge(entity, mergeStrategy, allWays, conflictingEntities)) {
+            existingEntity = allWays.get(entity.osm_id);
+            if(handleMerge(entity, existingEntity, mergeStrategy, allWays, conflictingEntities)) {
                 //add all the child nodes of the way, then add the way itself
-                OSMWay curWay = (OSMWay) entity;
-                for(OSMNode node : curWay.getNodes()) { //TODO handle member node merging
-                    addEntity(node, mergeStrategy, conflictingEntities);
+                final OSMWay curWay = (OSMWay) entity;
+                final OSMWay localWay = new OSMWay(curWay, OSMEntity.MemberCopyStrategy.none);
+                for(final OSMNode node : curWay.getNodes()) {
+                    final OSMNode addedNode = (OSMNode) addEntity(node, mergeStrategy, conflictingEntities);
+                    localWay.appendNode(addedNode);
                 }
-                allWays.put(entity.osm_id, (OSMWay) entity);
+                allWays.put(localWay.osm_id, localWay);
+                allEntities.add(localWay);
+                return localWay;
             }
+            return existingEntity;
         } else if(entity instanceof OSMRelation) {
-            OSMRelation curRelation = (OSMRelation) entity;
-            if(handleMerge(entity, mergeStrategy, allRelations, conflictingEntities)) {
+            existingEntity = allRelations.get(entity.osm_id);
+            final OSMRelation curRelation = (OSMRelation) entity;
+            if(handleMerge(entity, existingEntity, mergeStrategy, allRelations, conflictingEntities)) {
+                final OSMRelation localRelation = new OSMRelation(curRelation, OSMEntity.MemberCopyStrategy.none);
+
                 //add all the member entities of the relation, then add the relation itself
-                for(OSMRelation.OSMRelationMember member : curRelation.members) {  //TODO handle member merging
-                    addEntity(member.member, mergeStrategy, conflictingEntities);
+                for(final OSMRelation.OSMRelationMember member : curRelation.members) {
+                    final OSMEntity addedMember = addEntity(member.member, mergeStrategy, conflictingEntities);
+                    localRelation.addMember(addedMember, member.role);
                 }
-                allRelations.put(entity.osm_id, (OSMRelation) entity);
+                allRelations.put(localRelation.osm_id, localRelation);
+                allEntities.add(localRelation);
+                return localRelation;
             }
+            return existingEntity;
         }
-        allEntities.add(entity);
+        //shouldn't reach here!
+        return null;
     }
     public void mergeEntities(final OSMEntity theEntity, final OSMEntity withEntity) {
         if(withEntity.getTags() != null) {
@@ -350,29 +288,29 @@ public class OSMEntitySpace {
                         curNode.setCoordinate(Double.parseDouble(attributes.getValue("lat")), Double.parseDouble(attributes.getValue("lon")));
                         processBaseValues(curNode, attributes);
 
-                        addEntity(curNode, EntityMergeStrategy.dontMerge, null);
-                        entityStack.push(curNode);
+                        final OSMNode addedNode = (OSMNode) addEntity(curNode, EntityTagMergeStrategy.keepTags, null);
+                        entityStack.push(addedNode);
                         break;
                     case tagWay:
                         final OSMWay curWay = new OSMWay(Long.parseLong(attributes.getValue(keyId)));
                         processBaseValues(curWay, attributes);
 
-                        addEntity(curWay, EntityMergeStrategy.dontMerge, null);
-                        entityStack.push(curWay);
+                        final OSMWay addedWay = (OSMWay) addEntity(curWay, EntityTagMergeStrategy.keepTags, null);
+                        entityStack.push(addedWay);
                         break;
                     case tagRelation:
                         final OSMRelation curRelation = new OSMRelation(Long.parseLong(attributes.getValue(keyId)));
                         processBaseValues(curRelation, attributes);
-                        addEntity(curRelation, EntityMergeStrategy.dontMerge, null);
-                        entityStack.push(curRelation);
+                        final OSMRelation addedRelation = (OSMRelation) addEntity(curRelation, EntityTagMergeStrategy.keepTags, null);
+                        entityStack.push(addedRelation);
                         break;
                     case tagTag: //tag for a node/way/relation
-                        OSMEntity curEntity = entityStack.peek();
+                        final OSMEntity curEntity = entityStack.peek();
                         curEntity.setTag(attributes.getValue("k"), attributes.getValue("v"));
                         break;
                     case tagWayNode: //node as a member of a way
                         long nodeId = Long.parseLong(attributes.getValue(keyRef));
-                        OSMNode wayNode = allNodes.get(nodeId);
+                        final OSMNode wayNode = allNodes.get(nodeId);
                         final OSMWay curWayToAdd = (OSMWay) entityStack.peek();
                         curWayToAdd.appendNode(wayNode);
                         break;
@@ -402,7 +340,6 @@ public class OSMEntitySpace {
             }
             @Override
             public void endElement(String uri, String localName, String qName) throws SAXException {
-                //System.out.println("End " + uri + ":" + localName + ":" + qName);
                 switch (qName) {
                     case tagNode: //nodes are simply added to the entity array
                     case tagWay:
@@ -488,14 +425,14 @@ public class OSMEntitySpace {
      * @param mergeStrategy determines how to handle entities which exist in both spaces
      * @param conflictingEntities any conflicting entities will be added to this list
      */
-    public void mergeWithSpace(final OSMEntitySpace otherSpace, final EntityMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
-        for(OSMNode node : otherSpace.allNodes.values()) {
+    public void mergeWithSpace(final OSMEntitySpace otherSpace, final EntityTagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
+        for(final OSMNode node : otherSpace.allNodes.values()) {
             addEntity(node, mergeStrategy, conflictingEntities);
         }
-        for(OSMWay way : otherSpace.allWays.values()) {
+        for(final OSMWay way : otherSpace.allWays.values()) {
             addEntity(way, mergeStrategy, conflictingEntities);
         }
-        for(OSMRelation relation: otherSpace.allRelations.values()) {
+        for(final OSMRelation relation: otherSpace.allRelations.values()) {
             addEntity(relation, mergeStrategy, conflictingEntities);
         }
     }

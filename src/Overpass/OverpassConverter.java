@@ -59,7 +59,7 @@ public class OverpassConverter {
                     if(curElement.has(keyVersion)) {
                         addMetadata(curElement,node);
                     }
-                    entitySpace.addEntity(node, OSMEntitySpace.EntityMergeStrategy.overwrite, null);
+                    entitySpace.addEntity(node, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
                 } else if(elementType.equals(OSMEntity.OSMType.way.name())) {
                     final OSMWay way = new OSMWay(curElement.getLong(keyId));
                     if(curElement.has(keyTags)) {
@@ -75,7 +75,7 @@ public class OverpassConverter {
                         curNode = entitySpace.allNodes.get(nodeId);
                         way.appendNode(curNode);
                     }
-                    entitySpace.addEntity(way, OSMEntitySpace.EntityMergeStrategy.overwrite, null);
+                    entitySpace.addEntity(way, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
                 } else if(elementType.equals(OSMEntity.OSMType.relation.name())) {
                     final OSMRelation relation = new OSMRelation(curElement.getLong(keyId));
                     if(curElement.has(keyTags)) {
@@ -119,7 +119,7 @@ public class OverpassConverter {
                             }
                         }
                     }
-                    entitySpace.addEntity(relation, OSMEntitySpace.EntityMergeStrategy.overwrite, null);
+                    entitySpace.addEntity(relation, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
                 }
             }
         } catch (Exceptions.UnknownOverpassError unknownOverpassError) {

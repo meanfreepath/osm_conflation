@@ -2,6 +2,9 @@ package OSM;
 
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,6 +26,15 @@ public class OSMNode extends OSMEntity {
 
     public OSMNode(final long id) {
         super(id);
+    }
+
+    /**
+     * Copy constructor
+     * @param nodeToCopy
+     */
+    public OSMNode(final OSMNode nodeToCopy) {
+        super(nodeToCopy);
+        setCoordinate(nodeToCopy.coordinate);
     }
 
     /**
@@ -55,16 +67,16 @@ public class OSMNode extends OSMEntity {
         return lon;
     }
 
-    public void setCoordinate(double lat, double lon) {
+    public void setCoordinate(final double lat, final double lon) {
         this.lat = lat;
         this.lon = lon;
         coordinate = new Point(lat, lon);
         boundingBox = null; //invalidate the bounding box
     }
-    public void setCoordinate(Point coordinate) {
-        this.lat = coordinate.latitude;
-        this.lon = coordinate.longitude;
-        this.coordinate = coordinate;
+    public void setCoordinate(final Point coordinate) {
+        lat = coordinate.latitude;
+        lon = coordinate.longitude;
+        this.coordinate = new Point(lat, lon);
         boundingBox = null; //invalidate the bounding box
     }
 
