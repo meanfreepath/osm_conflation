@@ -14,6 +14,7 @@ import java.util.Iterator;
 public class OverpassConverter {
     private final static String NODE_QUERY_FORMAT = "(node%s(%.04f,%.04f,%.04f,%.04f);>);";
     private final static String WAY_QUERY_FORMAT = "(way%s(%.04f,%.04f,%.04f,%.04f);>);";
+    private final static String ALL_QUERY_FORMAT = "(node%s(%.04f,%.04f,%.04f,%.04f);way%s(%.04f,%.04f,%.04f,%.04f);relation%s(%.04f,%.04f,%.04f,%.04f););(._;>;);";
     private OSMEntitySpace entitySpace;
 
     public OSMEntitySpace getEntitySpace() {
@@ -28,8 +29,9 @@ public class OverpassConverter {
                 return String.format(WAY_QUERY_FORMAT, tagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude);
             case relation:
                 return null;
+            default:
+                return String.format(ALL_QUERY_FORMAT, tagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude, tagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude, tagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude);
         }
-        return null;
     }
     public void fetchFromOverpass(final String query) throws InvalidArgumentException {
         HashMap<String, String> apiConfig = new HashMap<>(1);
@@ -59,7 +61,7 @@ public class OverpassConverter {
                     if(curElement.has(keyVersion)) {
                         addMetadata(curElement,node);
                     }
-                    entitySpace.addEntity(node, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
+                    entitySpace.addEntity(node, OSMEntity.TagMergeStrategy.keepTags, null);
                 } else if(elementType.equals(OSMEntity.OSMType.way.name())) {
                     final OSMWay way = new OSMWay(curElement.getLong(keyId));
                     if(curElement.has(keyTags)) {
@@ -75,7 +77,7 @@ public class OverpassConverter {
                         curNode = entitySpace.allNodes.get(nodeId);
                         way.appendNode(curNode);
                     }
-                    entitySpace.addEntity(way, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
+                    entitySpace.addEntity(way, OSMEntity.TagMergeStrategy.keepTags, null);
                 } else if(elementType.equals(OSMEntity.OSMType.relation.name())) {
                     final OSMRelation relation = new OSMRelation(curElement.getLong(keyId));
                     if(curElement.has(keyTags)) {
@@ -119,7 +121,7 @@ public class OverpassConverter {
                             }
                         }
                     }
-                    entitySpace.addEntity(relation, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
+                    entitySpace.addEntity(relation, OSMEntity.TagMergeStrategy.keepTags, null);
                 }
             }
         } catch (Exceptions.UnknownOverpassError unknownOverpassError) {

@@ -116,7 +116,17 @@ public abstract class OSMEntity {
         if(tags == null) {
             tags = new HashMap<>();
         }
-        tags.put(name, value.trim());
+        if(value != null) {
+            tags.put(name, value.trim());
+        } else {
+            removeTag(name);
+        }
+    }
+    public boolean removeTag(final String name) {
+        if(tags == null) {
+            return false;
+        }
+        return tags.remove(name) != null;
     }
     /**
      *

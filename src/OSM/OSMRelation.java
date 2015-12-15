@@ -107,13 +107,13 @@ public class OSMRelation extends OSMEntity {
             xml.append(openTag);
 
             //output members
-            for (OSMRelationMember member : members) {
+            for (final OSMRelationMember member : members) {
                 xml.append(String.format(BASE_XML_TAG_FORMAT_MEMBER, member.member.getType(), member.member.osm_id, escapeForXML(member.role)));
             }
 
             //and tags (if any)
             if(tagCount > 0) {
-                for (HashMap.Entry<String, String> entry : tags.entrySet()) {
+                for (final HashMap.Entry<String, String> entry : tags.entrySet()) {
                     xml.append(String.format(BASE_XML_TAG_FORMAT_TAG, escapeForXML(entry.getKey()), escapeForXML(entry.getValue())));
                 }
             }
@@ -128,10 +128,13 @@ public class OSMRelation extends OSMEntity {
         }
     }
     public void clearMembers() {
+        for(final OSMRelationMember member : members) {
+            member.member.didRemoveFromRelation(this);
+        }
         members.clear();
     }
 
-    private int indexOfMember(final OSMEntity entity) {
+    public int indexOfMember(final OSMEntity entity) {
         int index = 0;
         for(final OSMRelationMember member : members) {
             if(member.member == entity) {
@@ -165,15 +168,19 @@ public class OSMRelation extends OSMEntity {
         }
 
         if(relationMemberToRemove != null) {
-            members.remove(relationMemberToRemove);
-            relationMemberToRemove.member.didRemoveFromRelation(this);
-            return true;
+            if(members.remove(relationMemberToRemove)) {
+                relationMemberToRemove.member.didRemoveFromRelation(this);
+                return true;
+            }
         }
         return false;
     }
-    public void addMember(final OSMEntity member, final String role) {
-        members.add(new OSMRelationMember(member, role));
-        member.didAddToRelation(this);
+    public boolean addMember(final OSMEntity member, final String role) {
+        if(members.add(new OSMRelationMember(member, role))) {
+            member.didAddToRelation(this);
+            return true;
+        }
+        return false;
     }
     /**
      * Replace the old member with the new member

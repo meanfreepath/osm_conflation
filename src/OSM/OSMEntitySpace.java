@@ -25,19 +25,16 @@ public class OSMEntitySpace {
             XML_BOUNDING_BOX = " <bounds minlat=\"%.07f\" minlon=\"%.07f\" maxlat=\"%.07f\" maxlon=\"%.07f\"/>\n",
             XML_DOCUMENT_CLOSE = "</osm>\n";
 
-    public enum EntityTagMergeStrategy {
-        keepTags, replaceTags, mergeTags, mergeTagsIgnoreConflict
-    }
-
     /**
      * Id sequence for new OSM entities
      */
     private static long osmIdSequence = 0;
 
-    public final List<OSMEntity> allEntities;
+    public final HashMap<Long, OSMEntity> allEntities;
     public final HashMap<Long, OSMNode> allNodes;
     public final HashMap<Long, OSMWay> allWays;
     public final HashMap<Long, OSMRelation> allRelations;
+    public String name;
 
     private void setIdSequence(long sequence) {
         osmIdSequence = sequence;
@@ -59,7 +56,7 @@ public class OSMEntitySpace {
                 newNode.setTag(tag.getKey(), tag.getValue());
             }
         }
-        return (OSMNode) addEntity(newNode, EntityTagMergeStrategy.keepTags, null);
+        return (OSMNode) addEntity(newNode, OSMEntity.TagMergeStrategy.keepTags, null);
     }
 
     /**
@@ -81,7 +78,7 @@ public class OSMEntitySpace {
                 newWay.appendNode(node);
             }
         }
-        return (OSMWay) addEntity(newWay, EntityTagMergeStrategy.keepTags, null);
+        return (OSMWay) addEntity(newWay, OSMEntity.TagMergeStrategy.keepTags, null);
     }
 
     /**
@@ -103,7 +100,7 @@ public class OSMEntitySpace {
                 newRelation.addMember(member.member, member.role);
             }
         }
-        return (OSMRelation) addEntity(newRelation, EntityTagMergeStrategy.keepTags, null);
+        return (OSMRelation) addEntity(newRelation, OSMEntity.TagMergeStrategy.keepTags, null);
     }
 
     /**
@@ -111,32 +108,38 @@ public class OSMEntitySpace {
      * @param capacity
      */
     public OSMEntitySpace(final int capacity) {
-        allEntities = new ArrayList<>(capacity);
+        allEntities = new HashMap<>(capacity);
         allNodes = new HashMap<>(capacity);
         allWays = new HashMap<>(capacity);
         allRelations = new HashMap<>(capacity);
     }
-    private static boolean handleMerge(final OSMEntity entity, final OSMEntity existingEntity, final EntityTagMergeStrategy mergeStrategy, final HashMap<Long, ? extends OSMEntity> entityList, List<OSMEntity> conflictingEntities) {
+    public OSMEntitySpace(final OSMEntitySpace spaceToDuplicate, final int additionalCapacity) {
+        name = spaceToDuplicate.name;
+
+        final int capacity = spaceToDuplicate.allEntities.size() + additionalCapacity;
+        allEntities = new HashMap<>(capacity);
+        allNodes = new HashMap<>(capacity);
+        allWays = new HashMap<>(capacity);
+        allRelations = new HashMap<>(capacity);
+        mergeWithSpace(spaceToDuplicate, OSMEntity.TagMergeStrategy.keepTags, null);
+    }
+    private static boolean handleMerge(final OSMEntity entity, final OSMEntity existingEntity, final OSMEntity.TagMergeStrategy mergeStrategy, final HashMap<Long, ? extends OSMEntity> entityList, List<OSMEntity> conflictingEntities) {
         boolean shouldAddEntity = existingEntity == null;
         switch(mergeStrategy) {
             case keepTags:
-                break;
             case replaceTags:
+            case copyTags:
+            case copyNonexistentTags:
                 if(!shouldAddEntity) {
-                    existingEntity.copyTagsFrom(entity, true, false);
+                    existingEntity.copyTagsFrom(entity, mergeStrategy);
                 }
                 break;
             case mergeTags:
                 if(!shouldAddEntity) {
-                    Map<String, String> conflictingTags = existingEntity.copyTagsFrom(entity, false, true);
+                    Map<String, String> conflictingTags = existingEntity.copyTagsFrom(entity, mergeStrategy);
                     if(conflictingTags != null) { //add the conflict to the list for processing
                         conflictingEntities.add(existingEntity);
                     }
-                }
-                break;
-            case mergeTagsIgnoreConflict:
-                if(!shouldAddEntity) {
-                    existingEntity.copyTagsFrom(entity, false, false);
                 }
                 break;
         }
@@ -145,18 +148,18 @@ public class OSMEntitySpace {
     /**
      * Add the given OSM entity to the space, as well as any entities it contains
      * @param entity
+     * @param mergeStrategy
      * @return
      */
-    public OSMEntity addEntity(final OSMEntity entity, final EntityTagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
-        final OSMEntity resultEntity;
+    public OSMEntity addEntity(final OSMEntity entity, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
         final OSMEntity existingEntity;
         if(entity instanceof OSMNode) {
             existingEntity = allNodes.get(entity.osm_id);
             final OSMNode nodeToAdd;
             if(handleMerge(entity, existingEntity, mergeStrategy, allNodes, conflictingEntities)) {
-                nodeToAdd = new OSMNode((OSMNode) entity); //create an exact copy of the node
+                nodeToAdd = new OSMNode((OSMNode) entity, null); //create an exact copy of the node
                 allNodes.put(nodeToAdd.osm_id, nodeToAdd);
-                allEntities.add(nodeToAdd);
+                allEntities.put(nodeToAdd.osm_id, nodeToAdd);
                 return nodeToAdd;
             }
             return existingEntity;
@@ -165,13 +168,13 @@ public class OSMEntitySpace {
             if(handleMerge(entity, existingEntity, mergeStrategy, allWays, conflictingEntities)) {
                 //add all the child nodes of the way, then add the way itself
                 final OSMWay curWay = (OSMWay) entity;
-                final OSMWay localWay = new OSMWay(curWay, OSMEntity.MemberCopyStrategy.none);
+                final OSMWay localWay = new OSMWay(curWay, null, OSMEntity.MemberCopyStrategy.none);
                 for(final OSMNode node : curWay.getNodes()) {
                     final OSMNode addedNode = (OSMNode) addEntity(node, mergeStrategy, conflictingEntities);
                     localWay.appendNode(addedNode);
                 }
                 allWays.put(localWay.osm_id, localWay);
-                allEntities.add(localWay);
+                allEntities.put(localWay.osm_id, localWay);
                 return localWay;
             }
             return existingEntity;
@@ -179,7 +182,7 @@ public class OSMEntitySpace {
             existingEntity = allRelations.get(entity.osm_id);
             final OSMRelation curRelation = (OSMRelation) entity;
             if(handleMerge(entity, existingEntity, mergeStrategy, allRelations, conflictingEntities)) {
-                final OSMRelation localRelation = new OSMRelation(curRelation, OSMEntity.MemberCopyStrategy.none);
+                final OSMRelation localRelation = new OSMRelation(curRelation, null, OSMEntity.MemberCopyStrategy.none);
 
                 //add all the member entities of the relation, then add the relation itself
                 for(final OSMRelation.OSMRelationMember member : curRelation.members) {
@@ -187,7 +190,7 @@ public class OSMEntitySpace {
                     localRelation.addMember(addedMember, member.role);
                 }
                 allRelations.put(localRelation.osm_id, localRelation);
-                allEntities.add(localRelation);
+                allEntities.put(localRelation.osm_id, localRelation);
                 return localRelation;
             }
             return existingEntity;
@@ -195,56 +198,169 @@ public class OSMEntitySpace {
         //shouldn't reach here!
         return null;
     }
-    public void mergeEntities(final OSMEntity theEntity, final OSMEntity withEntity) {
-        if(withEntity.getTags() != null) {
-            for(final String key : withEntity.getTags().keySet()) {
-                OSMEntity.copyTag(withEntity, theEntity, key);
+    public boolean deleteEntity(final long entityId) {
+        final OSMEntity entityToDelete = allEntities.get(entityId);
+        if(entityToDelete != null) {
+            return deleteEntity(entityToDelete);
+        }
+        return false;
+    }
+
+    /**
+     * Remove the given entity from this space
+     * @param entityToDelete
+     * @return TRUE if deleted, FALSE if not
+     */
+    private boolean deleteEntity(final OSMEntity entityToDelete) {
+        //entity subclass-specific operations
+        if(entityToDelete instanceof OSMNode) {
+            final OSMNode theNode = (OSMNode) entityToDelete;
+            //check way membership, removing the entity if possible
+            for(final OSMWay way : theNode.containingWays.values()) {
+                way.removeNode(theNode);
             }
-        }
-
-        if(theEntity.osm_id < 0 && withEntity.osm_id > 0) {
-            //theEntity.osm_id = withEntity.osm_id; //TODO
-        }
-
-        if(withEntity.version >= 0) {
-            //osm_id = otherEntity.osm_id;
-
-            //if both entities have metadata, use the older entity's metadata
-            if(theEntity.version >= 0) {
-                final SimpleDateFormat parserSDF = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
-                try {
-                    final Date theDate = parserSDF.parse(theEntity.timestamp);
-                    final Date withDate = parserSDF.parse(withEntity.timestamp);
-                    if(theDate.getTime() > withDate.getTime()) {
-                        theEntity.uid = withEntity.uid;
-                        theEntity.version = withEntity.version;
-                        theEntity.changeset = withEntity.changeset;
-                        theEntity.user = withEntity.user;
-                        theEntity.timestamp = withEntity.timestamp;
-                    }
-                } catch (ParseException e) {
-                    e.printStackTrace();
+        } else if(entityToDelete instanceof OSMWay) {
+            final OSMWay theWay = (OSMWay) entityToDelete;
+            //delete any nodes that are untagged, and aren't a member of any other ways or relations
+            final List<OSMNode> containedNodes = new ArrayList<>(theWay.getNodes());
+            for(final OSMNode containedNode : containedNodes) {
+                theWay.removeNode(containedNode);
+                if((containedNode.getTags() == null || containedNode.getTags().isEmpty()) &&
+                        containedNode.containingWays.isEmpty() && containedNode.containingRelations.isEmpty()) {
+                    deleteEntity(containedNode);
                 }
             }
-        }
-    }
-    /**
-     * Generates the mapping between nodes and their containing ways, in preparation for
-     * checking way intersections etc.
-     * @param clearPrevious - whether to wipe the nodes' previous containingWays value
-     */
-    public void generateWayNodeMapping(final boolean clearPrevious) {
-        if(clearPrevious) {
-            for(final OSMNode node : allNodes.values()) {
-                node.resetContainingWays();
-            }
+        } else if(entityToDelete instanceof OSMRelation) {
+            final OSMRelation theRelation = (OSMRelation) entityToDelete;
+            theRelation.clearMembers(); //delete all memberships in the relation
         }
 
-        for(final OSMWay way : allWays.values()) {
-            for(final OSMNode containedNode : way.getNodes()) {
-                containedNode.addContainingWay(way);
-            }
+        //remove the instances of entityToDelete in any relations
+        final Map<Long, OSMRelation> containingRelations = new HashMap<>(entityToDelete.containingRelations);
+        for(final OSMRelation relation : containingRelations.values()) {
+            relation.removeMember(entityToDelete);
         }
+
+        //and remove all references from the main data arrays
+        if(entityToDelete instanceof OSMNode) {
+            allNodes.remove(entityToDelete.osm_id);
+        } else if(entityToDelete instanceof OSMWay) {
+            allWays.remove(entityToDelete.osm_id);
+        } else if(entityToDelete instanceof OSMRelation) {
+            allRelations.remove(entityToDelete.osm_id);
+        }
+        final OSMEntity deletedEntity = allEntities.remove(entityToDelete.osm_id);
+        return deletedEntity != null;
+    }
+    /**
+     * Merge the given entities
+     * @param theEntityId
+     * @param withEntityId
+     * @return the merged entity
+     */
+    public OSMEntity mergeEntities(final long theEntityId, final long withEntityId) {
+        //get a handle on our main reference to theEntity - must be a member of this space
+        final OSMEntity theEntity = allEntities.get(theEntityId), withEntity = allEntities.get(withEntityId);
+        if(theEntity == null || withEntity == null) {
+            System.out.println("Entities not in space!");
+            return null;
+        }
+
+        //determine which entity has the "best" (i.e. oldest) metadata
+        final OSMEntity entityWithBestMetadata = determinePreservedEntity(theEntity, withEntity);
+
+        final OSMEntity targetEntity;
+        final boolean entityReplaced = entityWithBestMetadata == withEntity;
+        if(!entityReplaced) { //i.e. we're keeping our current entity
+            //System.out.println("using local for merge: " + theEntity.osm_id + "/" + withEntity.osm_id);
+            targetEntity = theEntity;
+        } else {
+            //System.out.println(name + " using OTHER for merge: " + theEntity.osm_id + "/" + withEntity.osm_id);
+
+            //create a copy of theEntity with the OSM id of the incoming entity
+            if(theEntity instanceof OSMNode) {
+                final OSMNode theNode = (OSMNode) theEntity;
+                targetEntity = new OSMNode(theNode, withEntityId);
+                //replace all ways' references to the original node with the new node
+                for(final OSMWay containingWay : theNode.containingWays.values()) {
+                    containingWay.replaceNode(theNode, (OSMNode) targetEntity);
+                }
+            } else if (theEntity instanceof OSMWay) { //TODO not tested
+                targetEntity = new OSMWay((OSMWay) theEntity, withEntityId, OSMEntity.MemberCopyStrategy.shallow);
+            } else { //TODO not tested
+                targetEntity = new OSMRelation((OSMRelation) theEntity, withEntityId, OSMEntity.MemberCopyStrategy.shallow);
+            }
+
+            //and add targetEntity to any relations theEntity is involved in
+            for(final OSMRelation containingRelation : theEntity.containingRelations.values()) {
+                containingRelation.replaceMember(theEntity, targetEntity);
+            }
+
+            //copy the metadata from withEntity, since it's "better"
+            OSMEntity.copyMetadata(withEntity, targetEntity);
+
+            //remove theEntity from the database
+            deleteEntity(theEntity);
+        }
+
+        //copy over withEntity's tags into targetEntity
+        targetEntity.copyTagsFrom(withEntity, OSMEntity.TagMergeStrategy.copyTags);
+
+        //if merging nodes, add the localnode to any ways that the withNode belongs to
+        if(targetEntity instanceof OSMNode && withEntity instanceof OSMNode) {
+            final OSMNode targetNode = (OSMNode) targetEntity, withNode = (OSMNode) withEntity;
+            final Map<Long, OSMWay> containingWays = new HashMap<>(withNode.containingWays);
+            for (final OSMWay containingWay : containingWays.values()) {
+                containingWay.replaceNode(withNode, targetNode);
+            }
+            targetNode.setCoordinate(withNode.getCentroid());
+        }
+
+        //also copy over any memberships of the incoming entity
+        final Map<Long, OSMRelation> containingRelations = new HashMap<>(withEntity.containingRelations);
+        for(final OSMRelation containingRelation : containingRelations.values()) {
+            final int memberIndex = containingRelation.indexOfMember(withEntity);
+            final OSMRelation.OSMRelationMember member = containingRelation.members.get(memberIndex);
+            containingRelation.addMember(targetEntity, member.role);
+        }
+
+        //remove withEntity from this space
+        deleteEntity(withEntity);
+
+        //if the target entity is a new entity (with withEntity's id), add it to this spacenow that withEntity is deleted
+        if(entityReplaced) {
+            addEntity(targetEntity, OSMEntity.TagMergeStrategy.keepTags, null);
+        }
+        return targetEntity;
+    }
+    /**
+     *
+     * @param entity1
+     * @param entity2
+     * @return The entity whose metadata should be preserved, or null if neither has metadata (or a corrupted timestamp)
+     */
+    private static OSMEntity determinePreservedEntity(final OSMEntity entity1, final OSMEntity entity2) {
+        //first check if the entities are versioned (i.e. exist in the OSM database)
+        final boolean entity1Versioned = entity1.version >= 0, entity2Versioned = entity2.version >= 0;
+
+        //if both entities have metadata, use the older entity's metadata
+        if(entity1Versioned && entity2Versioned) {
+            final SimpleDateFormat parserSDF = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+            try {
+                final Date entity1Date = parserSDF.parse(entity1.timestamp);
+                final Date entity2Date = parserSDF.parse(entity2.timestamp);
+                if(entity1Date.getTime() > entity2Date.getTime()) {
+                    return entity2;
+                } else {
+                    return entity1;
+                }
+            } catch (ParseException ignored) {}
+        } else if(entity1Versioned) {
+            return entity1;
+        } else if(entity2Versioned){
+            return entity2;
+        }
+        return null;
     }
     /**
      * Parses an OSM XML file into entity objects, and adds them to this space
@@ -253,9 +369,10 @@ public class OSMEntitySpace {
      * @throws ParserConfigurationException
      * @throws SAXException
      */
-    public void loadFromXML(String fileName) throws IOException, ParserConfigurationException, SAXException {
+    public void loadFromXML(final String fileName) throws IOException, ParserConfigurationException, SAXException {
         final SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
         long minimumEntityId = 0;
+        name = fileName;
 
         final OSMEntitySpace entitySpace = this;
         parser.parse(new File(fileName), new DefaultHandler() {
@@ -288,20 +405,20 @@ public class OSMEntitySpace {
                         curNode.setCoordinate(Double.parseDouble(attributes.getValue("lat")), Double.parseDouble(attributes.getValue("lon")));
                         processBaseValues(curNode, attributes);
 
-                        final OSMNode addedNode = (OSMNode) addEntity(curNode, EntityTagMergeStrategy.keepTags, null);
+                        final OSMNode addedNode = (OSMNode) addEntity(curNode, OSMEntity.TagMergeStrategy.keepTags, null);
                         entityStack.push(addedNode);
                         break;
                     case tagWay:
                         final OSMWay curWay = new OSMWay(Long.parseLong(attributes.getValue(keyId)));
                         processBaseValues(curWay, attributes);
 
-                        final OSMWay addedWay = (OSMWay) addEntity(curWay, EntityTagMergeStrategy.keepTags, null);
+                        final OSMWay addedWay = (OSMWay) addEntity(curWay, OSMEntity.TagMergeStrategy.keepTags, null);
                         entityStack.push(addedWay);
                         break;
                     case tagRelation:
                         final OSMRelation curRelation = new OSMRelation(Long.parseLong(attributes.getValue(keyId)));
                         processBaseValues(curRelation, attributes);
-                        final OSMRelation addedRelation = (OSMRelation) addEntity(curRelation, EntityTagMergeStrategy.keepTags, null);
+                        final OSMRelation addedRelation = (OSMRelation) addEntity(curRelation, OSMEntity.TagMergeStrategy.keepTags, null);
                         entityStack.push(addedRelation);
                         break;
                     case tagTag: //tag for a node/way/relation
@@ -359,8 +476,8 @@ public class OSMEntitySpace {
             }*/
         });
 
-        for(OSMEntity e : allEntities) {
-            minimumEntityId = Math.min(minimumEntityId, e.osm_id);
+        for(long id : allEntities.keySet()) {
+            minimumEntityId = Math.min(minimumEntityId, id);
         }
         setIdSequence(minimumEntityId);
     }
@@ -371,7 +488,7 @@ public class OSMEntitySpace {
      */
     public Region getBoundingBox() {
         Region fileBoundingBox = null;
-        for (OSMEntity entity : allEntities) {
+        for (final OSMEntity entity : allEntities.values()) {
             if(fileBoundingBox != null) {
                 fileBoundingBox.combinedBoxWithRegion(entity.getBoundingBox());
             } else {
@@ -389,7 +506,7 @@ public class OSMEntitySpace {
     public void outputXml(String fileName) throws IOException, InvalidArgumentException {
         //produce an empty XMl file if no entities
         if(allEntities.size() == 0) {
-            FileWriter writer = new FileWriter(fileName);
+            final FileWriter writer = new FileWriter(fileName);
             writer.write(XML_DOCUMENT_OPEN);
             writer.write(XML_DOCUMENT_CLOSE);
             writer.close();
@@ -397,7 +514,7 @@ public class OSMEntitySpace {
         }
 
         //generate the bounding box for the file
-        Region fileBoundingBox = getBoundingBox();
+        final Region fileBoundingBox = getBoundingBox();
 
         final FileWriter writer = new FileWriter(fileName);
         writer.write(XML_DOCUMENT_OPEN);
@@ -405,13 +522,13 @@ public class OSMEntitySpace {
             writer.write(String.format(XML_BOUNDING_BOX, fileBoundingBox.origin.latitude, fileBoundingBox.origin.longitude, fileBoundingBox.extent.latitude, fileBoundingBox.extent.longitude));
         }
 
-        for(OSMNode node: allNodes.values()) {
+        for(final OSMNode node: allNodes.values()) {
             writer.write(node.toString());
         }
-        for(OSMWay way: allWays.values()) {
+        for(final OSMWay way: allWays.values()) {
             writer.write(way.toString());
         }
-        for(OSMRelation relation: allRelations.values()) {
+        for(final OSMRelation relation: allRelations.values()) {
             writer.write(relation.toString());
         }
         writer.write(XML_DOCUMENT_CLOSE);
@@ -425,7 +542,7 @@ public class OSMEntitySpace {
      * @param mergeStrategy determines how to handle entities which exist in both spaces
      * @param conflictingEntities any conflicting entities will be added to this list
      */
-    public void mergeWithSpace(final OSMEntitySpace otherSpace, final EntityTagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
+    public void mergeWithSpace(final OSMEntitySpace otherSpace, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
         for(final OSMNode node : otherSpace.allNodes.values()) {
             addEntity(node, mergeStrategy, conflictingEntities);
         }

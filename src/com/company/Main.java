@@ -11,12 +11,10 @@ import java.text.DecimalFormat;
 import java.util.*;
 
 public class Main {
-
+    private final static boolean debugEnabled = true;
     public static void main(String[] args) {
 
-        final boolean debugEnabled = true;
-
-        final OSMEntitySpace mainSpace = new OSMEntitySpace(1024);
+        OSMEntitySpace importSpace = new OSMEntitySpace(1024);
 
         //define the options for the LineComparison routines
         final LineComparison.ComparisonOptions options = new LineComparison.ComparisonOptions();
@@ -27,96 +25,67 @@ public class Main {
         options.maxSegmentMidPointDistance = 4.0 * options.maxSegmentLength;
 
         try {
-            mainSpace.loadFromXML("routes.osm");
+            importSpace.loadFromXML("routes.osm");
 
-            /*OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(mainSpace);
+            /*OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace);
             exporter.outputForOSMTaskingManager("boxes", "https://www.meanfreepath.com/kcstops/");
             if(Math.random() < 2) {
                 return;
             }*/
-
-            //first create a list of all the route_master relations
-            final List<OSMRelation> routeMasterRelations = new ArrayList<>(mainSpace.allRelations.size());
+            //first create a list of all the route_master relations in the import dataset
+            final List<OSMRelation> importRouteMasterRelations = new ArrayList<>(importSpace.allRelations.size());
             String relationType;
-            for(final OSMRelation relation : mainSpace.allRelations.values()) {
+            for(final OSMRelation relation : importSpace.allRelations.values()) {
                 relationType = relation.getTag(OSMEntity.KEY_TYPE);
                 if(relationType != null && relationType.equals(OSMEntity.TAG_ROUTE_MASTER)) {
-                    routeMasterRelations.add(relation);
+                    importRouteMasterRelations.add(relation);
                 }
             }
 
             //loop through the route masters, processing their subroutes in one entity space
-            for(final OSMRelation routeMaster : routeMasterRelations) {
-                final List<OSMRelation.OSMRelationMember> masterMembers = routeMaster.getMembers();
-                if(masterMembers.size() == 0) {
-                    System.out.println("No routes for Master " + routeMaster.getTag("name"));
-                    continue;
-                }
-                final List<OSMRelation> routeMasterSubRoutes = new ArrayList<>(masterMembers.size());
-                Region combinedBoundingBox = null;
-                String memberType;
+            for(final OSMRelation importRouteMaster : importRouteMasterRelations) {
 
-                final List<OSMWay> routePaths = new ArrayList<>(masterMembers.size());
-                for(final OSMRelation.OSMRelationMember member : masterMembers) {
-                    memberType = member.member.getTag(OSMEntity.KEY_TYPE);
-                    if(memberType != null && memberType.equals(OSMEntity.TAG_ROUTE)) {
-                        final OSMRelation curRoute = (OSMRelation) member.member;
-                        routeMasterSubRoutes.add(curRoute);
-                        if(combinedBoundingBox == null) {
-                            combinedBoundingBox = member.member.getBoundingBox().clone();
-                        } else {
-                            combinedBoundingBox.combinedBoxWithRegion(member.member.getBoundingBox());
+                final OSMEntitySpace workingEntitySpace = new OSMEntitySpace(importSpace, 32768);
+                downloadRegionsForImportDataset(importSpace, workingEntitySpace, importRouteMaster, options);
+                importSpace = null;
+
+                //get a handle on the objects in the *working* entity space.  ALL OPERATIONS MUST BE DONE IN THIS SPACE!
+                final OSMRelation osmRouteMaster = workingEntitySpace.allRelations.get(importRouteMaster.osm_id);
+                final List<OSMRelation> routeMasterSubRoutes = new ArrayList<>(osmRouteMaster.getMembers().size());
+                for(final OSMRelation.OSMRelationMember subRoute : osmRouteMaster.getMembers()) {
+                    if(subRoute.member instanceof OSMRelation) {
+                        final String routeTag = subRoute.member.getTag(OSMEntity.KEY_TYPE);
+                        if(routeTag != null && routeTag.equals(OSMEntity.TAG_ROUTE)) {
+                            routeMasterSubRoutes.add((OSMRelation) subRoute.member);
                         }
-
-                        routePaths.add((OSMWay) curRoute.getMembers("").get(0).member);
                     }
                 }
 
+                //the final space where the relation and all related data will be imported
                 final OSMEntitySpace relationSpace = new OSMEntitySpace(65536);
 
-                //fetch all possible useful ways that intersect the route's combined bounding box
-                /*final OverpassConverter converter = new OverpassConverter();
-                final String query = converter.queryForBoundingBox("[\"highway\"~\"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|service|living_street\"]", combinedBoundingBox, 0.0004, OSMEntity.OSMType.way);
-                converter.fetchFromOverpass(query);
-                final OSMEntitySpace existingDataSpace = converter.getEntitySpace();
-                existingDataSpace.outputXml("origdl.osm");//*/
-
-
-                OSMEntitySpace existingDataSpace = new OSMEntitySpace(65536);
-                final List<Region> downloadRegions = generateCombinedDownloadRegions(routePaths, options.boundingBoxSize);
-                for(final Region downloadRegion : downloadRegions) {
-                    final OverpassConverter converter = new OverpassConverter();
-                    final String query = converter.queryForBoundingBox("[\"highway\"~\"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|service|living_street\"]", downloadRegion, 0.0, OSMEntity.OSMType.way);
-                    converter.fetchFromOverpass(query);
-                    existingDataSpace.mergeWithSpace(converter.getEntitySpace(), OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
-                }//*/
-                System.out.println("Processing with " + existingDataSpace.allWays.size() + " ways");
-
+                //fetch all existing stops in the route's bounding box
+                conflateStops(osmRouteMaster, workingEntitySpace, osmRouteMaster.getBoundingBox(), 20.0);
 
                 for(final OSMRelation relation : routeMasterSubRoutes) {
                     final List<OSMRelation.OSMRelationMember> members = relation.getMembers("");
                     final OSMWay routePath = (OSMWay) members.get(0).member;
                     routePath.setTag("gtfs:ethereal", "yes");
-                    if (routePath.osm_id != -924) {
-                        //continue;
+                    if (routePath.osm_id != -3) {
+                       // continue;
                     }
-
-                    //fetch all existing stops in the route's bounding box
-                    //conflateStops(relation, relationSpace, combinedBoundingBox, 20.0);
+                    System.out.println("Begin conflation for subroute \"" + relation.getTag(OSMEntity.KEY_NAME) + "\" (id " + relation.osm_id + ")");
 
                     //Break the candidate ways into LineSegments and match their geometries to the main route line
                     final long timeStartLineComparison = new Date().getTime();
-                    final LineComparison comparison = new LineComparison(routePath, new ArrayList<>(existingDataSpace.allWays.values()), options, debugEnabled);
+                    final LineComparison comparison = new LineComparison(routePath, new ArrayList<>(workingEntitySpace.allWays.values()), options, debugEnabled);
                     comparison.matchLines();
                     System.out.println("Matched lines in " + (new Date().getTime() - timeStartLineComparison) + "ms");
 
                     //also, match the stops in the relation to their nearest matching way
                     final long timeStartStopMatching = new Date().getTime();
-                    final List<StopWayMatch> allStopMatches = matchStopsToWays(relation, comparison.candidateLines.values(), existingDataSpace);
+                    final List<StopWayMatch> allStopMatches = matchStopsToWays(relation, comparison.candidateLines.values(), workingEntitySpace);
                     System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
-
-                    //update the primary entity space to determine all connecting ways
-                    existingDataSpace.generateWayNodeMapping(false);
 
                     //now find the optimal path from the first stop to the last stop, using the provided ways
                     final long timeStartPathfinding = new Date().getTime();
@@ -142,31 +111,18 @@ public class Main {
                     }
 
                     if (debugEnabled) {
-                        for(final Region r : downloadRegions) {
-                            List<OSMNode> rNodes = new ArrayList<>(5);
-                            rNodes.add(existingDataSpace.createNode(r.origin.latitude, r.origin.longitude, null));
-                            rNodes.add(existingDataSpace.createNode(r.origin.latitude, r.extent.longitude, null));
-                            rNodes.add(existingDataSpace.createNode(r.extent.latitude, r.extent.longitude, null));
-                            rNodes.add(existingDataSpace.createNode(r.extent.latitude, r.origin.longitude, null));
-                            rNodes.add(existingDataSpace.createNode(r.origin.latitude, r.origin.longitude, null));
-                            final OSMWay regionWay = existingDataSpace.createWay(null, rNodes);
-                            regionWay.setTag("landuse", "construction");
-                            regionWay.setTag("gtfs:ethereal", "yes");
-                            System.out.println(r.toString());
-                        }
-                        debugOutputSegments(existingDataSpace, comparison);
+                        debugOutputSegments(workingEntitySpace, comparison);
                     }
 
                     //add the completed relation to its own separate file
-                    List<OSMEntity> conflictingEntities = new ArrayList<>(16);
-                    relationSpace.addEntity(relation, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
-                    existingDataSpace.addEntity(relation, OSMEntitySpace.EntityTagMergeStrategy.mergeTags, conflictingEntities);
-                    existingDataSpace.outputXml("newresult" + routePath.osm_id + ".osm");
+                    relationSpace.addEntity(relation, OSMEntity.TagMergeStrategy.keepTags, null);
+                    relationSpace.deleteEntity(routePath.osm_id);
+                    workingEntitySpace.outputXml("newresult" + routePath.osm_id + ".osm");
                 }
 
                 relationSpace.outputXml("relation.osm");
             }
-            //mainSpace.outputXml("newresult.osm");
+            //importSpace.outputXml("newresult.osm");
         } catch (IOException | ParserConfigurationException | SAXException | InvalidArgumentException e) {
             e.printStackTrace();
         }
@@ -231,6 +187,60 @@ public class Main {
             }
         }
         return downloadRegions;
+    }
+    private static boolean downloadRegionsForImportDataset(final OSMEntitySpace importSpace, final OSMEntitySpace osmServerEntitySpace, final OSMRelation routeMaster, final LineComparison.ComparisonOptions options) throws InvalidArgumentException {
+
+        final List<OSMRelation.OSMRelationMember> masterMembers = routeMaster.getMembers();
+        if(masterMembers.size() == 0) {
+            System.out.println("No routes for Master " + routeMaster.getTag("name"));
+            return false;
+        }
+
+        //get a handle on the route path geometries for the subroutes
+        String memberType;
+        final List<OSMWay> routePaths = new ArrayList<>(masterMembers.size());
+        for(final OSMRelation.OSMRelationMember member : masterMembers) {
+            memberType = member.member.getTag(OSMEntity.KEY_TYPE);
+            if(memberType != null && memberType.equals(OSMEntity.TAG_ROUTE)) {
+                final OSMRelation curRoute = (OSMRelation) member.member;
+                routePaths.add((OSMWay) curRoute.getMembers("").get(0).member);
+            }
+        }
+
+
+                /*final OverpassConverter converter = new OverpassConverter();
+                final String query = converter.queryForBoundingBox("[\"highway\"~\"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|service|living_street\"]", combinedBoundingBox, 0.0004, OSMEntity.OSMType.way);
+                converter.fetchFromOverpass(query);
+                final OSMEntitySpace osmServerEntitySpace = converter.getEntitySpace();
+                osmServerEntitySpace.outputXml("origdl.osm");//*/
+
+        //and get the download regions for them
+        final List<Region> downloadRegions = generateCombinedDownloadRegions(routePaths, options.boundingBoxSize);
+
+        //fetch all possible useful ways that intersect the route's combined bounding box
+        for(final Region downloadRegion : downloadRegions) {
+            final OverpassConverter converter = new OverpassConverter();
+            final String query = converter.queryForBoundingBox("[\"highway\"~\"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|service|living_street\"]", downloadRegion, 0.0, OSMEntity.OSMType.way);
+            converter.fetchFromOverpass(query);
+            osmServerEntitySpace.mergeWithSpace(converter.getEntitySpace(), OSMEntity.TagMergeStrategy.keepTags, null);
+        }
+        System.out.println("Processing with " + osmServerEntitySpace.allWays.size() + " ways");
+
+        if (debugEnabled) {
+            for (final Region r : downloadRegions) {
+                List<OSMNode> rNodes = new ArrayList<>(5);
+                rNodes.add(osmServerEntitySpace.createNode(r.origin.latitude, r.origin.longitude, null));
+                rNodes.add(osmServerEntitySpace.createNode(r.origin.latitude, r.extent.longitude, null));
+                rNodes.add(osmServerEntitySpace.createNode(r.extent.latitude, r.extent.longitude, null));
+                rNodes.add(osmServerEntitySpace.createNode(r.extent.latitude, r.origin.longitude, null));
+                rNodes.add(osmServerEntitySpace.createNode(r.origin.latitude, r.origin.longitude, null));
+                final OSMWay regionWay = osmServerEntitySpace.createWay(null, rNodes);
+                regionWay.setTag("landuse", "construction");
+                regionWay.setTag("gtfs:ethereal", "yes");
+                System.out.println(r.toString());
+            }
+        }
+        return true;
     }
     private static List<Region> generateDownloadRegionsForWay(final OSMWay way, final double boundingBoxSize) {
         final double maxRectArea = 5000000.0;
@@ -335,6 +345,7 @@ public class Main {
 
                 //skip this line if not within the maximum distance to the stop
                 if(nearestSegmentMatch == null) {
+                    //System.out.println("NO MATCH for platform " + stopPlatform.osm_id + "(ref " + stopPlatform.getTag("ref") + "/" + stopPlatform.getTag("name") + ")");
                     continue;
                 }
 
@@ -413,13 +424,13 @@ public class Main {
             final OSMWay segmentWay = segmentSpace.createWay(null, null);
             if(originNode == null) {
                 if(mainSegment.originNode != null) {
-                    originNode = (OSMNode) segmentSpace.addEntity(mainSegment.originNode, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
+                    originNode = (OSMNode) segmentSpace.addEntity(mainSegment.originNode, OSMEntity.TagMergeStrategy.keepTags, null);
                 } else {
                     originNode = segmentSpace.createNode(mainSegment.originPoint.latitude, mainSegment.originPoint.longitude, null);
                 }
             }
             if(mainSegment.destinationNode != null) {
-                lastNode = (OSMNode) segmentSpace.addEntity(mainSegment.destinationNode, OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
+                lastNode = (OSMNode) segmentSpace.addEntity(mainSegment.destinationNode, OSMEntity.TagMergeStrategy.keepTags, null);
             } else {
                 lastNode = segmentSpace.createNode(mainSegment.destinationPoint.latitude, mainSegment.destinationPoint.longitude, null);
             }
@@ -443,13 +454,13 @@ public class Main {
 
                 if(matchOriginNode == null) { //i.e. first node on line
                     if(matchingSegment.originNode != null && entitySpace.allNodes.containsKey(matchingSegment.originNode.osm_id)) {
-                        matchOriginNode = (OSMNode) segmentSpace.addEntity(entitySpace.allNodes.get(matchingSegment.originNode.osm_id), OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
+                        matchOriginNode = (OSMNode) segmentSpace.addEntity(entitySpace.allNodes.get(matchingSegment.originNode.osm_id), OSMEntity.TagMergeStrategy.keepTags, null);
                     } else {
                         matchOriginNode = segmentSpace.createNode(matchingSegment.originPoint.latitude, matchingSegment.originPoint.longitude, null);
                     }
                 }
                 if(matchingSegment.destinationNode != null && entitySpace.allNodes.containsKey(matchingSegment.destinationNode.osm_id)) {
-                    matchLastNode = (OSMNode) segmentSpace.addEntity(entitySpace.allNodes.get(matchingSegment.destinationNode.osm_id), OSMEntitySpace.EntityTagMergeStrategy.keepTags, null);
+                    matchLastNode = (OSMNode) segmentSpace.addEntity(entitySpace.allNodes.get(matchingSegment.destinationNode.osm_id), OSMEntity.TagMergeStrategy.keepTags, null);
                 } else {
                     matchLastNode = segmentSpace.createNode(matchingSegment.destinationPoint.latitude, matchingSegment.destinationPoint.longitude, null);
                 }
@@ -478,29 +489,57 @@ public class Main {
         }
         segmentSpace.outputXml("segments" + comparison.mainLine.way.osm_id + ".osm");
     }
-    private static void conflateStops(final OSMRelation routeRelation, final OSMEntitySpace importSpace, final Region inRegion, final double conflictDistance) throws InvalidArgumentException {
+    private static void conflateStops(final OSMRelation routeMaster, final OSMEntitySpace importSpace, final Region inRegion, final double conflictDistance) throws InvalidArgumentException {
         //fetch all possible useful ways that intersect the route's combined bounding box
         final OverpassConverter converter = new OverpassConverter();
         try {
-            final String query = converter.queryForBoundingBox("[\"highway\"=\"bus_stop\"]", inRegion, 0.0004, OSMEntity.OSMType.node);
+            final String query;
+            final String routeType = routeMaster.getTag(OSMEntity.KEY_ROUTE_MASTER);
+            switch (routeType) {
+                case OSMEntity.TAG_BUS: //bus stops are always nodes
+                    query = converter.queryForBoundingBox("[\"highway\"=\"bus_stop\"]", inRegion, 0.0, OSMEntity.OSMType.node);
+                    break;
+                case OSMEntity.TAG_LIGHT_RAIL:
+                case OSMEntity.TAG_TRAIN:
+                case OSMEntity.TAG_SUBWAY:
+                case OSMEntity.TAG_TRAM:
+                    query = converter.queryForBoundingBox("[\"railway\"=\"platform\"]", inRegion, 0.0, null);
+                    break;
+                default:
+                    System.out.println("Unsupported route type \"" + routeType + "\"");
+                    return;
+            }
             converter.fetchFromOverpass(query);
         } catch (InvalidArgumentException e) {
             e.printStackTrace();
             return;
         }
 
-        final OSMEntitySpace existingSpace = converter.getEntitySpace(); //TODO merge with ways' entity space
-
-        //generate a list of the stop nodes we want to import
-        final List<OSMRelation.OSMRelationMember> routeStops = routeRelation.getMembers("platform");
-        final List<OSMNode> stopsToImport = new ArrayList<>(routeStops.size());
-        for(final OSMRelation.OSMRelationMember member : routeStops) {
-            stopsToImport.add((OSMNode) member.member); //GTFS stops are always nodes
-            importSpace.addEntity(member.member, OSMEntitySpace.EntityMergeStrategy.dontMerge, null);
+        final OSMEntitySpace existingStopsSpace = converter.getEntitySpace();
+        importSpace.mergeWithSpace(existingStopsSpace, OSMEntity.TagMergeStrategy.keepTags, null);
+        if(Math.random() < 2) {
+         //   return;
         }
 
+        //create a list of the stops in the given route master
+        final List<OSMEntity> routeStopsToImport = new ArrayList<>(routeMaster.getMembers().size() * 64);
+        for(final OSMRelation.OSMRelationMember routeMasterMember : routeMaster.getMembers()) {
+            if(routeMasterMember.member instanceof OSMRelation) {
+                final OSMRelation subRoute = (OSMRelation) routeMasterMember.member;
+                final List<OSMRelation.OSMRelationMember> stops = subRoute.getMembers("platform");
+                for (final OSMRelation.OSMRelationMember stopMember : stops) {
+                    routeStopsToImport.add(stopMember.member);
+                    importSpace.addEntity(stopMember.member, OSMEntity.TagMergeStrategy.keepTags, null);
+                }
+            }
+        }
+        //and another list of stops in the existing OSM data
+        final Collection<OSMEntity> existingStopsInArea = existingStopsSpace.allEntities.values();
+
+        System.out.println(existingStopsInArea.size() + " STOPS TO EXIST");
+
         //and compare them to the existing OSM data
-        for(final OSMNode importStop : stopsToImport) {
+        for(final OSMEntity importStop : routeStopsToImport) {
             final String importGtfsId = importStop.getTag("gtfs:stop_id");
             final String importRefTag = importStop.getTag(OSMEntity.KEY_REF);
             double importRefTagNumeric;
@@ -511,33 +550,48 @@ public class Main {
                 importRefTagNumeric = Double.MAX_VALUE;
             }
 
-            for(final OSMNode existingStop : existingSpace.allNodes.values()) {
-                final String existingGtfsId = existingStop.getTag("gtfs:stop_id");
+            final String gtfsIdTag = "gtfs:stop_id";
+            for(final OSMEntity existingStopPlatform : existingStopsInArea) {
+                final String existingGtfsId = existingStopPlatform.getTag(gtfsIdTag);
+
                 assert importGtfsId != null;
+
+                //if the GTFS id or ref match, merge the existing stop with the import stop's data
+                final Point existingStopLocation = new Point(existingStopPlatform.getCentroid().latitude, existingStopPlatform.getCentroid().longitude);
+                OSMEntity mergedStopEntity = null;
                 if(importGtfsId.equals(existingGtfsId)) {
-                    //merge the existing stop with the import stop's data
-                    importSpace.mergeEntities(importStop, existingStop);
-                } else if(existingStop.hasTag(OSMEntity.KEY_REF)) { //try matching by ref if no importer id
-                    final String existingRefTag = existingStop.getTag(OSMEntity.KEY_REF);
+                    mergedStopEntity = importSpace.mergeEntities(existingStopPlatform.osm_id, importStop.osm_id);
+                    System.out.println("GTFS id match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(gtfsIdTag) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
+                } else if(existingStopPlatform.hasTag(OSMEntity.KEY_REF)) { //try matching by ref if no importer id
+                    final String existingRefTag = existingStopPlatform.getTag(OSMEntity.KEY_REF);
+                    //TODO also match based on import dataset
                     assert existingRefTag != null;
                     if(existingRefTag.trim().equals(importRefTag)) { //string match
-                        importSpace.mergeEntities(importStop, existingStop);
+                        System.out.println("Ref string match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
+                        mergedStopEntity = importSpace.mergeEntities(existingStopPlatform.osm_id, importStop.osm_id);
                     } else if(importRefTagNumeric != Double.MAX_VALUE) { //try doing a basic numeric match if strings don't match (special case for already-imported King County metro data)
                         try {
                             final double existingRefTagNumeric = Double.parseDouble(existingRefTag);
                             if(existingRefTagNumeric == importRefTagNumeric) {
-                                importSpace.mergeEntities(importStop, existingStop);
+                                System.out.println("Ref numeric match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
+                                mergedStopEntity = importSpace.mergeEntities(existingStopPlatform.osm_id, importStop.osm_id);
                             }
-                        } catch(NumberFormatException e) {
-                            //do nothing
-                        }
+                        } catch(NumberFormatException ignored) {}
                     }
-                } else { //if no tag matches, check that the import data doesn't conflict with existing stops
-                    final double stopDistance = Point.distance(importStop.getCentroid(), existingStop.getCentroid());
+                }
+
+                if(mergedStopEntity == null) { //if no matching stops found, check that the import data doesn't conflict with existing stops
+                    final double stopDistance = Point.distance(importStop.getCentroid(), existingStopPlatform.getCentroid());
                     if(stopDistance < conflictDistance) {
-                        System.out.println("Within distance! " + existingStop.getTag(OSMEntity.KEY_REF));
+                        System.out.println("Within distance! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
                         importStop.setTag("gtfsconflict", "yes");
                     }
+                } else {
+                    //keep the existing platform's location if it's a node, since these are usually better-positioned than the GTFS data's
+                    if(mergedStopEntity instanceof OSMNode) {
+                        ((OSMNode) mergedStopEntity).setCoordinate(existingStopLocation);
+                    }
+                    break; //bail since we've matched this stop
                 }
             }
         }

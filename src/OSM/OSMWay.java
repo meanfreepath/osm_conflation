@@ -113,8 +113,8 @@ public class OSMWay extends OSMEntity {
      * @param node
      * @return
      */
-    public boolean containsNode(final OSMNode node) {
-        return nodes.indexOf(node) >= 0;
+    public int indexOfNode(final OSMNode node) {
+        return nodes.indexOf(node);
     }
     public List<OSMNode> getNodes() {
         return nodes;
