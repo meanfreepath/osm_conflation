@@ -8,13 +8,17 @@ public class Point {
     private final static double RAD_FACTOR = Math.PI / 360.0;
     public double latitude, longitude;
 
-    public Point(double lat, double lon) {
+    public Point(final double lat, final double lon) {
         latitude = lat;
         longitude = lon;
     }
-    public Point(String lat, String lon) {
+    public Point(final String lat, final String lon) {
         latitude = Double.parseDouble(lat);
         longitude = Double.parseDouble(lon);
+    }
+    public Point(final Point point) {
+        latitude = point.latitude;
+        longitude = point.longitude;
     }
     public static double distance(final Point point1, final Point point2) {
         final double latitudeFactor = Math.cos(RAD_FACTOR * (point1.latitude + point2.latitude));
