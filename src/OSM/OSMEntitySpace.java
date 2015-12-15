@@ -316,18 +316,16 @@ public class OSMEntitySpace {
             targetNode.setCoordinate(withNode.getCentroid());
         }
 
-        //also copy over any memberships of the incoming entity
+        //also replace the incoming entity's relation memberships with the target entity
         final Map<Long, OSMRelation> containingRelations = new HashMap<>(withEntity.containingRelations);
         for(final OSMRelation containingRelation : containingRelations.values()) {
-            final int memberIndex = containingRelation.indexOfMember(withEntity);
-            final OSMRelation.OSMRelationMember member = containingRelation.members.get(memberIndex);
-            containingRelation.addMember(targetEntity, member.role);
+            containingRelation.replaceMember(withEntity, targetEntity);
         }
 
         //remove withEntity from this space
         deleteEntity(withEntity);
 
-        //if the target entity is a new entity (with withEntity's id), add it to this spacenow that withEntity is deleted
+        //if the target entity is a new entity (with withEntity's id), add it to this space now that withEntity is deleted (to avoid osm_id conflicts)
         if(entityReplaced) {
             addEntity(targetEntity, OSMEntity.TagMergeStrategy.keepTags, null);
         }
