@@ -125,6 +125,25 @@ public class OSMWay extends OSMEntity {
     public OSMNode getLastNode() {
         return lastNode;
     }
+    /**
+     * Returns the closest node (within the tolerance distance) to the given point
+     * @param point the point to test
+     * @param tolerance maximum distance, in meters
+     * @return the closest node, or null if none within the tolerance distance
+     */
+    public OSMNode nearestNodeAtPoint(final Point point, final double tolerance) {
+        double closestNodeDistance = tolerance, curDistance;
+        OSMNode closestNode = null;
+
+        for(final OSMNode existingNode : nodes) {
+            curDistance = Point.distance(point, existingNode.getCentroid());
+            if(curDistance <= closestNodeDistance) {
+                closestNodeDistance = curDistance;
+                closestNode = existingNode;
+            }
+        }
+        return closestNode;
+    }
 
     public void reverseNodes() {
         final OSMNode lastLastNode = lastNode;
