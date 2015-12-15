@@ -38,8 +38,11 @@ public class OSMNode extends OSMEntity {
         if(!containingWays.containsKey(way.osm_id)) {
             containingWays.put(way.osm_id, way);
             containingWayCount++;
+
+            if(debug) {
+                setTag("wcount", Short.toString(containingWayCount));
+            }
         }
-        //setTag("wcount", Short.toString(containingWayCount));
     }
     /**
      * Notifies this node it's been removed from the given way's node list
@@ -49,10 +52,12 @@ public class OSMNode extends OSMEntity {
         if(containingWays.containsKey(way.osm_id)) {
             containingWays.remove(way.osm_id);
             containingWayCount--;
-            if(containingWayCount > 0) {
-                setTag("wcount", Short.toString(containingWayCount));
-            } else {
-                removeTag("wcount");
+            if(debug) {
+                if (containingWayCount > 0) {
+                    setTag("wcount", Short.toString(containingWayCount));
+                } else {
+                    removeTag("wcount");
+                }
             }
         }
     }

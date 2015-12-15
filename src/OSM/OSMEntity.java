@@ -25,6 +25,8 @@ public abstract class OSMEntity {
         keepTags, replaceTags, copyTags, copyNonexistentTags, mergeTags
     }
 
+    public final static boolean debug = true;
+
     public final long osm_id;
 
     //Metadata (not required)
@@ -203,7 +205,9 @@ public abstract class OSMEntity {
             containingRelations.put(relation.osm_id, relation);
             containingRelationCount++;
         }
-        setTag("rcount", Short.toString(containingRelationCount));
+        if(debug) {
+            setTag("rcount", Short.toString(containingRelationCount));
+        }
     }
     /**
      * Notifies this entity it's been removed from the given relation's member list
@@ -213,7 +217,9 @@ public abstract class OSMEntity {
         if(containingRelations.containsKey(relation.osm_id)) {
             containingRelations.remove(relation.osm_id);
             containingRelationCount--;
-            setTag("rcount", Short.toString(containingRelationCount));
+            if(debug) {
+                setTag("rcount", Short.toString(containingRelationCount));
+            }
         }
     }
     public static String escapeForXML(final String str){
