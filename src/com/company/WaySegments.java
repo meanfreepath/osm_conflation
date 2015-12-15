@@ -69,36 +69,15 @@ public class WaySegments {
             nodeIndex++;
         }
     }
-
     /**
      * Inserts a node on the given segment, splitting it into two segments
      * NOTE: does not check if node lies on onSegment!
      * @param node The node to add
      * @param onSegment The segment to add the node to
-     * @param tolerance The distance tolerance: if node is closer to an existing node than this distance, it's merged
      * @return If an existing node is within the tolerance distance, that node, otherwise the input node
      */
-    public OSMNode insertNode(final OSMNode node, final LineSegment onSegment, final double tolerance) {
+    public OSMNode insertNode(final OSMNode node, final LineSegment onSegment) {
         final Point nodePoint = node.getCentroid();
-
-        //if a tolerance is provided, check if the input node needs to be added or merged
-        if(tolerance > 0.0) {
-            double closestNodeDistance = Double.MAX_VALUE, curDistance;
-            OSMNode closestNode = null;
-
-            for(final OSMNode existingNode : way.getNodes()) {
-                curDistance = Point.distance(nodePoint, existingNode.getCentroid());
-                if(curDistance <= closestNodeDistance) {
-                    closestNodeDistance = curDistance;
-                    closestNode = existingNode;
-                }
-            }
-
-            //if the node is within the tolerance distance of an existing node, return that node
-            if(closestNode != null && closestNodeDistance <= tolerance) {
-                return closestNode;
-            }
-        }
 
         //create a new segment starting from the node, and ending at onSegment's destination Point
         final LineSegment insertedSegment = new LineSegment(this, nodePoint, onSegment.destinationPoint, node, onSegment.destinationNode, onSegment.segmentIndex + 1, onSegment.nodeIndex + 1);

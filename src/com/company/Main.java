@@ -61,9 +61,6 @@ public class Main {
                     }
                 }
 
-                //the final space where the relation and all related data will be imported
-                final OSMEntitySpace relationSpace = new OSMEntitySpace(65536);
-
                 //fetch all existing stops in the route's bounding box
                 conflateStops(osmRouteMaster, workingEntitySpace, osmRouteMaster.getBoundingBox(), 20.0);
 
@@ -114,12 +111,15 @@ public class Main {
                         debugOutputSegments(workingEntitySpace, comparison);
                     }
 
-                    //add the completed relation to its own separate file
-                    relationSpace.addEntity(relation, OSMEntity.TagMergeStrategy.keepTags, null);
-                    relationSpace.deleteEntity(routePath.osm_id);
                     workingEntitySpace.outputXml("newresult" + routePath.osm_id + ".osm");
                 }
 
+                //finally, add the completed relations to their own separate file for review and upload
+                final OSMEntitySpace relationSpace = new OSMEntitySpace(65536);
+                for(final OSMRelation relation : routeMasterSubRoutes) {
+                    relationSpace.addEntity(relation, OSMEntity.TagMergeStrategy.keepTags, null);
+                    relationSpace.deleteEntity(relation.getMembers("").get(0).member.osm_id); //remove the route path way
+                }
                 relationSpace.outputXml("relation.osm");
             }
             //importSpace.outputXml("newresult.osm");
@@ -387,20 +387,25 @@ public class Main {
             //Create (or update an existing node) to serve as the stop position node for the platform
             final LineSegment bestSegment = match.bestMatch.candidateSegmentMatch.matchingSegment;
             final Point nearestPointOnSegment = bestSegment.closestPointToPoint(match.platformNode.getCentroid());
-            final OSMNode nearestNode = bestSegment.parentSegments.insertNode(existingEntitySpace.createNode(nearestPointOnSegment.latitude, nearestPointOnSegment.longitude, null), bestSegment, StopWayMatch.stopNodeTolerance);
+
+            OSMNode nearestNodeOnWay = bestSegment.parentSegments.way.nearestNodeAtPoint(nearestPointOnSegment, StopWayMatch.stopNodeTolerance);
+            if(nearestNodeOnWay == null) {
+                nearestNodeOnWay = bestSegment.parentSegments.insertNode(existingEntitySpace.createNode(nearestPointOnSegment.latitude, nearestPointOnSegment.longitude, null), bestSegment);
+            }
 
             //then add a node on the nearest point and add to the relation and the way
-            nearestNode.setTag(OSMEntity.KEY_NAME, match.platformNode.getTag(OSMEntity.KEY_NAME));
-            nearestNode.setTag(OSMEntity.KEY_REF, match.platformNode.getTag(OSMEntity.KEY_REF));
-            nearestNode.setTag("public_transport", "stop_position");
-            nearestNode.setTag(routeRelation.getTag(OSMEntity.KEY_ROUTE), OSMEntity.TAG_YES);
+            nearestNodeOnWay.setTag(OSMEntity.KEY_NAME, match.platformNode.getTag(OSMEntity.KEY_NAME));
+            nearestNodeOnWay.setTag(OSMEntity.KEY_REF, match.platformNode.getTag(OSMEntity.KEY_REF));
+            nearestNodeOnWay.setTag("gtfs:stop_id", match.platformNode.getTag("gtfs:stop_id"));
+            nearestNodeOnWay.setTag(OSMEntity.KEY_PUBLIC_TRANSPORT, OSMEntity.TAG_STOP_POSITION);
+            nearestNodeOnWay.setTag(routeRelation.getTag(OSMEntity.KEY_ROUTE), OSMEntity.TAG_YES);
 
             //add to the WaySegments object as well
             bestSegment.parentSegments.matchObject.addStopMatch(match);
 
             //and add the stop position to the route relation
-            match.stopPositionNode = nearestNode;
-            routeRelation.addMember(nearestNode, "stop");
+            match.stopPositionNode = nearestNodeOnWay;
+            routeRelation.addMember(nearestNodeOnWay, "stop");
 
             //warn if no decent match is found
             if(match.bestMatch == null) {
@@ -561,19 +566,19 @@ public class Main {
                 OSMEntity mergedStopEntity = null;
                 if(importGtfsId.equals(existingGtfsId)) {
                     mergedStopEntity = importSpace.mergeEntities(existingStopPlatform.osm_id, importStop.osm_id);
-                    System.out.println("GTFS id match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(gtfsIdTag) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
+                    //System.out.println("GTFS id match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(gtfsIdTag) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
                 } else if(existingStopPlatform.hasTag(OSMEntity.KEY_REF)) { //try matching by ref if no importer id
                     final String existingRefTag = existingStopPlatform.getTag(OSMEntity.KEY_REF);
                     //TODO also match based on import dataset
                     assert existingRefTag != null;
                     if(existingRefTag.trim().equals(importRefTag)) { //string match
-                        System.out.println("Ref string match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
+                        //System.out.println("Ref string match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
                         mergedStopEntity = importSpace.mergeEntities(existingStopPlatform.osm_id, importStop.osm_id);
                     } else if(importRefTagNumeric != Double.MAX_VALUE) { //try doing a basic numeric match if strings don't match (special case for already-imported King County metro data)
                         try {
                             final double existingRefTagNumeric = Double.parseDouble(existingRefTag);
                             if(existingRefTagNumeric == importRefTagNumeric) {
-                                System.out.println("Ref numeric match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
+                                //System.out.println("Ref numeric match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
                                 mergedStopEntity = importSpace.mergeEntities(existingStopPlatform.osm_id, importStop.osm_id);
                             }
                         } catch(NumberFormatException ignored) {}
