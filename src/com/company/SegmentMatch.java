@@ -18,7 +18,7 @@ public class SegmentMatch {
         midPointDistance = midDistance;
         this.dotProduct = dotProduct;
     }
-    public static void checkCandidateForMatch(final LineComparison comparison, final LineSegment segment1, final LineSegment segment2, final LineMatch lineMatch) {
+    public static boolean checkCandidateForMatch(final LineComparison comparison, final LineSegment segment1, final LineSegment segment2, final LineMatch lineMatch) {
         //take the dot product
         final double dotProduct = (segment1.vectorX * segment2.vectorX + segment1.vectorY * segment2.vectorY) / (segment1.vectorMagnitude * segment2.vectorMagnitude);
 
@@ -71,6 +71,7 @@ public class SegmentMatch {
 
         final double latitudeFactor = Math.cos(segment1.midPointY * Math.PI / 180.0);
         final double oDiffX = (xInt - segment1.midPointX) * latitudeFactor, oDiffY = yInt - segment1.midPointY, mDiffX = (segment2.midPointX - segment1.midPointX) * latitudeFactor, mDiffY = (segment2.midPointY - segment1.midPointY);
+
         final double orthogonalDistance = Point.distance(oDiffY, oDiffX);
         final double midPointDistance = Point.distance(mDiffY, mDiffX);
 
@@ -87,6 +88,8 @@ public class SegmentMatch {
             segment1.matchingSegments.add(match);
             segment2.matchingSegments.add(match);
             lineMatch.addMatch(match);
+            return true;
         }
+        return false;
     }
 }
