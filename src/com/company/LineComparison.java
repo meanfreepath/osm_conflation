@@ -45,8 +45,8 @@ public class LineComparison {
         for(final LineSegment mainLineSegment : mainLine.segments) {
             final Region mainBoundingBox = mainLineSegment.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
             for(final OSMWay candidateWay : candidateWays) {
-                //don't match against any lines that have been marked as "ethereal", such as other gtfs shape lines
-                if(candidateWay.hasTag("gtfs:ethereal")) {
+                //don't match against any lines that have been marked as "ignore", such as other gtfs shape lines
+                if(candidateWay.hasTag("gtfs:ignore")) {
                     continue;
                 }
 
