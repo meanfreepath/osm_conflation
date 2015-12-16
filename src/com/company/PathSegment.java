@@ -16,9 +16,6 @@ import java.util.ListIterator;
 public class PathSegment {
     private final static int INITIAL_CHILD_CAPACITY = 8;
     private final static double SCORE_FOR_DETOUR = -40.0, SCORE_FOR_STOP_ON_WAY = 100.0, SCORE_FOR_ALIGNMENT = 1.0;
-    private enum OneWayDirection {
-        none, forward, backward
-    }
 
     public final static long[] debugFilterIds = {};
 
@@ -30,7 +27,6 @@ public class PathSegment {
     public final WaySegments line;
     public final PathSegment parentPathSegment;
     public final List<PathSegment> childPathSegments = new ArrayList<>(INITIAL_CHILD_CAPACITY);
-    public final OneWayDirection oneWayDirection;
     public OSMNode originatingNode; //the node this path segment "begins" from
 
     private double scoreSegments, scoreStops, scoreAdjust;
@@ -50,31 +46,12 @@ public class PathSegment {
         parentPathSegment = parent;
         line = startingWay;
         this.originatingNode = originatingNode;
-        oneWayDirection = determineOneWayDirection(line.way);
         scoreSegments = scoreStops = 0.0;
         this.scoreAdjust = scoreAdjust;
         this.debugDepth = debugDepth;
     }
 
-    /**
-     * Maps the "oneway" tag of the way to the OneWayDirection enum
-     * @param way
-     * @return
-     */
-    private static OneWayDirection determineOneWayDirection(final OSMWay way) {
-        final String oneWayTag = way.getTag("oneway");
 
-        //check the oneway status of the way
-        if(oneWayTag == null) {
-            return OneWayDirection.none;
-        } else if(oneWayTag.equals(OSMEntity.TAG_YES)) {
-            return OneWayDirection.forward;
-        } else if(oneWayTag.equals("-1")) {
-            return OneWayDirection.backward;
-        } else {
-            return OneWayDirection.none;
-        }
-    }
 
     /**
      * Checks the validity of this segment for addition to a path of travel.
@@ -101,7 +78,7 @@ public class PathSegment {
 
         final OSMNode firstNode, lastNode;
         if(ourDirectionForward) { //i.e. we're traveling along the natural direction of this way
-            if(oneWayDirection == OneWayDirection.backward) { //oneway runs counter our direction of travel
+            if(line.oneWayDirection == WaySegments.OneWayDirection.backward) { //oneway runs counter our direction of travel
                 debugLog("PATH BLOCKS ENTRY TO " + line.way.getTag("name") + " (" + line.way.osm_id + ")\n");
                 return false;
             }
@@ -130,7 +107,7 @@ public class PathSegment {
                 }
             }
         } else { //i.e. we're traveling against the natural direction of this way
-            if(oneWayDirection == OneWayDirection.forward) { //oneway runs counter our direction of travel
+            if(line.oneWayDirection == WaySegments.OneWayDirection.forward) { //oneway runs counter our direction of travel
                 debugLog("PATH BLOCKS ENTRY TO " + line.way.getTag("name") + " (" + line.way.osm_id + ")\n");
                 return false;
             }

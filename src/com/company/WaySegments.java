@@ -1,5 +1,6 @@
 package com.company;
 
+import OSM.OSMEntity;
 import OSM.OSMNode;
 import OSM.OSMWay;
 import OSM.Point;
@@ -13,15 +14,21 @@ import java.util.List;
  * Created by nick on 11/9/15.
  */
 public class WaySegments {
+    public enum OneWayDirection {
+        none, forward, backward
+    }
+
     public final OSMWay way;
     public final List<LineSegment> segments;
     public final LineMatch matchObject;
     private final boolean debug;
+    public final OneWayDirection oneWayDirection;
 
     public WaySegments(final OSMWay way, final double maxSegmentLength, boolean debug) {
         this.way = way;
         this.debug = debug;
         matchObject = new LineMatch(this);
+        oneWayDirection = determineOneWayDirection(way);
 
         //generate a list of line segments out of this line
         segments = new ArrayList<>(way.getNodes().size() - 1); //TODO base on total line length, to handle the newly
@@ -99,6 +106,25 @@ public class WaySegments {
         way.insertNode(node, insertedSegment.nodeIndex);
 
         return node;
+    }
+    /**
+     * Maps the "oneway" tag of the way to the OneWayDirection enum
+     * @param way
+     * @return
+     */
+    public static OneWayDirection determineOneWayDirection(final OSMWay way) {
+        final String oneWayTag = way.getTag("oneway");
+
+        //check the oneway status of the way
+        if(oneWayTag == null) {
+            return OneWayDirection.none;
+        } else if(oneWayTag.equals(OSMEntity.TAG_YES)) {
+            return OneWayDirection.forward;
+        } else if(oneWayTag.equals("-1")) {
+            return OneWayDirection.backward;
+        } else {
+            return OneWayDirection.none;
+        }
     }
     /**
      * Appends a node to the current segments list
