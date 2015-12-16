@@ -54,9 +54,19 @@ public class LineSegment {
     }
 
     public void chooseBestMatch() {
+        double minDistanceScore = Double.MAX_VALUE, distanceScore;
         for(final SegmentMatch match : matchingSegments) {
-            if(bestMatch == null || Math.abs(match.dotProduct) >= Math.abs(bestMatch.dotProduct) && match.orthogonalDistance < bestMatch.orthogonalDistance) {
+            //the main route path must not go against the oneway direction of this line's way (if oneway is set): automatic disqualification if it does
+            final boolean parallelTravel = parentSegments.oneWayDirection == WaySegments.OneWayDirection.none || parentSegments.oneWayDirection == WaySegments.OneWayDirection.forward && match.dotProduct > 0.0 || parentSegments.oneWayDirection == WaySegments.OneWayDirection.backward && match.dotProduct < 0.0;
+            if(!parallelTravel) {
+                continue;
+            }
+
+            //choose the best match based on their dot product and distance score
+            distanceScore = match.orthogonalDistance * match.orthogonalDistance + match.midPointDistance * match.midPointDistance;
+            if(bestMatch == null || Math.abs(match.dotProduct) >= Math.abs(bestMatch.dotProduct) && distanceScore < minDistanceScore) {
                 bestMatch = match;
+                minDistanceScore = distanceScore;
             }
         }
     }
