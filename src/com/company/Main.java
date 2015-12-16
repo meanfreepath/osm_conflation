@@ -320,7 +320,7 @@ public class Main {
             final Point platformCentroid = stopPlatform.getCentroid();
             for(final WaySegments matchingLine : candidateLines) {
                 //check the line's bounding box intersects
-                if(!Region.intersects(matchingLine.way.getBoundingBox(), searchRegion)) {
+                if(!Region.intersects(matchingLine.way.getBoundingBox().regionInset(latitudeDelta, longitudeDelta), searchRegion)) {
                     continue;
                 }
 
@@ -589,13 +589,14 @@ public class Main {
                     final double stopDistance = Point.distance(importStop.getCentroid(), existingStopPlatform.getCentroid());
                     if(stopDistance < conflictDistance) {
                         System.out.println("Within distance! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
-                        importStop.setTag("gtfsconflict", "yes");
+                        importStop.setTag("gtfs:conflict", "yes");
                     }
                 } else {
                     //keep the existing platform's location if it's a node, since these are usually better-positioned than the GTFS data's
                     if(mergedStopEntity instanceof OSMNode) {
                         ((OSMNode) mergedStopEntity).setCoordinate(existingStopLocation);
                     }
+                    mergedStopEntity.removeTag("gtfs:conflict"); //in case previously marked as a conflict
                     break; //bail since we've matched this stop
                 }
             }
