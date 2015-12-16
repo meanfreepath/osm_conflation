@@ -21,7 +21,7 @@ import java.util.*;
  */
 public class OSMEntitySpace {
     private final static String
-            XML_DOCUMENT_OPEN = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<osm version=\"0.6\" upload=\"false\" generator=\"KCMetroImporter\">\n",
+            XML_DOCUMENT_OPEN = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<osm version=\"0.6\" upload=\"%s\" generator=\"KCMetroImporter\">\n",
             XML_BOUNDING_BOX = " <bounds minlat=\"%.07f\" minlon=\"%.07f\" maxlat=\"%.07f\" maxlon=\"%.07f\"/>\n",
             XML_DOCUMENT_CLOSE = "</osm>\n";
 
@@ -31,10 +31,17 @@ public class OSMEntitySpace {
     private static long osmIdSequence = 0;
 
     public final HashMap<Long, OSMEntity> allEntities;
+    public final HashMap<Long, OSMEntity> deletedEntities;
     public final HashMap<Long, OSMNode> allNodes;
     public final HashMap<Long, OSMWay> allWays;
     public final HashMap<Long, OSMRelation> allRelations;
     public String name;
+
+    public void setCanUpload(boolean canUpload) {
+        this.canUpload = canUpload;
+    }
+
+    private boolean canUpload = false;
 
     private void setIdSequence(long sequence) {
         osmIdSequence = sequence;
@@ -109,6 +116,7 @@ public class OSMEntitySpace {
      */
     public OSMEntitySpace(final int capacity) {
         allEntities = new HashMap<>(capacity);
+        deletedEntities = new HashMap<>(64);
         allNodes = new HashMap<>(capacity);
         allWays = new HashMap<>(capacity);
         allRelations = new HashMap<>(capacity);
@@ -118,6 +126,7 @@ public class OSMEntitySpace {
 
         final int capacity = spaceToDuplicate.allEntities.size() + additionalCapacity;
         allEntities = new HashMap<>(capacity);
+        deletedEntities = new HashMap<>(64);
         allNodes = new HashMap<>(capacity);
         allWays = new HashMap<>(capacity);
         allRelations = new HashMap<>(capacity);
@@ -250,7 +259,14 @@ public class OSMEntitySpace {
             allRelations.remove(entityToDelete.osm_id);
         }
         final OSMEntity deletedEntity = allEntities.remove(entityToDelete.osm_id);
-        return deletedEntity != null;
+
+        //mark the entity as deleted if it exists on the OSM server
+        if(deletedEntity != null && deletedEntity.version > 0) {
+            deletedEntity.markAsDeleted();
+            deletedEntities.put(entityToDelete.osm_id, entityToDelete);
+            return true;
+        }
+        return false;
     }
     /**
      * Merge the given entities
@@ -262,7 +278,7 @@ public class OSMEntitySpace {
         //get a handle on our main reference to theEntity - must be a member of this space
         final OSMEntity theEntity = allEntities.get(theEntityId), withEntity = allEntities.get(withEntityId);
         if(theEntity == null || withEntity == null) {
-            System.out.println("Entities not in space!");
+            System.out.println("Entities not in space: " + theEntityId + ":" + (theEntity != null ? "OK" : "MISSING") + "/" + withEntityId + ":" + (withEntity != null ? "OK" : "MISSING"));
             return null;
         }
 
@@ -329,6 +345,7 @@ public class OSMEntitySpace {
         if(entityReplaced) {
             addEntity(targetEntity, OSMEntity.TagMergeStrategy.keepTags, null);
         }
+        targetEntity.markAsModified();
         return targetEntity;
     }
     /**
@@ -515,7 +532,7 @@ public class OSMEntitySpace {
         final Region fileBoundingBox = getBoundingBox();
 
         final FileWriter writer = new FileWriter(fileName);
-        writer.write(XML_DOCUMENT_OPEN);
+        writer.write(String.format(XML_DOCUMENT_OPEN, Boolean.toString(canUpload)));
         if(fileBoundingBox != null) {
             writer.write(String.format(XML_BOUNDING_BOX, fileBoundingBox.origin.latitude, fileBoundingBox.origin.longitude, fileBoundingBox.extent.latitude, fileBoundingBox.extent.longitude));
         }
@@ -528,6 +545,9 @@ public class OSMEntitySpace {
         }
         for(final OSMRelation relation: allRelations.values()) {
             writer.write(relation.toString());
+        }
+        for(final OSMEntity entity: deletedEntities.values()) {
+            writer.write(entity.toString());
         }
         writer.write(XML_DOCUMENT_CLOSE);
 
