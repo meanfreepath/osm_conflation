@@ -8,8 +8,6 @@ import OSM.Point;
 public class SegmentMatch {
     public final double orthogonalDistance, midPointDistance, dotProduct;
     public final LineSegment mainSegment, matchingSegment;
-    public boolean consolidated = false;
-    public int consolidatedMatches = 0;
 
     public SegmentMatch(LineSegment segment1, LineSegment segment2, double orthDistance, double midDistance, double dotProduct) {
         mainSegment = segment1;
