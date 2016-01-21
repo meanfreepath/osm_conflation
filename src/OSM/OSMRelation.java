@@ -134,6 +134,24 @@ public class OSMRelation extends OSMEntity {
         members.clear();
     }
 
+    /**
+     * Gets the OSMRelationMember object for the given entity
+     * @param entity
+     * @return
+     */
+    public OSMRelationMember getMemberForEntity(final OSMEntity entity) {
+        int index = indexOfMember(entity);
+        if(index < 0) {
+            return null;
+        }
+        return members.get(index);
+    }
+
+    /**
+     * Get the index of the membership object for the given entity
+     * @param entity
+     * @return the index, or -1 if entity isn't a member of this relation
+     */
     public int indexOfMember(final OSMEntity entity) {
         int index = 0;
         for(final OSMRelationMember member : members) {
@@ -176,11 +194,12 @@ public class OSMRelation extends OSMEntity {
         return false;
     }
     public boolean addMember(final OSMEntity member, final String role) {
-        if(members.add(new OSMRelationMember(member, role))) {
-            member.didAddToRelation(this);
-            return true;
-        }
-        return false;
+        return addMember(member, role, members.size());
+    }
+    public boolean addMember(final OSMEntity member, final String role, int index) {
+        members.add(index, new OSMRelationMember(member, role));
+        member.didAddToRelation(this);
+        return true;
     }
     /**
      * Replace the old member with the new member
@@ -211,5 +230,51 @@ public class OSMRelation extends OSMEntity {
             }
         }
         return matchingMembers;
+    }
+    /**
+     * Checks whether this relation is valid
+     * @return true if valid, FALSE if not
+     */
+    public boolean isValid() {
+        final String relationType = getTag(OSMEntity.KEY_TYPE);
+        if(relationType == null) {
+            return false;
+        }
+        switch (relationType) {
+            case "restriction":
+                //first validate the restriction
+                final List<OSMRelation.OSMRelationMember> viaEntities = getMembers("via");
+                final List<OSMRelation.OSMRelationMember> fromWays = getMembers("from");
+                final List<OSMRelation.OSMRelationMember> toWays = getMembers("to");
+
+                //restrictions should only have 1 each of "from", "via", and "to"  members
+                boolean restrictionIsValid = viaEntities.size() == 1 && fromWays.size() == 1 && toWays.size() == 1;
+                //and the "from" and "to" members must be ways, and the "via" member must be a node or way
+                if(!restrictionIsValid) {
+                    return restrictionIsValid;
+                }
+                restrictionIsValid = fromWays.get(0).member instanceof OSMWay && toWays.get(0).member instanceof OSMWay && (viaEntities.get(0).member instanceof OSMNode || viaEntities.get(0).member instanceof OSMWay);
+                if(!restrictionIsValid) {
+                    return restrictionIsValid;
+                }
+
+                //check the intersection of the members
+                final OSMWay fromWay = (OSMWay) fromWays.get(0).member, toWay = (OSMWay) toWays.get(0).member;
+                final OSMEntity viaEntity = viaEntities.get(0).member;
+                if(viaEntity instanceof OSMNode) { //if "via" is a node, the to and from ways must start or end on it
+                    restrictionIsValid = (fromWay.getFirstNode() == viaEntity || fromWay.getLastNode() == viaEntity) && (toWay.getFirstNode() == viaEntity || toWay.getLastNode() == viaEntity);
+                } else if(viaEntity instanceof OSMWay) { //if "via" is a way, the to and from ways' first/last nodes must match its first/last/nodes
+                    final OSMWay viaWay = (OSMWay) viaEntities.get(0).member;
+                    final OSMNode viaFirstNode = viaWay.getFirstNode(), viaLastNode = viaWay.getLastNode();
+                    restrictionIsValid = (viaFirstNode == fromWay.getFirstNode() || viaFirstNode == fromWay.getLastNode() || viaFirstNode == toWay.getFirstNode() || viaFirstNode == toWay.getLastNode()) &&
+                            (viaLastNode == fromWay.getFirstNode() || viaLastNode == fromWay.getLastNode() || viaLastNode == toWay.getFirstNode() || viaLastNode == toWay.getLastNode());
+                } else {
+                    restrictionIsValid = false;
+                }
+
+                return restrictionIsValid;
+            default:
+                return false;
+        }
     }
 }
