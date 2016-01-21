@@ -1,7 +1,10 @@
 package com.company;
 
 import OSM.OSMEntity;
+import OSM.OSMEntitySpace;
 import OSM.OSMNode;
+import OSM.OSMWay;
+import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -12,6 +15,7 @@ import java.util.List;
  */
 public class Path implements Cloneable {
     public List<PathSegment> pathSegments = new ArrayList<>(256);
+    public final OSMEntitySpace entitySpace;
     private static int idSequence = 0;
     public final int id;
 
@@ -20,7 +24,8 @@ public class Path implements Cloneable {
     public StopWayMatch firstStopOnPath = null, lastStopOnPath = null;
     public int stopsOnPath = 0;
 
-    public Path() {
+    public Path(final OSMEntitySpace space) {
+        entitySpace = space;
         id = ++idSequence;
     }
 
@@ -34,8 +39,11 @@ public class Path implements Cloneable {
     public void addSegment(final PathSegment segment) {
         //the current segment should descend from the last segment on this path
         final PathSegment lastSegment = getLastPathSegment();
-        if(lastSegment != null && segment.parentPathSegment != lastSegment) {
-            System.out.println("INCORRECT CHILD!");
+        if(lastSegment != null) {
+            if(segment.parentPathSegment != lastSegment) {
+                System.out.println("INCORRECT CHILD!");
+            }
+            lastSegment.endingNode = segment.originatingNode;
         }
         pathSegments.add(segment);
         segmentCount++;
@@ -91,6 +99,55 @@ public class Path implements Cloneable {
             scoreSegments /= segmentCount;
         }
         scoreTotal = scoreSegments + scoreStops + scoreAdjust;
+    }
+
+    /**
+     * Checks the PathSegments' originating/ending nodes and splits any ways that extend past them
+     * Only needs to be called on the "best" path
+     */
+    public void splitWaysAtIntersections() {
+        for(final PathSegment segment : pathSegments) {
+            segment.usedWay = segment.line.way;
+            final List<OSMNode> splitNodes = new ArrayList<>(2);
+
+            //check if we should split at the origin node
+            if(segment.originatingNode != segment.line.way.getFirstNode() && segment.originatingNode != segment.line.way.getLastNode()) {
+                if(PathTree.debug) {
+                    segment.originatingNode.setTag("split", "begin");
+                }
+                splitNodes.add(segment.originatingNode);
+            }
+
+            //and at the ending node.  NB: the very last segment on the path will not have an ending node
+            if(segment.endingNode != null && segment.endingNode != segment.line.way.getFirstNode() && segment.endingNode != segment.line.way.getLastNode()) {
+                if(PathTree.debug) {
+                    segment.endingNode.setTag("split", "end");
+                }
+                splitNodes.add(segment.endingNode);
+            }
+
+            if(splitNodes.size() == 0) {
+                //System.out.println("DON'T SPLIT " + segment.line.way.getTag("name") + " (" + segment.line.way.osm_id + ")");
+                continue;
+            }
+
+            //and run the split
+            //System.out.println("SPLIT " + segment.line.way.getTag("name") + " (" + segment.line.way.osm_id + ")" + " with " + splitNodes.size() + " nodes");
+            try {
+                final OSMWay splitWays[] = entitySpace.splitWay(segment.line.way, splitNodes.toArray(new OSMNode[splitNodes.size()]));
+
+                //determine which of the newly-split ways to use for the PathSegment's usedWay property
+                for(final OSMWay splitWay : splitWays) {
+                    //System.out.println("Check split for " + splitWay.osm_id + " - " + (splitWay.getFirstNode() != null ? splitWay.getFirstNode().osm_id : "NULL") + ":" + (splitWay.getLastNode() != null ? splitWay.getLastNode().osm_id : "NULL") + " vs " + segment.originatingNode.osm_id + ":" + (segment.endingNode != null ? segment.endingNode.osm_id : "NULL"));
+                    if(splitWay.getFirstNode() == segment.originatingNode && splitWay.getLastNode() == segment.endingNode || splitWay.getLastNode() == segment.originatingNode && splitWay.getFirstNode() == segment.endingNode) {
+                        //System.out.println("Way Split: using way " + splitWay.osm_id);
+                        segment.usedWay = splitWay;
+                    }
+                }
+            } catch (InvalidArgumentException e) {
+                e.printStackTrace();
+            }
+        }
     }
     /*public void validate() {
         PathSegment lastSegment = null;
@@ -161,7 +218,7 @@ public class Path implements Cloneable {
     }
     @Override
     public Path clone() {
-        final Path newPath = new Path();
+        final Path newPath = new Path(entitySpace);
         newPath.pathSegments.addAll(pathSegments);
         newPath.segmentCount = segmentCount;
         newPath.scoreSegments = scoreSegments;

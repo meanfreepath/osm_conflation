@@ -1,5 +1,6 @@
 package com.company;
 
+import OSM.OSMEntitySpace;
 import OSM.OSMRelation;
 
 import java.io.FileWriter;
@@ -16,9 +17,12 @@ public class PathTree {
     public final static boolean debug = true;
     private final FileWriter debugFileWriter;
     public final OSMRelation routeRelation;
+    public final OSMEntitySpace entitySpace;
 
-    public PathTree(final OSMRelation routeRelation) {
+    public PathTree(final OSMRelation routeRelation, final OSMEntitySpace space) {
         this.routeRelation = routeRelation;
+        entitySpace = space;
+
         if(debug) {
             FileWriter writer = null;
             try {
@@ -34,7 +38,6 @@ public class PathTree {
     public void findPaths(final List<StopWayMatch> stops, final HashMap<Long, WaySegments> availableLines) {
         //first find the point on the nearest way closest to the toNode and fromNode
         final StopWayMatch firstStop = stops.size() > 0 ? stops.get(0) : null;
-
 
         //create the initial path segment
         final PathSegment startPathSegment;
@@ -53,7 +56,7 @@ public class PathTree {
         /*final ArrayList<Path> allPaths = new ArrayList<>(128);
         compileChildren(startPathSegment, allPaths);*/
 
-        final Path initialPath = new Path();
+        final Path initialPath = new Path(entitySpace);
         initialPath.addSegment(startPathSegment);
         final ArrayList<Path> allPaths = new ArrayList<>(65536);
         compileChildren(initialPath, allPaths);
@@ -97,12 +100,21 @@ public class PathTree {
 
         if(debugFileWriter != null) {
             try {
-                debugFileWriter.close();
+                debugFileWriter.flush();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
+
+    @Override
+    protected void finalize() throws Throwable {
+        if(debugFileWriter != null) {
+            debugFileWriter.close();
+        }
+        super.finalize();
+    }
+
     private void compileChildren(final Path path, final ArrayList<Path> allPaths) {
         final PathSegment pathSegment = path.getLastPathSegment();
         final int childCount = pathSegment.childPathSegments.size();

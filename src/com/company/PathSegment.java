@@ -25,9 +25,11 @@ public class PathSegment {
     private final PathTree parentPathTree;
     public final int id, debugDepth;
     public final WaySegments line;
+    public OSMWay usedWay; //the final word on which line to use, based off of splitting etc
     public final PathSegment parentPathSegment;
     public final List<PathSegment> childPathSegments = new ArrayList<>(INITIAL_CHILD_CAPACITY);
     public OSMNode originatingNode; //the node this path segment "begins" from
+    public OSMNode endingNode; //the node this path segment "ends" at
 
     private double scoreSegments, scoreStops, scoreAdjust;
 
@@ -45,6 +47,7 @@ public class PathSegment {
         this.parentPathTree = parentPathTree;
         parentPathSegment = parent;
         line = startingWay;
+        usedWay = startingWay.way; //may be updated if way is split
         this.originatingNode = originatingNode;
         scoreSegments = scoreStops = 0.0;
         this.scoreAdjust = scoreAdjust;
