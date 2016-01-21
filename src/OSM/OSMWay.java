@@ -169,7 +169,7 @@ public class OSMWay extends OSMEntity {
 
         final Region node0BoundingBox = firstNode.getBoundingBox();
         final Region boundingBox = new Region(node0BoundingBox.origin, node0BoundingBox.extent);
-        for(OSMNode node: nodes) {
+        for(final OSMNode node: nodes) {
             boundingBox.combinedBoxWithRegion(node.getBoundingBox());
         }
         return boundingBox;
@@ -179,7 +179,7 @@ public class OSMWay extends OSMEntity {
     public Point getCentroid() {
         Point[] wayPoints = new Point[nodes.size()];
         int i = 0;
-        for(OSMNode node: nodes) {
+        for(final OSMNode node: nodes) {
             wayPoints[i++] = new Point(node.getLat(), node.getLon());
         }
         return Region.computeCentroid(wayPoints);
