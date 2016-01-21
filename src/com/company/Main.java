@@ -70,51 +70,12 @@ public class Main {
                 conflateStops(osmRouteMaster, workingEntitySpace, osmRouteMaster.getBoundingBox(), 20.0);
 
                 for(final OSMRelation relation : routeMasterSubRoutes) {
-                    final List<OSMRelation.OSMRelationMember> members = relation.getMembers("");
-                    final OSMWay routePath = (OSMWay) members.get(0).member;
-                    if (routePath.osm_id != -464) {
-                    //    continue;
+                    final OSMWay routePath = (OSMWay) relation.getMembers("").get(0).member;
+                    relation.setTag("name", routePath.osm_id + ": " + relation.getTag("name"));
+                    if (routePath.osm_id != -600) {
+                       // continue;
                     }
-                    System.out.println("Begin conflation for subroute \"" + relation.getTag(OSMEntity.KEY_NAME) + "\" (id " + relation.osm_id + ")");
-
-                    //Break the candidate ways into LineSegments and match their geometries to the main route line
-                    final long timeStartLineComparison = new Date().getTime();
-                    final LineComparison comparison = new LineComparison(routePath, new ArrayList<>(workingEntitySpace.allWays.values()), options, debugEnabled);
-                    comparison.matchLines();
-                    System.out.println("Matched lines in " + (new Date().getTime() - timeStartLineComparison) + "ms");
-
-                    //also, match the stops in the relation to their nearest matching way
-                    final long timeStartStopMatching = new Date().getTime();
-                    final List<StopWayMatch> allStopMatches = matchStopsToWays(relation, comparison.candidateLines.values(), workingEntitySpace, options);
-                    System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
-
-                    //now find the optimal path from the first stop to the last stop, using the provided ways
-                    final long timeStartPathfinding = new Date().getTime();
-                    final PathTree pathList = new PathTree(relation);
-                    pathList.findPaths(allStopMatches, comparison.candidateLines);
-                    System.out.println("Found paths in " + (new Date().getTime() - timeStartPathfinding) + "ms");
-
-                    //TODO: split ways that only partially overlap the main way
-
-
-                    //finally, add the matched ways to the relation's members
-                    //relation.removeMember(routePath);
-                    if(pathList.bestPath != null) {
-                        for (final PathSegment pathSegment : pathList.bestPath.pathSegments) {
-                            relation.addMember(pathSegment.line.way, "");
-                        }
-                    } else { //debug: if no matched path, output the best candidates instead
-                        for (final WaySegments line : comparison.candidateLines.values()) {
-                            if(line.matchObject.matchingSegments.size() > 2 && line.matchObject.getAvgDotProduct() >= 0.9) {
-                                relation.addMember(line.way, "");
-                            }
-                        }
-                    }
-
-                    if (debugEnabled) {
-                        debugOutputSegments(workingEntitySpace, comparison);
-                    }
-                    workingEntitySpace.outputXml("newresult" + routePath.osm_id + ".osm");
+                    conflateWays(relation, workingEntitySpace, options);
                 }
 
                 //finally, add the completed relations to their own separate file for review and upload
@@ -132,6 +93,63 @@ public class Main {
 
     }
 
+    /**
+     * Matches the existing OSM ways to the given relation's route path
+     * @param relation
+     * @param workingEntitySpace
+     * @param options
+     */
+    private static void conflateWays(final OSMRelation relation, final OSMEntitySpace workingEntitySpace, final LineComparison.ComparisonOptions options) {
+        final List<OSMRelation.OSMRelationMember> members = relation.getMembers("");
+        final OSMWay routePath = (OSMWay) members.get(0).member;
+        System.out.println("Begin way conflation for subroute \"" + relation.getTag(OSMEntity.KEY_NAME) + "\" (id " + relation.osm_id + "), path id " + routePath.osm_id);
+
+        //Break the candidate ways into LineSegments and match their geometries to the main route line
+        final long timeStartLineComparison = new Date().getTime();
+        final LineComparison comparison = new LineComparison(routePath, new ArrayList<>(workingEntitySpace.allWays.values()), options, debugEnabled);
+        comparison.matchLines();
+        System.out.println("Matched lines in " + (new Date().getTime() - timeStartLineComparison) + "ms");
+
+        //also, match the stops in the relation to their nearest matching way
+        final long timeStartStopMatching = new Date().getTime();
+        final List<StopWayMatch> allStopMatches = matchStopsToWays(relation, comparison.candidateLines.values(), workingEntitySpace, options);
+        System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
+
+        //now find the optimal path from the first stop to the last stop, using the provided ways
+        final long timeStartPathfinding = new Date().getTime();
+        final PathTree pathList = new PathTree(relation, workingEntitySpace);
+        pathList.findPaths(allStopMatches, comparison.candidateLines);
+        System.out.println("Found paths in " + (new Date().getTime() - timeStartPathfinding) + "ms");
+
+        //finally, add the matched ways to the relation's members
+        if(pathList.bestPath != null) {
+            //split ways that only partially overlap the main way
+            pathList.bestPath.splitWaysAtIntersections();
+
+            //and add the ways contained in the bestPath to the relation
+            //relation.removeMember(routePath);
+            for (final PathSegment pathSegment : pathList.bestPath.pathSegments) {
+                relation.addMember(pathSegment.usedWay, "");
+            }
+        } else { //debug: if no matched path, output the best candidates instead
+            for (final WaySegments line : comparison.candidateLines.values()) {
+                if(line.matchObject.matchingSegments.size() > 2 && line.matchObject.getAvgDotProduct() >= 0.9) {
+                    relation.addMember(line.way, "");
+                }
+            }
+        }
+
+        try {
+            if (debugEnabled) {
+                debugOutputSegments(workingEntitySpace, comparison);
+            }
+            workingEntitySpace.outputXml("newresult" + routePath.osm_id + ".osm");
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InvalidArgumentException e) {
+            e.printStackTrace();
+        }
+    }
     /**
      * Generates a set of rectangular regions which roughly corresponds with the download area for the given ways
      * TODO: improve algorithm to reduce overlap etc
