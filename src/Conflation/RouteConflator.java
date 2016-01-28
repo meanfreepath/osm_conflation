@@ -1,7 +1,9 @@
-package com.company;
+package Conflation;
 
 import OSM.*;
 import Overpass.OverpassConverter;
+import com.company.PathSegment;
+import com.company.PathTree;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
@@ -11,7 +13,7 @@ import java.util.*;
  * Tracks and processes a route_master-type OSM relation
  * Created by nick on 1/27/16.
  */
-public class RouteMaster {
+public class RouteConflator {
     public static class LineComparisonOptions {
         public double maxSegmentLength = 5.0, maxSegmentOrthogonalDistance = 10.0, maxSegmentMidPointDistance = 20.0, boundingBoxSize = 50.0;
         private double minSegmentDotProduct;
@@ -35,7 +37,7 @@ public class RouteMaster {
     private final LineComparisonOptions wayMatchingOptions;
     private HashMap<Long, WaySegments> candidateWaySegments;
 
-    public RouteMaster(final OSMRelation routeMaster, final LineComparisonOptions wayMatchingOptions) throws InvalidArgumentException {
+    public RouteConflator(final OSMRelation routeMaster, final LineComparisonOptions wayMatchingOptions) throws InvalidArgumentException {
         importRouteMaster = routeMaster;
         this.wayMatchingOptions = wayMatchingOptions;
         routeType = importRouteMaster.getTag(OSMEntity.KEY_ROUTE_MASTER);
@@ -377,7 +379,7 @@ public class RouteMaster {
             }
         }
     }
-    public void conflateRoutePaths(final StopComparison stopMatcher) {
+    public void conflateRoutePaths(final StopConflator stopMatcher) {
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             final long timeStartLineComparison = new Date().getTime();

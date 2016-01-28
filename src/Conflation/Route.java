@@ -1,9 +1,8 @@
-package com.company;
+package Conflation;
 
 import OSM.*;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -18,7 +17,7 @@ public class Route {
     public final OSMWay routePath;
     public final WaySegments routeLine;
 
-    public Route(final OSMRelation routeRelation, final RouteMaster.LineComparisonOptions wayMatchingOptions) {
+    public Route(final OSMRelation routeRelation, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
         this.routeRelation = routeRelation;
         routeType = routeRelation.getTag(OSMEntity.KEY_TYPE);
 
@@ -33,7 +32,7 @@ public class Route {
             stops.add(new StopArea(stopMember.member, null));
         }
     }
-    public Route(final Route oldRoute, final OSMEntitySpace newEntitySpace, final List<StopArea> stops, final RouteMaster.LineComparisonOptions wayMatchingOptions) {
+    public Route(final Route oldRoute, final OSMEntitySpace newEntitySpace, final List<StopArea> stops, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
         routeRelation = newEntitySpace.createRelation(oldRoute.routeRelation.getTags(), null);
         routeType = routeRelation.getTag(OSMEntity.KEY_TYPE);
         routePath = oldRoute.routePath; //NOTE: not added to new route's entity space!

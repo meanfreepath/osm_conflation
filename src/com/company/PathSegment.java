@@ -1,6 +1,9 @@
 package com.company;
 
-import OSM.OSMEntity;
+import Conflation.LineSegment;
+import Conflation.StopArea;
+import Conflation.StopWayMatch;
+import Conflation.WaySegments;
 import OSM.OSMNode;
 import OSM.OSMWay;
 

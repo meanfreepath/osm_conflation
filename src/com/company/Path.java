@@ -1,5 +1,8 @@
 package com.company;
 
+import Conflation.Route;
+import Conflation.StopArea;
+import Conflation.StopWayMatch;
 import OSM.OSMEntity;
 import OSM.OSMNode;
 

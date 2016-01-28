@@ -1,4 +1,4 @@
-package com.company;
+package Conflation;
 
 import OSM.Point;
 
@@ -18,7 +18,7 @@ public class SegmentMatch {
         midPointDistance = midDistance;
         this.dotProduct = dotProduct;
     }
-    public static boolean checkCandidateForMatch(final RouteMaster.LineComparisonOptions options, final LineSegment segment1, final LineSegment segment2, final LineMatch lineMatch) {
+    public static boolean checkCandidateForMatch(final RouteConflator.LineComparisonOptions options, final LineSegment segment1, final LineSegment segment2, final LineMatch lineMatch) {
         //take the dot product
         final double dotProduct = (segment1.vectorX * segment2.vectorX + segment1.vectorY * segment2.vectorY) / (segment1.vectorMagnitude * segment2.vectorMagnitude);
 

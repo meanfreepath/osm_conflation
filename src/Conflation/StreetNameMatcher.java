@@ -1,4 +1,4 @@
-package com.company;
+package Conflation;
 
 import java.util.HashMap;
 import java.util.Locale;

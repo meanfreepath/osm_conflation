@@ -1,8 +1,4 @@
-package com.company;
-
-import OSM.OSMEntity;
-import OSM.OSMNode;
-import javafx.scene.paint.Stop;
+package Conflation;
 
 import java.util.ArrayList;
 import java.util.Collections;

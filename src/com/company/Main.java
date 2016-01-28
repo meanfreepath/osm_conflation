@@ -1,13 +1,14 @@
 package com.company;
 
+import Conflation.Route;
+import Conflation.RouteConflator;
+import Conflation.StopConflator;
 import OSM.*;
-import Overpass.OverpassConverter;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
-import java.text.DecimalFormat;
 import java.util.*;
 
 public class Main {
@@ -17,7 +18,7 @@ public class Main {
         OSMEntitySpace importSpace = new OSMEntitySpace(1024);
 
         //define the options for the comparison routines
-        final RouteMaster.LineComparisonOptions options = new RouteMaster.LineComparisonOptions();
+        final RouteConflator.LineComparisonOptions options = new RouteConflator.LineComparisonOptions();
         options.boundingBoxSize = 50.0;
         options.maxSegmentLength = 10.0;
         options.setMaxSegmentAngle(10.0);
@@ -25,7 +26,7 @@ public class Main {
         options.maxSegmentMidPointDistance = 4.0 * options.maxSegmentLength;
 
         //propagate the debug value as needed
-        RouteMaster.debugEnabled = debugEnabled;
+        RouteConflator.debugEnabled = debugEnabled;
 
         try {
             importSpace.loadFromXML("routes.osm");
@@ -50,25 +51,25 @@ public class Main {
                 final OSMEntitySpace workingEntitySpace = new OSMEntitySpace(32768); //the entity space that all processing will occur on
 
                 //create an object to handle the processing of the data for this route master
-                final RouteMaster routeMaster = new RouteMaster(importRouteMaster, options);
+                final RouteConflator routeConflator = new RouteConflator(importRouteMaster, options);
 
                 //fetch all ways from OSM that are within the route master's bounding box
-                routeMaster.downloadRegionsForImportDataset(workingEntitySpace);
+                routeConflator.downloadRegionsForImportDataset(workingEntitySpace);
 
                 //fetch all existing stops from OSM in the route's bounding box
-                routeMaster.conflateStops(20.0);
+                routeConflator.conflateStops(20.0);
 
                 //also, match the stops in the relation to their nearest matching way
                 final long timeStartStopMatching = new Date().getTime();
-                final StopComparison stopMatcher = new StopComparison(routeMaster);
+                final StopConflator stopMatcher = new StopConflator(routeConflator);
                 stopMatcher.matchStopsToWays();
                 stopMatcher.createStopPositionsForPlatforms(workingEntitySpace);
                 System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
 
                 //and match the subroutes' routePath to the downloaded OSM ways
-                routeMaster.conflateRoutePaths(stopMatcher);
+                routeConflator.conflateRoutePaths(stopMatcher);
 
-                /*for(final Route route : routeMaster.getExportRoutes()) {
+                /*for(final Route route : routeConflator.getExportRoutes()) {
 
 
                     //now find the optimal path from the first stop to the last stop, using the provided ways
@@ -95,17 +96,17 @@ public class Main {
                     }
 
                     if (debugEnabled) {
-                       // debugOutputSegments(workingEntitySpace, routeMaster);
+                       // debugOutputSegments(workingEntitySpace, routeConflator);
                     }
                     workingEntitySpace.outputXml("newresult" + route.routePath.osm_id + ".osm");
                 }*/
 
                 //finally, add the completed relations to their own separate file for review and upload
                 final OSMEntitySpace relationSpace = new OSMEntitySpace(65536);
-                for(final Route route: routeMaster.getExportRoutes()) {
+                for(final Route route: routeConflator.getExportRoutes()) {
                     relationSpace.addEntity(route.routeRelation, OSMEntity.TagMergeStrategy.keepTags, null);
                 }
-                relationSpace.addEntity(routeMaster.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null);
+                relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null);
                 relationSpace.outputXml("relation.osm");
             }
             //importSpace.outputXml("newresult.osm");
@@ -118,7 +119,7 @@ public class Main {
     /**
      * Outputs the segment ways to an OSM XML file
      *
-    private static void debugOutputSegments(final OSMEntitySpace entitySpace, final RouteMaster routeMaster) throws IOException, InvalidArgumentException {
+    private static void debugOutputSegments(final OSMEntitySpace entitySpace, final RouteConflator routeConflator) throws IOException, InvalidArgumentException {
         final OSMEntitySpace segmentSpace = new OSMEntitySpace(entitySpace.allWays.size() + entitySpace.allNodes.size());
         final DecimalFormat format = new DecimalFormat("#.###");
 

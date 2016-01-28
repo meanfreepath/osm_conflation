@@ -1,4 +1,4 @@
-package com.company;
+package Conflation;
 
 import OSM.OSMEntity;
 import OSM.OSMNode;

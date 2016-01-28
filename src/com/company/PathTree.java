@@ -1,12 +1,13 @@
 package com.company;
 
-import OSM.OSMRelation;
+import Conflation.Route;
+import Conflation.StopArea;
+import Conflation.WaySegments;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
 /**
  * Created by nick on 11/10/15.

@@ -1,31 +1,32 @@
-package com.company;
+package Conflation;
 
 import OSM.*;
+
 import java.util.Locale;
 
 /**
  * Manages the association of stops/waypoints with their respective OSM ways
  * Created by nick on 1/27/16.
  */
-public class StopComparison {
+public class StopConflator {
     private final static String stopNameStreetSeparator = " & ";
 
-    public final RouteMaster routeMaster;
+    public final RouteConflator routeConflator;
 
-    public StopComparison(final RouteMaster routeMaster) {
-        this.routeMaster = routeMaster;
+    public StopConflator(final RouteConflator routeConflator) {
+        this.routeConflator = routeConflator;
     }
     public void matchStopsToWays() {
-        final int stopCount = routeMaster.getAllRouteStops().size();
+        final int stopCount = routeConflator.getAllRouteStops().size();
         if(stopCount == 0) { //TODO add warning
             return;
         }
         final StreetNameMatcher matcher = new StreetNameMatcher(Locale.US);
-        final double latitudeDelta = -StopWayMatch.maxDistanceFromPlatformToWay / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * routeMaster.roughCentroid.latitude / 180.0);
+        final double latitudeDelta = -StopWayMatch.maxDistanceFromPlatformToWay / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * routeConflator.roughCentroid.latitude / 180.0);
 
         //loop through the route's stops, determining the best-matching way for each one
         int stopIndex = 0;
-        for(final StopArea stop : routeMaster.getAllRouteStops()) {
+        for(final StopArea stop : routeConflator.getAllRouteStops()) {
             //get the stop's name components, to see if we can use the name to match to a nearby way
             final String stopName = stop.platform.getTag(OSMEntity.KEY_NAME);
             String[] stopStreetNames = null;
@@ -42,7 +43,7 @@ public class StopComparison {
             final Region searchRegion = stop.platform.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
             final Point platformCentroid = stop.platform.getCentroid();
             //for(final WaySegments matchingLine : lineComparison.candidateLines.values()) {
-            for(final WaySegments line : routeMaster.getCandidateWaySegments().values()) {
+            for(final WaySegments line : routeConflator.getCandidateWaySegments().values()) {
                 //check the line's bounding box intersects
                 if(!Region.intersects(line.way.getBoundingBox().regionInset(latitudeDelta, longitudeDelta), searchRegion)) {
                     continue;
@@ -111,7 +112,7 @@ public class StopComparison {
         }
 
         //now pick the best matches for each platform
-        for(final StopArea stop : routeMaster.getAllRouteStops()) {
+        for(final StopArea stop : routeConflator.getAllRouteStops()) {
             if(stop.wayMatches.matches.size() == 0) {
                 System.out.println("No matches found for stop #" + stop.platform.osm_id + " (" + stop.platform.getTag("name") + ")");
                 continue;
@@ -122,7 +123,7 @@ public class StopComparison {
     }
     public void createStopPositionsForPlatforms(final OSMEntitySpace entitySpace) {
         //now pick the best matches for each platform
-        for(final StopArea stopArea : routeMaster.getAllRouteStops()) {
+        for(final StopArea stopArea : routeConflator.getAllRouteStops()) {
             final StopWayMatch match = stopArea.wayMatches;
             if(match.bestMatch == null) {
                 continue;
@@ -142,7 +143,7 @@ public class StopComparison {
             nearestNodeOnWay.setTag(OSMEntity.KEY_REF, match.stopEntity.platform.getTag(OSMEntity.KEY_REF));
             nearestNodeOnWay.setTag("gtfs:stop_id", match.stopEntity.platform.getTag("gtfs:stop_id"));
             nearestNodeOnWay.setTag(OSMEntity.KEY_PUBLIC_TRANSPORT, OSMEntity.TAG_STOP_POSITION);
-            nearestNodeOnWay.setTag(routeMaster.routeType, OSMEntity.TAG_YES); //TODO need proper key mapping (e.g. for subway, light_rail, etc)
+            nearestNodeOnWay.setTag(routeConflator.routeType, OSMEntity.TAG_YES); //TODO need proper key mapping (e.g. for subway, light_rail, etc)
 
             //add to the WaySegments object as well
             bestSegment.parentSegments.matchObject.addStopMatch(match);

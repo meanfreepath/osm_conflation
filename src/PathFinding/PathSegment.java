@@ -1,6 +1,6 @@
 package PathFinding;
 
-import com.company.WaySegments;
+import Conflation.WaySegments;
 
 /**
  * Represents the portion of a way that is traversed by a route's path

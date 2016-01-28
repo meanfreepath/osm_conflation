@@ -1,7 +1,7 @@
 package PathFinding;
 
 import OSM.OSMNode;
-import com.company.WaySegments;
+import Conflation.WaySegments;
 
 /**
  * Represents the possible paths between 2 nodes
