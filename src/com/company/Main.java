@@ -57,17 +57,17 @@ public class Main {
                 routeConflator.downloadRegionsForImportDataset(workingEntitySpace);
 
                 //fetch all existing stops from OSM in the route's bounding box
-                routeConflator.conflateStops(20.0);
+                final StopConflator stopConflator = new StopConflator(routeConflator);
+                stopConflator.conflateStops(20.0);
 
                 //also, match the stops in the relation to their nearest matching way
                 final long timeStartStopMatching = new Date().getTime();
-                final StopConflator stopMatcher = new StopConflator(routeConflator);
-                stopMatcher.matchStopsToWays();
-                stopMatcher.createStopPositionsForPlatforms(workingEntitySpace);
+                stopConflator.matchStopsToWays();
+                stopConflator.createStopPositionsForPlatforms(workingEntitySpace);
                 System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
 
                 //and match the subroutes' routePath to the downloaded OSM ways
-                routeConflator.conflateRoutePaths(stopMatcher);
+                routeConflator.conflateRoutePaths(stopConflator);
 
                 /*for(final Route route : routeConflator.getExportRoutes()) {
 
