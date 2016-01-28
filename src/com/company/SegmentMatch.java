@@ -18,7 +18,7 @@ public class SegmentMatch {
         midPointDistance = midDistance;
         this.dotProduct = dotProduct;
     }
-    public static boolean checkCandidateForMatch(final LineComparison comparison, final LineSegment segment1, final LineSegment segment2, final LineMatch lineMatch) {
+    public static boolean checkCandidateForMatch(final RouteMaster.LineComparisonOptions options, final LineSegment segment1, final LineSegment segment2, final LineMatch lineMatch) {
         //take the dot product
         final double dotProduct = (segment1.vectorX * segment2.vectorX + segment1.vectorY * segment2.vectorY) / (segment1.vectorMagnitude * segment2.vectorMagnitude);
 
@@ -81,7 +81,7 @@ public class SegmentMatch {
         }*/
 
         //if the segments meet the threshold requirements, store the match in a SegmentMatch object
-        if(Math.abs(dotProduct) >= comparison.options.getMinSegmentDotProduct() && orthogonalDistance <= comparison.options.maxSegmentOrthogonalDistance && midPointDistance <= comparison.options.maxSegmentMidPointDistance) {
+        if(Math.abs(dotProduct) >= options.getMinSegmentDotProduct() && orthogonalDistance <= options.maxSegmentOrthogonalDistance && midPointDistance <= options.maxSegmentMidPointDistance) {
             //System.out.println("DP MATCH: " + dotProduct + ", dist:" + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
             //System.out.println("DP MATCH: " + segment2.parentSegments.line.getTag("name") + ": " + dotProduct + ", dist:" + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
             final SegmentMatch match = new SegmentMatch(segment1, segment2, orthogonalDistance, midPointDistance, dotProduct);

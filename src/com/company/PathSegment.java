@@ -19,10 +19,10 @@ public class PathSegment {
 
     public final static long[] debugFilterIds = {};
 
-    public static boolean checkDetours = true;
+    public static boolean checkDetours = false;
     private static int idSequence = 0;
 
-    private final PathTree parentPathTree;
+    public final PathTree parentPathTree;
     public final int id, debugDepth;
     public final WaySegments line;
     public final PathSegment parentPathSegment;
@@ -65,13 +65,13 @@ public class PathSegment {
         boolean ourDirectionForward = line.matchObject.getAvgDotProduct() >= 0.0;
 
         //boost the score if there's are stops on the current line segment
-        StopWayMatch lastStopOnSegment = null;
+        StopArea lastStopOnSegment = null;
         if(line.matchObject.stopMatches != null) {
             for(final StopWayMatch stopMatch : line.matchObject.stopMatches) {
                 if (stopMatch.bestMatch != null) {
                     scoreStops += SCORE_FOR_STOP_ON_WAY;
-                    lastStopOnSegment = stopMatch;
-                    debugLog("HAS MATCHING TRANSIT STOP (id " + stopMatch.stopPositionNode.osm_id + ", ref " + stopMatch.stopPositionNode.getTag("ref") + ")\n");
+                    lastStopOnSegment = stopMatch.stopEntity;
+                    debugLog("HAS MATCHING TRANSIT STOP (id " + stopMatch.stopEntity.getStopPosition().osm_id + ", ref " + stopMatch.stopEntity.getStopPosition().getTag("ref") + ")\n");
                 }
             }
         }
@@ -143,7 +143,7 @@ public class PathSegment {
         }
 
         //if there's a stop on this path segment, and it's the last stop in the route, we're done: no need to check further connecting ways
-        if(lastStopOnSegment != null && lastStopOnSegment.isLastStop()) {
+        if(lastStopOnSegment != null && parentPathTree.route.stopIsLast(lastStopOnSegment)) {
             return true;
         }
 

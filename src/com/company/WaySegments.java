@@ -21,17 +21,15 @@ public class WaySegments {
     public final OSMWay way;
     public final List<LineSegment> segments;
     public final LineMatch matchObject;
-    private final boolean debug;
     public final OneWayDirection oneWayDirection;
 
-    public WaySegments(final OSMWay way, final double maxSegmentLength, boolean debug) {
+    public WaySegments(final OSMWay way, final double maxSegmentLength) {
         this.way = way;
-        this.debug = debug;
         matchObject = new LineMatch(this);
         oneWayDirection = determineOneWayDirection(way);
 
         //generate a list of line segments out of this line
-        segments = new ArrayList<>(way.getNodes().size() - 1); //TODO base on total line length, to handle the newly
+        segments = new ArrayList<>(way.getNodes().size() - 1); //TODO base on total line length, to handle the newly-created segments
         OSMNode originNode = way.getNodes().get(0);
         int nodeIndex = 0, segmentIndex = 0;
         for(final OSMNode destinationNode: way.getNodes()) {
@@ -59,8 +57,7 @@ public class WaySegments {
                     destinationLat = miniOrigin.latitude + vectorY / segmentsToAdd;
                     miniDestination = new Point(destinationLat, destinationLon);
 
-                    final LineSegment segment = new LineSegment(this, miniOrigin, miniDestination, miniOriginNode, null, segmentIndex++, nodeIndex);
-                    segments.add(segment);
+                    segments.add(new LineSegment(this, miniOrigin, miniDestination, miniOriginNode, null, segmentIndex++, nodeIndex));
 
                     miniOrigin = miniDestination;
                     miniOriginNode = null;
@@ -68,8 +65,7 @@ public class WaySegments {
 
                 //add the last segment, with its last node as the original destination node
                 miniDestination = destinationNode.getCentroid();
-                final LineSegment segment = new LineSegment(this, miniOrigin, miniDestination, miniOriginNode, destinationNode, segmentIndex++, nodeIndex);
-                segments.add(segment);
+                segments.add(new LineSegment(this, miniOrigin, miniDestination, miniOriginNode, destinationNode, segmentIndex++, nodeIndex));
             }
             //System.out.println("END MAINSEGMENT #" + mainSegmentIndex + ": " + originNode.osm_id + "-" + destinationNode.osm_id);
             originNode = destinationNode;

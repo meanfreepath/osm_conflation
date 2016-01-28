@@ -1,6 +1,8 @@
 package com.company;
 
+import OSM.OSMEntity;
 import OSM.OSMNode;
+import javafx.scene.paint.Stop;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,7 +17,16 @@ public class StopWayMatch {
     private final static Comparator<WayMatch> comp = new Comparator<WayMatch>() {
         @Override
         public int compare(final WayMatch o1, final WayMatch o2) {
-            return o1.distance < o2.distance ? -1 : 1;
+            if(o1.matchType == MatchType.primaryStreet) { //prioritize name matches
+                if(o2.matchType == MatchType.primaryStreet) {
+                    return o1.distance < o2.distance ? -1 : 1;
+                }
+                return -1;
+            } else if(o2.matchType == MatchType.primaryStreet) {
+                return 1;
+            } else {
+                return o1.distance < o2.distance ? -1 : 1;
+            }
         }
     };
     public enum MatchType {
@@ -23,11 +34,11 @@ public class StopWayMatch {
     }
 
     public class WayMatch {
-        public final SegmentMatch candidateSegmentMatch;
+        public final LineSegment candidateSegmentMatch;
         public final MatchType matchType;
         public final double distance;
 
-        public WayMatch(final SegmentMatch segmentMatch, final double distance, final MatchType matchType) {
+        public WayMatch(final LineSegment segmentMatch, final double distance, final MatchType matchType) {
             this.candidateSegmentMatch = segmentMatch;
             this.distance = distance;
             this.matchType = matchType;
@@ -35,37 +46,28 @@ public class StopWayMatch {
     }
 
     /**
-     * The index of this stop on the route
-     */
-    public final int stopIndex;
-
-    /**
-     * The total number of stops on the route
-     */
-    public final int stopCount;
-
-    /**
      * Pointer to the actual OSM node of the stop's platform
      */
-    public final OSMNode platformNode;
+    public final StopArea stopEntity;
     public final List<WayMatch> matches = new ArrayList<>(16);
 
-    public OSMNode stopPositionNode = null;
     public WayMatch bestMatch = null;
 
-    public StopWayMatch(final OSMNode platform, int index, int count) {
-        platformNode = platform;
-        stopIndex = index;
-        stopCount = count;
+    public StopWayMatch(final StopArea stop) {
+        stopEntity = stop;
     }
-    public void addWayMatch(final SegmentMatch segmentMatch, final double distance, final MatchType matchType) {
+    public void addWayMatch(final LineSegment segmentMatch, final double distance, final MatchType matchType) {
         matches.add(new WayMatch(segmentMatch, distance, matchType));
     }
     public void chooseBestMatch() {
+        if(matches.size() == 0) {
+            return;
+        }
         Collections.sort(matches, comp);
+        bestMatch = matches.get(0);
 
         //System.out.println("Platform: " + firstMatch.platformNode.getTag("name") + ":::");
-        for(final WayMatch otherMatch : matches) {
+        /*for(final WayMatch otherMatch : matches) {
             if(otherMatch.matchType == StopWayMatch.MatchType.primaryStreet) { //always use the primary street (based off the name) as the best match
                 bestMatch = otherMatch;
                 break;
@@ -73,12 +75,7 @@ public class StopWayMatch {
 
             //the next-best match is the closest way
             bestMatch = otherMatch;
-        }
-    }
-    public boolean isFirstStop() {
-        return stopIndex == 0;
-    }
-    public boolean isLastStop() {
-        return stopIndex == stopCount - 1;
+        }*/
+        //System.out.println("Platform: " + stopEntity.platform.getTag("name") + ":: on " + bestMatch.candidateSegmentMatch.parentSegments.way.getTag("name"));
     }
 }

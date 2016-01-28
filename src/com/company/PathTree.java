@@ -15,14 +15,14 @@ public class PathTree {
     public Path bestPath = null;
     public final static boolean debug = true;
     private final FileWriter debugFileWriter;
-    public final OSMRelation routeRelation;
+    public final Route route;
 
-    public PathTree(final OSMRelation routeRelation) {
-        this.routeRelation = routeRelation;
+    public PathTree(final Route route) {
+        this.route = route;
         if(debug) {
             FileWriter writer = null;
             try {
-                writer = new FileWriter("pathDebug" + routeRelation.osm_id);
+                writer = new FileWriter("pathDebug" + route.routeRelation.osm_id);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -31,19 +31,19 @@ public class PathTree {
             debugFileWriter = null;
         }
     }
-    public void findPaths(final List<StopWayMatch> stops, final HashMap<Long, WaySegments> availableLines) {
+    public void findPaths(final HashMap<Long, WaySegments> availableLines) {
         //first find the point on the nearest way closest to the toNode and fromNode
-        final StopWayMatch firstStop = stops.size() > 0 ? stops.get(0) : null;
+        final StopArea firstStop = route.stops.size() > 0 ? route.stops.get(0) : null;
 
 
         //create the initial path segment
         final PathSegment startPathSegment;
-        if(firstStop != null && firstStop.bestMatch != null) { //if a stop match is present, use the way closest to the first stop
-            startPathSegment = new PathSegment(this, null, firstStop.bestMatch.candidateSegmentMatch.matchingSegment.parentSegments, firstStop.stopPositionNode, 0.0, 0);
+        if(firstStop != null && firstStop.wayMatches.bestMatch != null) { //if a stop match is present, use the way closest to the first stop
+            startPathSegment = new PathSegment(this, null, firstStop.wayMatches.bestMatch.candidateSegmentMatch/*.matchingSegment*/.parentSegments, firstStop.getStopPosition(), 0.0, 0);
         } else { //otherwise, use the way closest to the start of the main route path line
             //startPathSegment = new PathSegment(null, firstLine, null); //the path will figure out the originating node in this case
             startPathSegment = null; //TODO
-            System.out.println("ERROR: first stop for " + routeRelation.getTag("name") + " is not near a road or railway!");
+            System.out.println("ERROR: first stop for " + route.routeRelation.getTag("name") + " is not near a road or railway!");
             return;
         }
 
@@ -53,7 +53,7 @@ public class PathTree {
         /*final ArrayList<Path> allPaths = new ArrayList<>(128);
         compileChildren(startPathSegment, allPaths);*/
 
-        final Path initialPath = new Path();
+        final Path initialPath = new Path(this);
         initialPath.addSegment(startPathSegment);
         final ArrayList<Path> allPaths = new ArrayList<>(65536);
         compileChildren(initialPath, allPaths);
@@ -88,7 +88,7 @@ public class PathTree {
              //   System.out.print("GOOD PATH (" + path.segmentCount + " segs): SCORE (out of " + allPaths.size() + "): #" + path.id + ", score (" + path.scoreSegments + "/" + path.scoreStops + "/" + path.scoreAdjust + ") = " + path.scoreTotal + ", first/last stop " + bestPath.lastStopOnPath.platformNode.getTag("name") + ":" + Boolean.toString(bestPath.firstStopOnPath.isFirstStop()) + "/" + Boolean.toString(bestPath.lastStopOnPath.isLastStop()) + "\nSEGMENTS: " + path.toString());
             }*/
             if(bestPath != null) {
-                System.out.println("BEST PATH SCORE (out of " + allPaths.size() + "): #" + bestPath.id + ", score (" + bestPath.scoreSegments + "/" + bestPath.scoreStops + "/" + bestPath.scoreAdjust + ") = " + bestPath.scoreTotal + ", stops: " + bestPath.stopsOnPath + "/" + stops.size() + ", first/last stop:" + (bestPath.firstStopOnPath != null ? Boolean.toString(bestPath.firstStopOnPath.isFirstStop()) : "NULL") + "/" + (bestPath.lastStopOnPath != null ? Boolean.toString(bestPath.lastStopOnPath.isLastStop()) : "NULL") + "\nSEGMENTS: " + bestPath.toString());
+                System.out.println("BEST PATH SCORE (out of " + allPaths.size() + "): #" + bestPath.id + ", score (" + bestPath.scoreSegments + "/" + bestPath.scoreStops + "/" + bestPath.scoreAdjust + ") = " + bestPath.scoreTotal + ", stops: " + bestPath.stopsOnPath + "/" + route.stops.size() + ", first/last stop:" + (bestPath.firstStopOnPath != null ? Boolean.toString(route.stopIsFirst(bestPath.firstStopOnPath)) : "NULL") + "/" + (bestPath.lastStopOnPath != null ? Boolean.toString(route.stopIsLast(bestPath.lastStopOnPath)) : "NULL") + "\nSEGMENTS: " + bestPath.toString());
                 System.out.print(bestPath.scoreSummary());
             } else {
                 System.out.println("NO BEST PATH");

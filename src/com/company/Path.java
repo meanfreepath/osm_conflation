@@ -12,15 +12,17 @@ import java.util.List;
  */
 public class Path implements Cloneable {
     public List<PathSegment> pathSegments = new ArrayList<>(256);
+    final PathTree parentPathTree;
     private static int idSequence = 0;
     public final int id;
 
     public int segmentCount = 0;
     public double scoreSegments = 0.0, scoreStops = 0.0, scoreAdjust = 0.0, scoreTotal = 0.0;
-    public StopWayMatch firstStopOnPath = null, lastStopOnPath = null;
+    public StopArea firstStopOnPath = null, lastStopOnPath = null;
     public int stopsOnPath = 0;
 
-    public Path() {
+    public Path(final PathTree parentPathTree) {
+        this.parentPathTree = parentPathTree;
         id = ++idSequence;
     }
 
@@ -52,24 +54,27 @@ public class Path implements Cloneable {
         int lastStopIndex = -1;
         firstStopOnPath = null;
         lastStopOnPath = null;
+        final Route route = parentPathTree.route;
         for(final PathSegment segment : pathSegments) {
             //track whether the stops on this path are in order (strong indicator of accuracy)
             if(segment.line.matchObject.stopMatches != null) {
                 for(final StopWayMatch stopMatch : segment.line.matchObject.stopMatches) {
                     //track the first/last stops on the path
                     if(firstStopOnPath == null) {
-                        firstStopOnPath = stopMatch;
+                        firstStopOnPath = stopMatch.stopEntity;
                     }
-                    lastStopOnPath = stopMatch;
+                    lastStopOnPath = stopMatch.stopEntity;
 
                     //check if the current stop comes directly after the previous stop
+                    final int stopIndex = route.stops.indexOf(stopMatch.stopEntity);
                     if(stopMatch.bestMatch != null) {
                         stopsOnPath++;
-                        if(stopMatch.stopIndex != lastStopIndex + 1) {
+
+                        if(stopIndex != lastStopIndex + 1) {
                             stopsInOrder = false;
                         }
                     }
-                    lastStopIndex = stopMatch.stopIndex;
+                    lastStopIndex = stopIndex;
                 }
             }
 
@@ -79,7 +84,7 @@ public class Path implements Cloneable {
         }
 
         //if the path contains the first and last stops of the route, it gets a bonus
-        if(lastStopOnPath != null && firstStopOnPath.isFirstStop() && lastStopOnPath.isLastStop()) {
+        if(lastStopOnPath != null && route.stopIsFirst(firstStopOnPath) && route.stopIsLast(lastStopOnPath)) {
             scoreStops *= 2.0;
             //and a further bonus if it contains the stops *in order*, give it a further bonus
             if(stopsInOrder) {
@@ -161,7 +166,7 @@ public class Path implements Cloneable {
     }
     @Override
     public Path clone() {
-        final Path newPath = new Path();
+        final Path newPath = new Path(parentPathTree);
         newPath.pathSegments.addAll(pathSegments);
         newPath.segmentCount = segmentCount;
         newPath.scoreSegments = scoreSegments;
