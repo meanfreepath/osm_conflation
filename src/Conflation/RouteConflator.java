@@ -2,6 +2,7 @@ package Conflation;
 
 import OSM.*;
 import Overpass.OverpassConverter;
+import PathFinding.RoutePath;
 import com.company.PathSegment;
 import com.company.PathTree;
 import com.sun.javaws.exceptions.InvalidArgumentException;
@@ -35,7 +36,7 @@ public class RouteConflator {
     public static boolean debugEnabled = false;
     private OSMEntitySpace workingEntitySpace = null;
     private final LineComparisonOptions wayMatchingOptions;
-    private HashMap<Long, WaySegments> candidateWaySegments;
+    //private HashMap<Long, WaySegments> candidateWaySegments;
 
     public RouteConflator(final OSMRelation routeMaster, final LineComparisonOptions wayMatchingOptions) throws InvalidArgumentException {
         importRouteMaster = routeMaster;
@@ -153,11 +154,11 @@ public class RouteConflator {
             exportRouteMaster.addMember(exportRoute.routeRelation, OSMEntity.MEMBERSHIP_DEFAULT);
         }
 
-        //create WaySegments objects for all downloaded ways
+        /*//create WaySegments objects for all downloaded ways
         candidateWaySegments = new HashMap<>(workingEntitySpace.allWays.size());
         for(final OSMWay way : workingEntitySpace.allWays.values()) {
             candidateWaySegments.put(way.osm_id, new WaySegments(way, wayMatchingOptions.maxSegmentLength));
-        }
+        }*/
 
         return true;
     }
@@ -267,7 +268,17 @@ public class RouteConflator {
     }
     public void conflateRoutePaths(final StopConflator stopMatcher) {
         for(final Route route : exportRoutes) {
+            //create WaySegments objects for all downloaded ways (to take into account splits etc from previous route conflation operations)
+            final HashMap<Long, WaySegments> candidateWaySegments = new HashMap<>(workingEntitySpace.allWays.size());
+            for(final OSMWay way : workingEntitySpace.allWays.values()) {
+                candidateWaySegments.put(way.osm_id, new WaySegments(way, wayMatchingOptions.maxSegmentLength));
+            }
+
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
+            if(route.routeRelation.osm_id != -1214) {
+                continue;
+            }
+
             final long timeStartLineComparison = new Date().getTime();
             final double latitudeDelta = -wayMatchingOptions.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * route.routeLine.segments.get(0).originPoint.latitude / 180.0);
             for(final LineSegment mainLineSegment : route.routeLine.segments) {
@@ -300,23 +311,9 @@ public class RouteConflator {
             }
             System.out.println("Matched lines in " + (new Date().getTime() - timeStartLineComparison) + "ms");
 
-            //TODO BEGIN LEGACY PATHFINDING
-            final PathTree pathList = new PathTree(route);
-            pathList.findPaths(candidateWaySegments);
-
-            //finally, add the matched ways to the relation's members
-            if(pathList.bestPath != null) {
-                for (final PathSegment pathSegment : pathList.bestPath.pathSegments) {
-                    route.routeRelation.addMember(pathSegment.line.way, OSMEntity.MEMBERSHIP_DEFAULT);
-                }
-            } else { //debug: if no matched path, output the best candidates instead
-                for (final WaySegments line : candidateWaySegments.values()) {
-                    if(line.matchObject.matchingSegments.size() > 2 && line.matchObject.getAvgDotProduct() >= 0.9) {
-                        route.routeRelation.addMember(line.way, OSMEntity.MEMBERSHIP_DEFAULT);
-                    }
-                }
-            }
-            //TODO END LEGACY PATHFINDING
+            //and run the pathfinding routines on this route
+            final RoutePath routePath = new RoutePath(route, candidateWaySegments);
+            routePath.findPaths();
 
             //and add the stops data to the OSMRelation for the route
             route.syncStopsWithRelation();
@@ -341,7 +338,11 @@ public class RouteConflator {
     public OSMEntitySpace getWorkingEntitySpace() {
         return workingEntitySpace;
     }
-    public HashMap<Long, WaySegments> getCandidateWaySegments() {
+    public HashMap<Long, WaySegments> generateCandidateWaySegments() {
+        final HashMap<Long, WaySegments> candidateWaySegments = new HashMap<>(workingEntitySpace.allWays.size());
+        for(final OSMWay way : workingEntitySpace.allWays.values()) {
+            candidateWaySegments.put(way.osm_id, new WaySegments(way, wayMatchingOptions.maxSegmentLength));
+        }
         return candidateWaySegments;
     }
 }
