@@ -11,7 +11,7 @@ public class SegmentMatch {
     public boolean consolidated = false;
     public int consolidatedMatches = 0;
 
-    public SegmentMatch(LineSegment segment1, LineSegment segment2, double orthDistance, double midDistance, double dotProduct) {
+    public SegmentMatch(final LineSegment segment1, final LineSegment segment2, final double orthDistance, final double midDistance, final double dotProduct) {
         mainSegment = segment1;
         matchingSegment = segment2;
         orthogonalDistance = orthDistance;
