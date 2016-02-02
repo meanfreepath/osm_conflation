@@ -4,6 +4,7 @@ import Conflation.LineSegment;
 import Conflation.StopArea;
 import Conflation.StopWayMatch;
 import Conflation.WaySegments;
+import OSM.OSMEntity;
 import OSM.OSMNode;
 import OSM.OSMWay;
 
@@ -23,8 +24,11 @@ public class PathSegment {
     public final String id;
     public double pathScore, waypointScore;
     public double alignedPathLength = 0.0; //the length of segments this path aligns with
-    private boolean processed = false;
     private boolean containsPathOriginNode = false, containsPathDestinationNode = false;
+    /**
+     * Whether the contained line has a good enough match to process
+     */
+    private boolean lineMatched = false;
 
     public PathSegment(final WaySegments line, final Junction fromJunction) {
         this.line = line;
@@ -39,16 +43,17 @@ public class PathSegment {
         return String.format("%d:%d", way.osm_id, node.osm_id);
     }
 
-    public void determineScore(final RoutePath parentPath, final OSMNode initialOriginNode, final OSMNode finalDestinationNode) {
+    public void determineScore(final RoutePath parentPath, final WaySegments onRouteLine, final OSMNode initialOriginNode, final OSMNode finalDestinationNode) {
         //System.out.println("Segment of " + line.way.getTag("name") + " (" + line.way.osm_id + "): from " + originJunction.junctionNode.osm_id + " (traveling " + (line.matchObject.getAvgDotProduct() >= 0.0 ? "forward" : "backward") + ")");
-        if(processed) {
-            System.out.println("ALREADY PROCEEDED");
-            return;
-        }
+        lineMatched = false;
 
         //determine the direction of this line relative to the direction of route travel
         final List<OSMNode> segmentNodes = new ArrayList<>(line.way.getNodes().size());
-        final boolean ourDirectionForward = line.matchObject.getAvgDotProduct() >= 0.0;
+        if(line.getMatchForLine(onRouteLine) == null) {
+            parentPath.logEvent(RoutePath.RouteLogType.error, "No match for line " + line.way.getTag(OSMEntity.KEY_NAME) + "(" + line.way.osm_id + ")", this);
+            return;
+        }
+        final boolean ourDirectionForward = line.getMatchForLine(onRouteLine).getAvgDotProduct() >= 0.0;
 
         //determine the nodes on this path segment, and calculate their score based on their alignment with the main route's path
         final OSMNode firstNode, lastNode;
@@ -163,7 +168,10 @@ public class PathSegment {
         /*if(parentPathSegment == null && originatingNode == null) {
             originatingNode = firstNode;
         }*/
-        processed = true;
+        lineMatched = true;
+    }
+    public boolean isLineMatchedWithRoutePath() {
+        return lineMatched;
     }
     /*private int processSegment(final boolean inSegment, final LineSegment segment, final OSMNode node, final double directionMultiplier) {
         //only process the segments starting at the origin junction

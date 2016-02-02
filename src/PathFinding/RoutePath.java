@@ -16,7 +16,6 @@ public class RoutePath {
     public final Route route;
     public final List<WaypointPath> allPaths;
     public final List<Path> calculatedPaths;
-    public final WaySegments routeLine;
     public final HashMap<Long, WaySegments> candidateLines;
 
     public enum RouteLogType {
@@ -37,7 +36,6 @@ public class RoutePath {
 
     public RoutePath(final Route route, final HashMap<Long, WaySegments> candidateLines) {
         this.route = route;
-        routeLine = route.routeLine;
         this.candidateLines = candidateLines;
         allPaths = new ArrayList<>(route.stops.size() + 1);
         calculatedPaths = new ArrayList<>(allPaths.size());
@@ -55,7 +53,7 @@ public class RoutePath {
         //start the pathfinding code for each stop pair (TODO: may be able to multithread)
         for(final WaypointPath waypointPath : allPaths) {
             try {
-                waypointPath.findPaths(this);
+                waypointPath.findPaths(this, route.routeLine);
             }catch (Exception e) {
                 e.printStackTrace();
             }
@@ -69,13 +67,16 @@ public class RoutePath {
             final Path bestPath = waypointPath.bestPathTree.bestPath;
             if(bestPath == null) {
                 logEvent(RouteLogType.warning, "No path found between " + waypointPath.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + waypointPath.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
+                lastPath = null;
                 continue;
             } else {
                 logEvent(RouteLogType.info, "SUCCESSFUL PATH found between " + waypointPath.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + waypointPath.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
             }
 
             for(final OSMWay way : bestPath.getPathWays()) {
-                route.routeRelation.addMember(way, "");
+                if(!route.routeRelation.containsMember(way)) {
+                    route.routeRelation.addMember(way, "");
+                }
             }
 
             //check the paths are connected (start/end at same node)
@@ -83,7 +84,7 @@ public class RoutePath {
                 if(lastPath.bestPathTree.bestPath.lastPathSegment.getEndJunction().junctionNode == waypointPath.bestPathTree.bestPath.firstPathSegment.originJunction.junctionNode) {
                     calculatedPaths.add(waypointPath.bestPathTree.bestPath);
                 } else {
-                    logEvent(RouteLogType.warning, "Ends don't match for paths (" + lastPath + ") and (" + waypointPath + ")", this);
+                    logEvent(RouteLogType.warning, "Ends don't match for paths (" + lastPath.bestPathTree.bestPath + ") and (" + waypointPath + ")", this);
                 }
             } else {
                 calculatedPaths.add(waypointPath.bestPathTree.bestPath);

@@ -18,14 +18,12 @@ public class Path {
     }
 
     private final List<PathSegment> pathSegments;
-    public final PathSegment firstPathSegment;
-    public PathSegment lastPathSegment;
+    public PathSegment firstPathSegment, lastPathSegment;
     public PathOutcome outcome = PathOutcome.unknown;
 
-    public Path(final PathSegment startingSegment) {
+    public Path() {
         pathSegments = new ArrayList<>(INITIAL_PATH_SEGMENT_CAPACITY);
-        pathSegments.add(startingSegment);
-        firstPathSegment = lastPathSegment = startingSegment;
+        firstPathSegment = lastPathSegment = null;
     }
     public Path(final Path pathToClone, final PathSegment segmentToAdd) {
         if(pathToClone != null) {
@@ -34,14 +32,21 @@ public class Path {
             firstPathSegment = pathToClone.firstPathSegment;
         } else {
             pathSegments = new ArrayList<>(INITIAL_PATH_SEGMENT_CAPACITY);
-            firstPathSegment = segmentToAdd;
         }
-        pathSegments.add(segmentToAdd);
-        lastPathSegment = segmentToAdd;
+
+        if(segmentToAdd != null) {
+            addPathSegment(segmentToAdd);
+        }
+    }
+    private void addPathSegment(final PathSegment segment) {
+        pathSegments.add(segment);
+        if(firstPathSegment == null) {
+            firstPathSegment = pathSegments.get(0);
+        }
+        lastPathSegment = segment;
     }
     public void markAsSuccessful(final PathSegment lastPathSegment) {
-        pathSegments.add(lastPathSegment);
-        this.lastPathSegment = lastPathSegment;
+        addPathSegment(lastPathSegment);
         outcome = PathOutcome.waypointReached;
     }
     public double getTotalScore() {
@@ -69,7 +74,7 @@ public class Path {
     public String toString() {
         final List<String> streets = new ArrayList<>(pathSegments.size());
         for(final PathSegment segment : pathSegments) {
-            streets.add(segment.line.way.getTag(OSMEntity.KEY_NAME) + "(" + segment.originJunction.junctionNode.osm_id + " to " + segment.getEndJunction().junctionNode.osm_id + ")");
+            streets.add(segment.line.way.getTag(OSMEntity.KEY_NAME) + "(" + segment.line.way.osm_id + ": " + segment.originJunction.junctionNode.osm_id + " to " + (segment.getEndJunction() != null ? segment.getEndJunction().junctionNode.osm_id : "(MATCH-END)")+ ")");
         }
         return String.join("->", streets);
     }

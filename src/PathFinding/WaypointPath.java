@@ -47,10 +47,10 @@ public class WaypointPath {
         possiblePathTrees.add(tempPath);
         bestPathTree = tempPath;
     }
-    public void findPaths(final RoutePath parentPath) {
+    public void findPaths(final RoutePath parentPath, final WaySegments routeLine) {
         //Start finding paths on each path tree (TODO may also be able to multithread?)
         for(final PathTree pathTree : possiblePathTrees) {
-            pathTree.findPaths(parentPath);
+            pathTree.findPaths(parentPath, routeLine);
         }
 
         //and choose the best PathTree out of them
