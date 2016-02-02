@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
+ * Tracks the match status of a line with another line
  * Created by nick on 11/20/15.
  */
 public class LineMatch {
@@ -19,7 +20,7 @@ public class LineMatch {
     public final WaySegments parentLine;
     public final List<SegmentMatch> matchingSegments;
     public int matchingSegmentCount = -1;
-    public List<StopWayMatch> stopMatches = null;
+
     private double avgDotProduct, avgDistance;
 
     public LineMatch(final WaySegments parentLine) {
@@ -65,16 +66,5 @@ public class LineMatch {
     }
     public double getAvgDistance() {
         return avgDistance;
-    }
-
-    /**
-     * Adds the given StopWayMatch to this object
-     * @param stopMatch
-     */
-    public void addStopMatch(final StopWayMatch stopMatch) {
-        if(stopMatches == null) {
-            stopMatches = new ArrayList<>(4);
-        }
-        stopMatches.add(stopMatch);
     }
 }

@@ -48,7 +48,7 @@ public class StopConflator {
             final Region searchRegion = stop.platform.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
             final Point platformCentroid = stop.platform.getCentroid();
             //for(final WaySegments matchingLine : lineComparison.candidateLines.values()) {
-            for(final WaySegments line : routeConflator.getCandidateWaySegments().values()) {
+            for(final WaySegments line : routeConflator.getCandidateLines().values()) {
                 //check the line's bounding box intersects
                 if(!Region.intersects(line.way.getBoundingBox().regionInset(latitudeDelta, longitudeDelta), searchRegion)) {
                     continue;
@@ -151,7 +151,7 @@ public class StopConflator {
             nearestNodeOnWay.setTag(routeConflator.routeType, OSMEntity.TAG_YES); //TODO need proper key mapping (e.g. for subway, light_rail, etc)
 
             //add to the WaySegments object as well
-            bestSegment.parentSegments.matchObject.addStopMatch(match);
+            bestSegment.parentSegments.addStopMatch(match);
 
             //and add the stop position to the stop area
             match.stopEntity.setStopPosition(nearestNodeOnWay);

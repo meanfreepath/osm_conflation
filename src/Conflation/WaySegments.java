@@ -7,6 +7,7 @@ import OSM.Point;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -20,12 +21,12 @@ public class WaySegments {
 
     public final OSMWay way;
     public final List<LineSegment> segments;
-    public final LineMatch matchObject;
+    public final HashMap<Long,LineMatch> lineMatches = new HashMap<>(16);
+    public List<StopWayMatch> stopMatches = null;
     public final OneWayDirection oneWayDirection;
 
     public WaySegments(final OSMWay way, final double maxSegmentLength) {
         this.way = way;
-        matchObject = new LineMatch(this);
         oneWayDirection = determineOneWayDirection(way);
 
         //generate a list of line segments out of this line
@@ -71,6 +72,22 @@ public class WaySegments {
             originNode = destinationNode;
             nodeIndex++;
         }
+    }
+    public void initMatchForLine(final WaySegments otherLine) {
+        if(!lineMatches.containsKey(otherLine.way.osm_id)) {
+            lineMatches.put(otherLine.way.osm_id, new LineMatch(this));
+        }
+    }
+    public void addMatchForLine(final WaySegments otherLine, final SegmentMatch match) {
+        final LineMatch curMatch = lineMatches.get(otherLine.way.osm_id);
+        curMatch.addMatch(match);
+    }
+    public LineMatch getMatchForLine(final WaySegments otherLine) {
+        return lineMatches.get(otherLine.way.osm_id);
+    }
+    public void summarizeMatchesForLine(final WaySegments otherLine) {
+        final LineMatch curMatch = lineMatches.get(otherLine.way.osm_id);
+        curMatch.summarize();
     }
     /**
      * Inserts a node on the given segment, splitting it into two segments
@@ -139,5 +156,15 @@ public class WaySegments {
         final LineSegment newSegment = new LineSegment(this, lastSegment.destinationPoint, node.getCentroid(), lastSegment.destinationNode, node, lastSegment.segmentIndex + 1, lastSegment.nodeIndex + 1);
         segments.add(newSegment);
         way.appendNode(node);
+    }
+    /**
+     * Adds the given StopWayMatch to this object
+     * @param stopMatch
+     */
+    public void addStopMatch(final StopWayMatch stopMatch) {
+        if(stopMatches == null) {
+            stopMatches = new ArrayList<>(4);
+        }
+        stopMatches.add(stopMatch);
     }
 }
