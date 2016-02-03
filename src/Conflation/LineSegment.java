@@ -4,6 +4,7 @@ import OSM.OSMNode;
 import OSM.Point;
 import OSM.Region;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,6 +12,7 @@ import java.util.List;
  * Created by nick on 11/9/15.
  */
 public class LineSegment {
+    private final static DecimalFormat DEBUG_OUTPUT_FORMATTER = new DecimalFormat("#.####");
     public Point originPoint, destinationPoint;
     public OSMNode originNode, destinationNode;
     public final WaySegments parentSegments;
@@ -54,13 +56,13 @@ public class LineSegment {
     }
 
     public void chooseBestMatch() {
-        double minDistanceScore = Double.MAX_VALUE, distanceScore;
+        double minScore = Double.MAX_VALUE, matchScore;
         for(final SegmentMatch match : matchingSegments) {
-            //choose the best match based on their dot product and distance score
-            distanceScore = match.orthogonalDistance * match.orthogonalDistance + match.midPointDistance * match.midPointDistance;
-            if(bestMatch == null || Math.abs(match.dotProduct) >= Math.abs(bestMatch.dotProduct) && distanceScore < minDistanceScore) {
+            //choose the best match based on the product of their dot product and distance score
+            matchScore = (match.orthogonalDistance * match.orthogonalDistance + match.midPointDistance * match.midPointDistance) / Math.max(0.000001, Math.abs(match.dotProduct));
+            if(bestMatch == null || matchScore < minScore) {
                 bestMatch = match;
-                minDistanceScore = distanceScore;
+                minScore = matchScore;
             }
         }
     }
@@ -91,6 +93,6 @@ public class LineSegment {
         return new Point(originPoint.latitude + vectorY * t, originPoint.longitude + vectorX * t);
     }
     public String toString() {
-        return "wayseg " + parentSegments.way.osm_id + " #" + nodeIndex + "/" + segmentIndex + " ([" + originPoint.latitude + "," + originPoint.longitude + "], [" + destinationPoint.latitude + "," + destinationPoint.longitude + "])";
+        return "wayseg " + parentSegments.way.osm_id + " #" + nodeIndex + "/" + segmentIndex + " ([" + DEBUG_OUTPUT_FORMATTER.format(originPoint.latitude) + "," + DEBUG_OUTPUT_FORMATTER.format(originPoint.longitude) + "], [" + DEBUG_OUTPUT_FORMATTER.format(destinationPoint.latitude) + "," + DEBUG_OUTPUT_FORMATTER.format(destinationPoint.longitude) + "])";
     }
 }
