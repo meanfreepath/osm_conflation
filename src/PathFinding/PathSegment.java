@@ -1,8 +1,6 @@
 package PathFinding;
 
 import Conflation.LineSegment;
-import Conflation.StopArea;
-import Conflation.StopWayMatch;
 import Conflation.WaySegments;
 import OSM.OSMEntity;
 import OSM.OSMNode;
@@ -17,13 +15,14 @@ import java.util.ListIterator;
  * Created by nick on 1/27/16.
  */
 public class PathSegment {
-    private final static double SCORE_FOR_DETOUR = -40.0, SCORE_FOR_STOP_ON_WAY = 100.0, SCORE_FOR_ALIGNMENT = 1.0, SCORE_FOR_TRAVEL_DIRECTION = 50.0, SCORE_FACTOR_FOR_CORRECT_ONEWAY_TRAVEL = 2.0, SCORE_FACTOR_FOR_INCORRECT_ONEWAY_TRAVEL = 0.5,  SCORE_FACTOR_FOR_NON_ONEWAY_TRAVEL = 1.0;
+    private final static double SCORE_FOR_DETOUR = -40.0, SCORE_FOR_STOP_ON_WAY = 100.0, SCORE_FOR_ALIGNMENT = 1.0, SCORE_FOR_TRAVEL_DIRECTION = 50.0, SCORE_FACTOR_FOR_CORRECT_ONEWAY_TRAVEL = 2.0, SCORE_FACTOR_FOR_INCORRECT_ONEWAY_TRAVEL = -2.0, SCORE_FACTOR_FOR_NON_ONEWAY_TRAVEL = 1.0;
     public final Junction originJunction;
     private Junction endJunction;
     public final WaySegments line;
     public final String id;
-    public double pathScore, waypointScore;
-    public double alignedPathLength = 0.0; //the length of segments this path aligns with
+    private double traveledSegmentLength, alignedPathLength = 0.0; //the length of segments this path aligns with
+    private int traveledSegmentCount = 0, alignedSegmentCount = 0;
+    public double lengthFactor, pathScore, waypointScore;
     private boolean containsPathOriginNode = false, containsPathDestinationNode = false;
     /**
      * Whether the contained line has a good enough match to process
@@ -46,6 +45,8 @@ public class PathSegment {
     public void determineScore(final RoutePath parentPath, final OSMNode initialOriginNode, final OSMNode finalDestinationNode) {
         //System.out.println("Segment of " + line.way.getTag("name") + " (" + line.way.osm_id + "): from " + originJunction.junctionNode.osm_id + " (traveling " + (line.matchObject.getAvgDotProduct() >= 0.0 ? "forward" : "backward") + ")");
         lineMatched = false;
+
+        final int debugWayId = 368670627;
 
         //determine the direction of this line relative to the direction of route travel
         final List<OSMNode> segmentNodes = new ArrayList<>(line.way.getNodes().size());
@@ -79,12 +80,18 @@ public class PathSegment {
                         continue;
                     }
                 }
+                traveledSegmentLength += segment.length;
+                traveledSegmentCount++;
                 //System.out.println("segment " + line.way.getTag("name") + ":" + (segment.originNode != null? segment.originNode.osm_id : "N/A") + "/" + (segment.destinationNode != null? segment.destinationNode.osm_id + " - " + segment.destinationNode.containingWays.size() + " containing ways" : "N/A"));
 
-                //sum up the scode
+                //sum up the score
                 if(segment.bestMatch != null) {
                     pathScore += directionMultiplier * SCORE_FOR_ALIGNMENT * Math.abs(segment.bestMatch.dotProduct) / segment.bestMatch.midPointDistance;
                     alignedPathLength += segment.length;
+                    alignedSegmentCount++;
+                    if(line.way.osm_id == debugWayId) {
+                        System.out.println("WAY:: " + line.way.osm_id + "/SEG " + segment.bestMatch + ": dm " + directionMultiplier + "/dp " + segment.bestMatch.dotProduct + "/dist " + segment.bestMatch.midPointDistance);
+                    }
                 }
 
                 //flag whether this PathSegment contains the origin node for the entire path
@@ -119,6 +126,7 @@ public class PathSegment {
             final ListIterator<LineSegment> iterator = line.segments.listIterator(line.segments.size());
             while (iterator.hasPrevious()) {
                 final LineSegment segment = iterator.previous();
+
                 //only process the segments starting at the origin junction
                 if(!inSegment) {
                     if(segment.destinationNode == originJunction.junctionNode) {
@@ -127,11 +135,17 @@ public class PathSegment {
                         continue;
                     }
                 }
+                traveledSegmentLength += segment.length;
+                traveledSegmentCount++;
 
                 //System.out.println("segment " + line.way.getTag("name") + ":" + (segment.destinationNode != null? segment.destinationNode.osm_id : "N/A") + "/" + (segment.originNode != null? segment.originNode.osm_id : "N/A"));
                 if(segment.bestMatch != null) {
                     pathScore += directionMultiplier * SCORE_FOR_ALIGNMENT * Math.abs(segment.bestMatch.dotProduct) / segment.bestMatch.midPointDistance;
+                    if(line.way.osm_id == debugWayId) {
+                        System.out.println("WAY:: " + line.way.osm_id + "/SEG " + segment.bestMatch + ": dm " + directionMultiplier + "/dp " + segment.bestMatch.dotProduct + "/dist " + segment.bestMatch.midPointDistance);
+                    }
                     alignedPathLength += segment.length;
+                    alignedSegmentCount++;
                 }
 
                 //flag whether this PathSegment contains the origin node for the entire path
@@ -158,17 +172,20 @@ public class PathSegment {
         }
 
         //if endJunction wasn't created above, this is a dead-end PathSegment
-        if(endJunction == null) {
-            endJunction = new Junction(lastNode, this);
+        if(endJunction != null) {
+            lineMatched = true;
+            pathScore /= alignedSegmentCount;
+            lengthFactor = alignedPathLength / traveledSegmentLength;
+        } else {
+            lengthFactor = 0.0;
         }
 
-        //System.out.println("PROCESSED Segment of " + line.way.getTag("name") + " (" + line.way.osm_id + "): " + originJunction.junctionNode.osm_id + "->" + endJunction.junctionNode.osm_id);
+        //System.out.println("PROCESSED Segment of " + line.way.getTag("name") + " (" + line.way.osm_id + "): " + originJunction.junctionNode.osm_id + "->" + endJunction.junctionNode.osm_id + ", length: " + Math.round(100.0 * alignedPathLength / traveledSegmentLength) + "%, score " + getScore());
 
         //if this segment is the root segment of a Path, default its originating node to the "first" (based on our direction of travel) node on the path
         /*if(parentPathSegment == null && originatingNode == null) {
             originatingNode = firstNode;
         }*/
-        lineMatched = true;
     }
     public boolean isLineMatchedWithRoutePath() {
         return lineMatched;
@@ -219,7 +236,7 @@ public class PathSegment {
         return directionMultiplier;
     }
     public double getScore() {
-        return pathScore + waypointScore;
+        return lengthFactor * pathScore + waypointScore;
     }
     public boolean containsPathOriginNode() {
         return containsPathOriginNode;
@@ -229,5 +246,8 @@ public class PathSegment {
     }
     public Junction getEndJunction() {
         return endJunction;
+    }
+    public String toString() {
+        return "PathSegment " + line.way.getTag(OSMEntity.KEY_NAME) + " (" + line.way.osm_id + ": " + originJunction.junctionNode.osm_id + "->" + (endJunction != null ? endJunction.junctionNode.osm_id : "MatchEnd") + ")";
     }
 }

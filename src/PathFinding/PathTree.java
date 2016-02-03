@@ -21,7 +21,7 @@ public class PathTree {
             return o1.getTotalScore() > o2.getTotalScore() ? -1 : 1;
         }
     };
-    private final static double scoreThresholdToProcessPathSegment = 0.1;
+    private final static double scoreThresholdToProcessPathSegment = 0.05;
 
     public final OSMNode fromNode, toNode;
     public final WaySegments fromLine, toLine;
@@ -58,7 +58,7 @@ public class PathTree {
 
         int processedSegments = 0;
         for(final Junction.JunctionSegmentStatus segmentStatus : startingJunction.junctionPathSegments) {
-            parentPath.logEvent(RoutePath.RouteLogType.info, "Junction " + startingJunction.junctionNode.osm_id + ": score for PathSegment " + segmentStatus.segment.line.way.getTag(OSMEntity.KEY_NAME) + "(" + segmentStatus.segment.line.way.osm_id + "): " + segmentStatus.segment.getScore() + ", STATUS " + segmentStatus.processStatus.name(), this);
+            parentPath.logEvent(RoutePath.RouteLogType.info, "Junction " + startingJunction.junctionNode.osm_id + ": " + segmentStatus.segment + ": " +  Math.round(100.0 * segmentStatus.segment.pathScore)/100.0 + "/" + Math.round(100.0 * segmentStatus.segment.lengthFactor)/100.0 + "/" + Math.round(100.0 * segmentStatus.segment.waypointScore)/100.0 + "=" + Math.round(segmentStatus.segment.getScore())/100.0 + ", STATUS " + segmentStatus.processStatus.name(), this);
             if(segmentStatus.processStatus != Junction.ProcessStatus.yes) {
                 continue;
             }
@@ -122,6 +122,7 @@ public class PathTree {
 
             final Junction.JunctionSegmentStatus segmentStatus = new Junction.JunctionSegmentStatus(wayPathSegment);
             if(wayPathSegment.isLineMatchedWithRoutePath()) {
+                //if(wayPathSegment.)
                 if (wayPathSegment.getScore() >= scoreThresholdToProcessPathSegment) {
                     segmentStatus.processStatus = Junction.ProcessStatus.yes;
                 } else {
@@ -162,18 +163,6 @@ public class PathTree {
 
         //get the closest segment on the routeLine to fromNode
         fromLine.getMatchForLine(routeLine).getAvgDotProduct();
-
-        //iterate over the line's nodes in the direction of travel
-
-        //if a junction node is found, create PathSegment objects for each way, and evaluate them
-
-        //choose the best option and continue down that path
-
-        //if the best option dead ends, back out to the last junction with an untraveled match and repeat again
-
-
-        //pathfinding ends when we reach toNode
-
 
 
         //we then determine the best path based on score (TODO maybe try shortcuts etc here)
