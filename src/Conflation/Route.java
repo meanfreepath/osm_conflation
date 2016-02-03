@@ -127,7 +127,7 @@ public class Route {
                 OSMEntity.copyTag(matchingSegment.parentSegments.way, matchingSegmentWay, OSMEntity.KEY_NAME);
                 OSMEntity.copyTag(matchingSegment.parentSegments.way, matchingSegmentWay, OSMEntity.KEY_NAME);
                 if(matchingSegment.bestMatch != null) {
-                    matchingSegmentWay.setTag("note", "With: " + matchingSegment.bestMatch.mainSegment + ", DP: " + format.format(matchingSegment.bestMatch.dotProduct) + ", DIST: " + format.format(matchingSegment.bestMatch.orthogonalDistance));
+                    matchingSegmentWay.setTag("note", "With: " + matchingSegment.bestMatch.mainSegment + ", DP: " + format.format(matchingSegment.bestMatch.dotProduct) + ", DIST: " + format.format(matchingSegment.bestMatch.orthogonalDistance) + "/" + format.format(matchingSegment.bestMatch.midPointDistance));
                 } else {
                     matchingSegmentWay.setTag("note", "No matches");
                     matchingSegmentWay.setTag("tiger:reviewed", "no");

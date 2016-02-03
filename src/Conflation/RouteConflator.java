@@ -265,7 +265,7 @@ public class RouteConflator {
         return regions;
     }
     public void conflateRoutePaths(final StopConflator stopMatcher) {
-        final int debugRouteId = -920;
+        final int debugRouteId = -1214  ;
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (route.routeRelation.osm_id != debugRouteId) {
@@ -318,6 +318,10 @@ public class RouteConflator {
             }
             final RoutePath routePath = new RoutePath(route, candidateLines);
             routePath.findPaths();//*/
+            if(routePath.getFailedPaths() > 0) {
+                workingEntitySpace.addEntity(route.routePath, OSMEntity.TagMergeStrategy.keepTags, null);
+                route.routeRelation.addMember(route.routePath, "");
+            }
 
             //and add the stops data to the OSMRelation for the route
             route.syncStopsWithRelation();
