@@ -22,7 +22,7 @@ public class Main {
         options.boundingBoxSize = 50.0;
         options.maxSegmentLength = 10.0;
         options.setMaxSegmentAngle(10.0);
-        options.maxSegmentOrthogonalDistance = 1.0 * options.maxSegmentLength;
+        options.maxSegmentOrthogonalDistance = 3.0 * options.maxSegmentLength;
         options.maxSegmentMidPointDistance = 4.0 * options.maxSegmentLength;
 
         //propagate the debug value as needed
