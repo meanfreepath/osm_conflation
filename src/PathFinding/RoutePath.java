@@ -17,6 +17,7 @@ public class RoutePath {
     public final List<WaypointPath> allPaths;
     public final List<Path> calculatedPaths;
     public final HashMap<Long, WaySegments> candidateLines;
+    private int successfulPaths = 0, failedPaths = 0;
 
     public enum RouteLogType {
         info, notice, warning, error
@@ -25,9 +26,11 @@ public class RoutePath {
         public final RouteLogType type;
         public final String message;
         public final Date logTime;
+        public final Object sender;
         public RouteLog(final RouteLogType type, final String message, final Object sender) {
             this.type = type;
             this.message = message;
+            this.sender = sender;
             logTime = new Date();
             System.out.println(logTime.toString() + ": " + type.name() + ": " + message);
         }
@@ -63,13 +66,21 @@ public class RoutePath {
 
         //and consolidate into a single path
         WaypointPath lastPath = null;
+        successfulPaths = failedPaths = 0;
         for(final WaypointPath waypointPath : allPaths) {
             final Path bestPath = waypointPath.bestPathTree.bestPath;
             if(bestPath == null) {
                 logEvent(RouteLogType.warning, "No path found between " + waypointPath.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + waypointPath.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
                 lastPath = null;
+                for(final PathTree pathTree : waypointPath.possiblePathTrees) {
+                    for (final RouteLog event : eventLogsForObject(pathTree, null)) {
+                        System.out.println("\t" + event.message);
+                    }
+                }
+                failedPaths++;
                 continue;
             } else {
+                successfulPaths++;
                 logEvent(RouteLogType.info, "SUCCESSFUL PATH found between " + waypointPath.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + waypointPath.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
             }
 
@@ -100,5 +111,28 @@ public class RoutePath {
     }
     public void logEvent(final RouteLogType type, final String message, final Object sender) {
         logs.add(new RouteLog(type, message, sender));
+    }
+    public List<RouteLog> eventLogsForObject(final Object object, final RouteLogType types[]) {
+        final List<RouteLog> matchingLogs = new ArrayList<>(logs.size());
+        for(final RouteLog log : logs) {
+            if(log.sender == object) {
+                if(types == null) {
+                    matchingLogs.add(log);
+                } else {
+                    for(final RouteLogType type : types) {
+                        if(log.type == type) {
+                            matchingLogs.add(log);
+                        }
+                    }
+                }
+            }
+        }
+        return matchingLogs;
+    }
+    public int getSuccessfulPaths() {
+        return successfulPaths;
+    }
+    public int getFailedPaths() {
+        return failedPaths;
     }
 }

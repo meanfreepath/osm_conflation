@@ -105,7 +105,7 @@ public class PathTree {
             if(junction.originatingPathSegment == wayPathSegment) {
                 continue;
             }
-            wayPathSegment.determineScore(parentPath, routeLine, fromNode, toNode);
+            wayPathSegment.determineScore(parentPath, fromNode, toNode);
 
             //if wayPathSegment contains toNode, we've found a successful path.  Mark it and bail
             if(wayPathSegment.containsPathDestinationNode()) {
