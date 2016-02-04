@@ -155,7 +155,7 @@ public class RouteConflator {
         //create WaySegments objects for all downloaded ways
         candidateLines = new HashMap<>(workingEntitySpace.allWays.size());
         for(final OSMWay way : workingEntitySpace.allWays.values()) {
-            candidateLines.put(way.osm_id, new WaySegments(way, wayMatchingOptions.maxSegmentLength));
+            candidateLines.put(way.osm_id, new WaySegments(way, WaySegments.LineType.osmLine, wayMatchingOptions.maxSegmentLength));
         }
 
         return true;
@@ -264,7 +264,7 @@ public class RouteConflator {
         }
         return regions;
     }
-    public void conflateRoutePaths(final StopConflator stopMatcher) {
+    public void conflateRoutePaths(final StopConflator stopConflator) {
         final int debugRouteId = -1214  ;
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
@@ -310,6 +310,12 @@ public class RouteConflator {
             }
             System.out.println("Matched lines in " + (new Date().getTime() - timeStartLineComparison) + "ms");
         }
+
+        //update the route's stop matches to include the match info on the OSM ways
+        final long timeStartStopMatching = new Date().getTime();
+        stopConflator.matchStopsToWays();
+        stopConflator.createStopPositionsForPlatforms(workingEntitySpace);
+        System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
 
         //with the candidate lines determined, begin the pathfinding stage to lock down the path between the route's stops
         for(final Route route : exportRoutes) {

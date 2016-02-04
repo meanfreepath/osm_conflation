@@ -18,15 +18,20 @@ public class WaySegments {
     public enum OneWayDirection {
         none, forward, backward
     }
+    public enum LineType {
+        routeLine, osmLine
+    }
 
     public final OSMWay way;
+    public final LineType lineType;
     public final List<LineSegment> segments;
     public final HashMap<Long,LineMatch> lineMatches = new HashMap<>(16);
     public List<StopWayMatch> stopMatches = null;
     public final OneWayDirection oneWayDirection;
 
-    public WaySegments(final OSMWay way, final double maxSegmentLength) {
+    public WaySegments(final OSMWay way, final LineType type, final double maxSegmentLength) {
         this.way = way;
+        this.lineType = type;
         oneWayDirection = determineOneWayDirection(way);
 
         //generate a list of line segments out of this line

@@ -30,7 +30,6 @@ public class StopConflator {
         final double latitudeDelta = -StopWayMatch.maxDistanceFromPlatformToWay / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * routeConflator.roughCentroid.latitude / 180.0);
 
         //loop through the route's stops, determining the best-matching way for each one
-        int stopIndex = 0;
         for(final StopArea stop : routeConflator.getAllRouteStops()) {
             //get the stop's name components, to see if we can use the name to match to a nearby way
             final String stopName = stop.platform.getTag(OSMEntity.KEY_NAME);

@@ -60,13 +60,7 @@ public class Main {
                 final StopConflator stopConflator = new StopConflator(routeConflator);
                 stopConflator.conflateStops(20.0);
 
-                //also, match the stops in the relation to their nearest matching way
-                final long timeStartStopMatching = new Date().getTime();
-                stopConflator.matchStopsToWays();
-                stopConflator.createStopPositionsForPlatforms(workingEntitySpace);
-                System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
-
-                //and match the subroutes' routePath to the downloaded OSM ways
+                //and match the subroutes' routePath to the downloaded OSM ways.  Also matches the stops in the route to their nearest matching way
                 routeConflator.conflateRoutePaths(stopConflator);
 
                 /*for(final Route route : routeConflator.getExportRoutes()) {

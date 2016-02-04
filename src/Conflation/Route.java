@@ -28,7 +28,7 @@ public class Route {
         final List<OSMRelation.OSMRelationMember> members = routeRelation.getMembers("");
         routePath = (OSMWay) members.get(0).member;
         routePath.setTag("gtfs:ignore", "yes");
-        routeLine = new WaySegments(routePath, wayMatchingOptions.maxSegmentLength);
+        routeLine = new WaySegments(routePath, WaySegments.LineType.routeLine, wayMatchingOptions.maxSegmentLength);
 
         final List<OSMRelation.OSMRelationMember> routeStops = routeRelation.getMembers(OSMEntity.TAG_PLATFORM);
         stops = new ArrayList<>(routeStops.size());
@@ -40,7 +40,7 @@ public class Route {
         routeRelation = newEntitySpace.createRelation(oldRoute.routeRelation.getTags(), null);
         routeType = routeRelation.getTag(OSMEntity.KEY_TYPE);
         routePath = oldRoute.routePath; //NOTE: not added to new route's entity space!
-        routeLine = new WaySegments(routePath, wayMatchingOptions.maxSegmentLength);
+        routeLine = new WaySegments(routePath, WaySegments.LineType.routeLine, wayMatchingOptions.maxSegmentLength);
 
         //add the imported route's stops to the new entity space
         this.stops = stops;

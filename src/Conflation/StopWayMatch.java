@@ -1,5 +1,7 @@
 package Conflation;
 
+import OSM.OSMEntity;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -9,20 +11,11 @@ import java.util.List;
  * Created by nick on 11/19/15.
  */
 public class StopWayMatch {
-    public final static double maxDistanceFromPlatformToWay = 25.0, stopNodeTolerance = 3.0, minMatchingSegmentPathDotProduct = 0.7;
+    public final static double maxDistanceFromPlatformToWay = 25.0, stopNodeTolerance = 3.0;
     private final static Comparator<WayMatch> comp = new Comparator<WayMatch>() {
         @Override
         public int compare(final WayMatch o1, final WayMatch o2) {
-            if(o1.matchType == MatchType.primaryStreet) { //prioritize name matches
-                if(o2.matchType == MatchType.primaryStreet) {
-                    return o1.distance < o2.distance ? -1 : 1;
-                }
-                return -1;
-            } else if(o2.matchType == MatchType.primaryStreet) {
-                return 1;
-            } else {
-                return o1.distance < o2.distance ? -1 : 1;
-            }
+            return o1.getScore() < o2.getScore() ? 1 : -1;
         }
     };
     public enum MatchType {
@@ -38,6 +31,29 @@ public class StopWayMatch {
             this.candidateSegmentMatch = segmentMatch;
             this.distance = distance;
             this.matchType = matchType;
+        }
+        public double getScore() {
+            final double dpFactor, odFactor;
+            if(candidateSegmentMatch.bestMatch != null) {
+                dpFactor = candidateSegmentMatch.bestMatch.dotProduct;
+                odFactor = candidateSegmentMatch.bestMatch.orthogonalDistance;
+            } else {
+                dpFactor = 0.01;
+                odFactor = maxDistanceFromPlatformToWay;
+            }
+            return scoreFactorForMatchType(matchType) + dpFactor * 5.0 +  1.0 / (odFactor * distance);
+        }
+        public double scoreFactorForMatchType(MatchType type) {
+            switch (type) {
+                case primaryStreet: //prioritize name matches
+                    return 100.0;
+                case crossStreet:
+                    return 50.0;
+                case proximity:
+                    return 25.0;
+                default:
+                    return 0.0;
+            }
         }
     }
 
@@ -57,21 +73,18 @@ public class StopWayMatch {
     }
     public void chooseBestMatch() {
         if(matches.size() == 0) {
+            //System.out.println("NOMATCH: " + stopEntity.platform.getTag("name"));
             return;
         }
         Collections.sort(matches, comp);
         bestMatch = matches.get(0);
 
         //System.out.println("Platform: " + firstMatch.platformNode.getTag("name") + ":::");
-        /*for(final WayMatch otherMatch : matches) {
-            if(otherMatch.matchType == StopWayMatch.MatchType.primaryStreet) { //always use the primary street (based off the name) as the best match
-                bestMatch = otherMatch;
-                break;
+        System.out.println("Platform: " + stopEntity.platform.getTag("name") + ":: on " + bestMatch.candidateSegmentMatch.parentSegments.way.getTag(OSMEntity.KEY_NAME) + "(" + bestMatch.candidateSegmentMatch.parentSegments.way.osm_id + ") with score " + bestMatch.getScore());
+        if(bestMatch.getScore() < 100.0) {
+            for (final WayMatch otherMatch : matches) {
+                System.out.println("\tALTMATCHES: " + stopEntity.platform.getTag("name") + ":: on " + otherMatch.candidateSegmentMatch.parentSegments.way.getTag(OSMEntity.KEY_NAME) + "(" + otherMatch.candidateSegmentMatch.parentSegments.way.osm_id + ") with score " + otherMatch.getScore());
             }
-
-            //the next-best match is the closest way
-            bestMatch = otherMatch;
-        }*/
-        //System.out.println("Platform: " + stopEntity.platform.getTag("name") + ":: on " + bestMatch.candidateSegmentMatch.parentSegments.way.getTag("name"));
+        }
     }
 }
