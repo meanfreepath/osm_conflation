@@ -13,7 +13,7 @@ import java.util.List;
  */
 public class LineSegment {
     private final static DecimalFormat DEBUG_OUTPUT_FORMATTER = new DecimalFormat("#.####");
-    public Point originPoint, destinationPoint;
+    public Point originPoint, midPoint, destinationPoint;
     public OSMNode originNode, destinationNode;
     public final WaySegments parentSegments;
 
@@ -48,6 +48,7 @@ public class LineSegment {
 
         midPointX = origin.longitude + 0.5 * vectorX;
         midPointY = origin.latitude + 0.5 * vectorY;
+        midPoint = new Point(midPointY, midPointX);
 
         length = Point.distance(vectorY, vectorX);
     }
