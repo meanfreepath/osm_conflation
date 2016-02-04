@@ -26,7 +26,6 @@ public class WaySegments {
     public final LineType lineType;
     public final List<LineSegment> segments;
     public final HashMap<Long,LineMatch> lineMatches = new HashMap<>(16);
-    public List<StopWayMatch> stopMatches = null;
     public final OneWayDirection oneWayDirection;
 
     public WaySegments(final OSMWay way, final LineType type, final double maxSegmentLength) {
@@ -161,15 +160,5 @@ public class WaySegments {
         final LineSegment newSegment = new LineSegment(this, lastSegment.destinationPoint, node.getCentroid(), lastSegment.destinationNode, node, lastSegment.segmentIndex + 1, lastSegment.nodeIndex + 1);
         segments.add(newSegment);
         way.appendNode(node);
-    }
-    /**
-     * Adds the given StopWayMatch to this object
-     * @param stopMatch
-     */
-    public void addStopMatch(final StopWayMatch stopMatch) {
-        if(stopMatches == null) {
-            stopMatches = new ArrayList<>(4);
-        }
-        stopMatches.add(stopMatch);
     }
 }

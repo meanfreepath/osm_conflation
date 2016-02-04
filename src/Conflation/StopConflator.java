@@ -149,9 +149,6 @@ public class StopConflator {
             nearestNodeOnWay.setTag(OSMEntity.KEY_PUBLIC_TRANSPORT, OSMEntity.TAG_STOP_POSITION);
             nearestNodeOnWay.setTag(routeConflator.routeType, OSMEntity.TAG_YES); //TODO need proper key mapping (e.g. for subway, light_rail, etc)
 
-            //add to the WaySegments object as well
-            bestSegment.parentSegments.addStopMatch(match);
-
             //and add the stop position to the stop area
             match.stopEntity.setStopPosition(nearestNodeOnWay);
 
