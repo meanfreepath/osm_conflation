@@ -25,7 +25,7 @@ public class StopArea {
     public final Region nearbyWaySearchRegion;
 
     public enum SegmentMatchType {
-        none, primaryStreet, crossStreet, proximityToOSMWay, proximityToRouteLine
+        none, primaryStreet, crossStreet, proximityToOSMWay
     }
 
     public class StopWayMatch {
@@ -38,22 +38,6 @@ public class StopArea {
                 this.candidateSegment = segment;
                 this.distance = distance;
                 this.matchType = matchType;
-            }
-            public double getScore() {
-                final double dpFactor, odFactor;
-                if(candidateSegment.bestMatch != null) {
-                    dpFactor = candidateSegment.bestMatch.dotProduct;
-                    odFactor = candidateSegment.bestMatch.orthogonalDistance;
-                } else {
-                    dpFactor = 0.01;
-                    odFactor = maxDistanceFromPlatformToWay;
-                }
-                nameScore = scoreFactorForMatchType(matchType);
-                dpScore = dpFactor * 5.0;
-                distanceScore = 1.0 / (odFactor * distance);
-
-                System.out.println("SCORE: " + platform.getTag("name") + "(" + platform.getTag("ref") + "):: on " + candidateSegment.parentSegments.way.getTag(OSMEntity.KEY_NAME) + "(" + candidateSegment.parentSegments.way.osm_id + ") with score " + nameScore + "/" + dpScore + "(" + dpFactor + ")/" + distanceScore + "(" + odFactor + "): " +  (nameScore + dpScore + distanceScore));
-                return nameScore + dpScore + distanceScore;
             }
         }
 
@@ -77,14 +61,14 @@ public class StopArea {
             for(final StopSegmentMatch segmentMatch : stopSegmentMatches) {
                 final double dpFactor, odFactor;
                 if(segmentMatch.candidateSegment.bestMatch != null) {
-                    dpFactor = segmentMatch.candidateSegment.bestMatch.dotProduct;
+                    dpFactor = Math.abs(segmentMatch.candidateSegment.bestMatch.dotProduct);
                     odFactor = segmentMatch.candidateSegment.bestMatch.orthogonalDistance;
                 } else {
                     dpFactor = 0.01;
                     odFactor = maxDistanceFromPlatformToWay;
                 }
 
-                dpScore += dpFactor * 5.0 * scoreFactorForMatchType(segmentMatch.matchType);
+                dpScore += dpFactor * scoreFactorForMatchType(segmentMatch.matchType);
                 distanceScore += 1.0 / (odFactor * segmentMatch.distance) * scoreFactorForMatchType(segmentMatch.matchType);
             }
 
@@ -167,10 +151,8 @@ public class StopArea {
                 return 100.0;
             case crossStreet:
                 return 50.0;
-            case proximityToRouteLine:
-                return 25.0;
             case proximityToOSMWay:
-                return 20.0;
+                return 5.0;
             default:
                 return 0.0;
         }
