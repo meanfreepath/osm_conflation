@@ -14,7 +14,7 @@ import java.util.*;
  */
 public class RoutePath {
     public final Route route;
-    public final List<WaypointPath> allPaths;
+    public final List<PathTree> allPathTrees;
     public final List<Path> calculatedPaths;
     public final HashMap<Long, WaySegments> candidateLines;
     private int successfulPaths = 0, failedPaths = 0;
@@ -40,23 +40,23 @@ public class RoutePath {
     public RoutePath(final Route route, final HashMap<Long, WaySegments> candidateLines) {
         this.route = route;
         this.candidateLines = candidateLines;
-        allPaths = new ArrayList<>(route.stops.size() + 1);
-        calculatedPaths = new ArrayList<>(allPaths.size());
+        allPathTrees = new ArrayList<>(route.stops.size() + 1);
+        calculatedPaths = new ArrayList<>(allPathTrees.size());
 
         //get the stop matches from the route, creating a new
         StopArea lastStop = null;
         for(final StopArea curStop : route.stops) {
             if(lastStop != null) {
-                allPaths.add(new WaypointPath(lastStop, curStop));
+                allPathTrees.add(new PathTree(lastStop, curStop));
             }
             lastStop = curStop;
         }
     }
     public void findPaths() {
         //start the pathfinding code for each stop pair (TODO: may be able to multithread)
-        for(final WaypointPath waypointPath : allPaths) {
+        for(final PathTree pathTree : allPathTrees) {
             try {
-                waypointPath.findPaths(this, route.routeLine);
+                pathTree.findPaths(this, route.routeLine);
             }catch (Exception e) {
                 e.printStackTrace();
             }
@@ -65,23 +65,21 @@ public class RoutePath {
         }
 
         //and consolidate into a single path
-        WaypointPath lastPath = null;
+        PathTree lastPath = null;
         successfulPaths = failedPaths = 0;
-        for(final WaypointPath waypointPath : allPaths) {
-            final Path bestPath = waypointPath.bestPathTree.bestPath;
+        for(final PathTree pathTree : allPathTrees) {
+            final Path bestPath = pathTree.bestPath;
             if(bestPath == null) {
-                logEvent(RouteLogType.warning, "No path found between " + waypointPath.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + waypointPath.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
+                logEvent(RouteLogType.warning, "NO PATH found between " + pathTree.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + pathTree.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
                 lastPath = null;
-                for(final PathTree pathTree : waypointPath.possiblePathTrees) {
-                    for (final RouteLog event : eventLogsForObject(pathTree, null)) {
-                        System.out.println("\t" + event.message);
-                    }
+                for (final RouteLog event : eventLogsForObject(pathTree, null)) {
+                    System.out.println("\t" + event.message);
                 }
                 failedPaths++;
                 continue;
             } else {
                 successfulPaths++;
-                logEvent(RouteLogType.info, "SUCCESSFUL PATH found between " + waypointPath.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + waypointPath.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
+                logEvent(RouteLogType.info, "SUCCESSFUL PATH found between " + pathTree.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + pathTree.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
             }
 
             for(final OSMWay way : bestPath.getPathWays()) {
@@ -92,16 +90,16 @@ public class RoutePath {
 
             //check the paths are connected (start/end at same node)
             if(lastPath != null) {
-                if(lastPath.bestPathTree.bestPath.lastPathSegment.getEndJunction().junctionNode == waypointPath.bestPathTree.bestPath.firstPathSegment.originJunction.junctionNode) {
-                    calculatedPaths.add(waypointPath.bestPathTree.bestPath);
+                if(lastPath.bestPath.lastPathSegment.getEndJunction().junctionNode == pathTree.bestPath.firstPathSegment.originJunction.junctionNode) {
+                    calculatedPaths.add(pathTree.bestPath);
                 } else {
-                    logEvent(RouteLogType.warning, "Ends don't match for paths (" + lastPath.bestPathTree.bestPath + ") and (" + waypointPath + ")", this);
+                    logEvent(RouteLogType.warning, "Ends don't match for paths (" + lastPath.bestPath + ") and (" + pathTree.bestPath + ")", this);
                 }
             } else {
-                calculatedPaths.add(waypointPath.bestPathTree.bestPath);
+                calculatedPaths.add(pathTree.bestPath);
             }
 
-            lastPath = waypointPath;
+            lastPath = pathTree;
         }
 
         //split ways as needed

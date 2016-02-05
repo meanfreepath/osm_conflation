@@ -23,11 +23,13 @@ public class PathTree {
     };
     private final static double scoreThresholdToProcessPathSegment = 3.0;
 
+    public final StopArea fromStop, toStop;
     public final OSMNode fromNode, toNode;
     public final WaySegments fromLine, toLine;
 
     public final List<Path> candidatePaths = new ArrayList<>(MAX_PATHS_TO_CONSIDER);
     public Path bestPath = null;
+    public static boolean debugEnabled = false;
 
     private class PathIterationException extends Exception {
         public PathIterationException(final String message) {
@@ -35,11 +37,14 @@ public class PathTree {
         }
     }
 
-    public PathTree(final OSMNode fromNode, final OSMNode toNode, final WaySegments fromLine, final WaySegments toLine) {
-        this.fromNode = fromNode;
-        this.toNode = toNode;
-        this.fromLine = fromLine;
-        this.toLine = toLine;
+    //public PathTree(final OSMNode fromNode, final OSMNode toNode, final WaySegments fromLine, final WaySegments toLine) {
+    public PathTree(final StopArea fromStop, final StopArea toStop) {
+        this.fromStop = fromStop;
+        this.toStop = toStop;
+        fromNode = fromStop.getStopPosition();
+        toNode = toStop.getStopPosition();
+        fromLine = fromStop.bestWayMatch.line;
+        toLine = toStop.bestWayMatch.line;
     }
     private void iteratePath(final Junction startingJunction, final WaySegments routeLine, final RoutePath parentPath, final Path curPath) throws PathIterationException {
         //bail if the junction indicates there's no need to continue processing
@@ -168,4 +173,5 @@ public class PathTree {
         //we then determine the best path based on score (TODO maybe try shortcuts etc here)
         //bestPath =
     }
+    //public void splitWaysAtIntersections
 }
