@@ -1,4 +1,4 @@
-package com.company;
+package Conflation;
 
 import OSM.OSMEntity;
 import OSM.OSMNode;
@@ -7,6 +7,7 @@ import OSM.Point;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -17,21 +18,23 @@ public class WaySegments {
     public enum OneWayDirection {
         none, forward, backward
     }
+    public enum LineType {
+        routeLine, osmLine
+    }
 
     public final OSMWay way;
+    public final LineType lineType;
     public final List<LineSegment> segments;
-    public final LineMatch matchObject;
-    private final boolean debug;
+    public final HashMap<Long,LineMatch> lineMatches = new HashMap<>(16);
     public final OneWayDirection oneWayDirection;
 
-    public WaySegments(final OSMWay way, final double maxSegmentLength, boolean debug) {
+    public WaySegments(final OSMWay way, final LineType type, final double maxSegmentLength) {
         this.way = way;
-        this.debug = debug;
-        matchObject = new LineMatch(this);
+        this.lineType = type;
         oneWayDirection = determineOneWayDirection(way);
 
         //generate a list of line segments out of this line
-        segments = new ArrayList<>(way.getNodes().size() - 1); //TODO base on total line length, to handle the newly
+        segments = new ArrayList<>(way.getNodes().size() - 1); //TODO base on total line length, to handle the newly-created segments
         OSMNode originNode = way.getNodes().get(0);
         int nodeIndex = 0, segmentIndex = 0;
         for(final OSMNode destinationNode: way.getNodes()) {
@@ -59,8 +62,7 @@ public class WaySegments {
                     destinationLat = miniOrigin.latitude + vectorY / segmentsToAdd;
                     miniDestination = new Point(destinationLat, destinationLon);
 
-                    final LineSegment segment = new LineSegment(this, miniOrigin, miniDestination, miniOriginNode, null, segmentIndex++, nodeIndex);
-                    segments.add(segment);
+                    segments.add(new LineSegment(this, miniOrigin, miniDestination, miniOriginNode, null, segmentIndex++, nodeIndex));
 
                     miniOrigin = miniDestination;
                     miniOriginNode = null;
@@ -68,13 +70,28 @@ public class WaySegments {
 
                 //add the last segment, with its last node as the original destination node
                 miniDestination = destinationNode.getCentroid();
-                final LineSegment segment = new LineSegment(this, miniOrigin, miniDestination, miniOriginNode, destinationNode, segmentIndex++, nodeIndex);
-                segments.add(segment);
+                segments.add(new LineSegment(this, miniOrigin, miniDestination, miniOriginNode, destinationNode, segmentIndex++, nodeIndex));
             }
             //System.out.println("END MAINSEGMENT #" + mainSegmentIndex + ": " + originNode.osm_id + "-" + destinationNode.osm_id);
             originNode = destinationNode;
             nodeIndex++;
         }
+    }
+    public void initMatchForLine(final WaySegments otherLine) {
+        if(!lineMatches.containsKey(otherLine.way.osm_id)) {
+            lineMatches.put(otherLine.way.osm_id, new LineMatch(this));
+        }
+    }
+    public void addMatchForLine(final WaySegments otherLine, final SegmentMatch match) {
+        final LineMatch curMatch = lineMatches.get(otherLine.way.osm_id);
+        curMatch.addMatch(match);
+    }
+    public LineMatch getMatchForLine(final WaySegments otherLine) {
+        return lineMatches.get(otherLine.way.osm_id);
+    }
+    public void summarizeMatchesForLine(final WaySegments routeLine) {
+        final LineMatch curMatch = lineMatches.get(routeLine.way.osm_id);
+        curMatch.summarize(routeLine);
     }
     /**
      * Inserts a node on the given segment, splitting it into two segments

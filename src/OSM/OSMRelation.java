@@ -73,14 +73,17 @@ public class OSMRelation extends OSMEntity {
 
     @Override
     public Region getBoundingBox() {
-        if(members.size() == 0) {
-            return null;
-        }
-
-        Region member0BoundingBox = members.get(0).member.getBoundingBox();
-        Region combinedBoundingBox = new Region(member0BoundingBox.origin, member0BoundingBox.extent);
+        //generate the combined bounding box from the members' bounding boxes
+        Region combinedBoundingBox = null, curBoundingBox;
         for(OSMRelationMember member: members) {
-            combinedBoundingBox.combinedBoxWithRegion(member.member.getBoundingBox());
+            curBoundingBox = member.member.getBoundingBox();
+            if(curBoundingBox == null) {
+                continue;
+            } else if(combinedBoundingBox == null) {
+                combinedBoundingBox = new Region(curBoundingBox.origin, curBoundingBox.extent);
+                continue;
+            }
+            combinedBoundingBox.combinedBoxWithRegion(curBoundingBox);
         }
         return combinedBoundingBox;
     }

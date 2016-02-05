@@ -1,10 +1,11 @@
-package com.company;
+package Conflation;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
 /**
+ * Tracks the match status of a line with another line
  * Created by nick on 11/20/15.
  */
 public class LineMatch {
@@ -19,39 +20,40 @@ public class LineMatch {
     public final WaySegments parentLine;
     public final List<SegmentMatch> matchingSegments;
     public int matchingSegmentCount = -1;
-    public List<StopWayMatch> stopMatches = null;
+
     private double avgDotProduct, avgDistance;
 
     public LineMatch(final WaySegments parentLine) {
         this.parentLine = parentLine;
         matchingSegments = new ArrayList<>(64);
     }
-    public void addMatch(SegmentMatch match) {
+    public void addMatch(final SegmentMatch match) {
         matchingSegments.add(match);
     }
 
     /**
      * Consolidates all the segment matches and calculates the various totals
      */
-    public void summarize() {
+    public void summarize(final WaySegments routeLine) {
 
         /*first, collapse the segment matchers down by their index (each segment in mainWaySegments
           may match multiple segments, and there is a typically good deal of overlap).  We want only
            the unique segment matches.
          */
         for(final LineSegment segment : parentLine.segments) {
-            segment.chooseBestMatch();
+            segment.chooseBestMatch(routeLine);
         }
         matchingSegments.clear();
 
         //now re-add the consolidated segments, calculating the average dot product and distance for each matching segment
         avgDotProduct = avgDistance = 0.0;
         for(final LineSegment segment : parentLine.segments) {
-            if(segment.bestMatch != null) {
-                matchingSegments.add(segment.bestMatch);
+            final SegmentMatch bestMatchForLine = segment.bestMatchForLine.get(routeLine.way.osm_id);
+            if(bestMatchForLine != null) {
+                matchingSegments.add(bestMatchForLine);
 
-                avgDistance += segment.bestMatch.orthogonalDistance;
-                avgDotProduct += segment.bestMatch.dotProduct;
+                avgDistance += bestMatchForLine.orthogonalDistance;
+                avgDotProduct += bestMatchForLine.dotProduct;
             }
         }
         matchingSegmentCount = matchingSegments.size();
@@ -65,16 +67,5 @@ public class LineMatch {
     }
     public double getAvgDistance() {
         return avgDistance;
-    }
-
-    /**
-     * Adds the given StopWayMatch to this object
-     * @param stopMatch
-     */
-    public void addStopMatch(final StopWayMatch stopMatch) {
-        if(stopMatches == null) {
-            stopMatches = new ArrayList<>(4);
-        }
-        stopMatches.add(stopMatch);
     }
 }
