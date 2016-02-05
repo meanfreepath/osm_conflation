@@ -3,12 +3,8 @@ package PathFinding;
 import Conflation.StopArea;
 import Conflation.WaySegments;
 import OSM.OSMEntity;
-import OSM.OSMNode;
-import OSM.Point;
-import OSM.Region;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 /**
@@ -41,9 +37,9 @@ public class WaypointPath {
 
         }*/
 
-        //determine the possible starting/ending ways for each stop, and create a PathTree for each one (TODO consider all stop matches)
+        //determine the possible starting/ending ways for each stop, and create a PathTree for each one (TODO consider all stop stopSegmentMatches)
         possiblePathTrees = new ArrayList<>(8);
-        final PathTree tempPath = new PathTree(fromStop.getStopPosition(), toStop.getStopPosition(), fromStop.wayMatches.bestMatch.candidateSegmentMatch.parentSegments, toStop.wayMatches.bestMatch.candidateSegmentMatch.parentSegments);
+        final PathTree tempPath = new PathTree(fromStop.getStopPosition(), toStop.getStopPosition(), fromStop.bestWayMatch.line, toStop.bestWayMatch.line);
         possiblePathTrees.add(tempPath);
         bestPathTree = tempPath;
     }
