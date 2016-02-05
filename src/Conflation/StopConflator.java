@@ -15,6 +15,7 @@ import java.util.Locale;
  */
 public class StopConflator {
     private final static String stopNameStreetSeparator = " & ";
+    private final static double MAX_LEVENSHTEIN_DISTANCE_RATIO = 0.20;
     public static boolean debugEnabled = false;
 
     public final RouteConflator routeConflator;
@@ -81,13 +82,15 @@ public class StopConflator {
                     final StreetNameMatcher.StreetNameComponents secondaryStreetComponents = nameComponents.size() > 1 ?  nameComponents.get(1) : null;
 
                     final String primaryStreetBaseName = String.join(" ", primaryStreetComponents.baseComponents);
-                    int primaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(primaryStreetBaseName, wayBaseName, 128);
-                    if (primaryStringDistance == 0) {
+                    final double primaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(primaryStreetBaseName, wayBaseName, 128);
+                    System.out.println("CHECK PLATFORM PRINAME: " + stop.platform.getTag("name") + "(" + stop.platform.getTag("ref") + ") vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + primaryStringDistance + "/" + primaryStreetBaseName.length() + ", ratio " + (primaryStringDistance / primaryStreetBaseName.length()));
+                    if (primaryStringDistance / primaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
                         stop.addNameMatch(line, StopArea.SegmentMatchType.primaryStreet);
                     } else if (secondaryStreetComponents != null) {
                         final String secondaryStreetBaseName = String.join(" ", secondaryStreetComponents.baseComponents);
-                        final int secondaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(secondaryStreetBaseName, wayBaseName, 128);
-                        if(secondaryStringDistance == 0) {
+                        final double secondaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(secondaryStreetBaseName, wayBaseName, 128);
+                        System.out.println("CHECK PLATFORM SECNAME: " + stop.platform.getTag("name") + "(" + stop.platform.getTag("ref") + "): vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + secondaryStringDistance + "/" + secondaryStreetBaseName.length() + ", ratio " + (secondaryStringDistance / secondaryStreetBaseName.length()));
+                        if(secondaryStringDistance / secondaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
                             stop.addNameMatch(line, StopArea.SegmentMatchType.crossStreet);
                         }
                     }
@@ -121,7 +124,7 @@ public class StopConflator {
                     //skip this line if not within the maximum distance to the stop
                     if (nearestSegment != null) {
                         //System.out.println("OSMLINE MATCH for platform " + routeStop.platform.osm_id + "(ref " + routeStop.platform.getTag("ref") + "/" + routeStop.platform.getTag("name") + ")");
-                        routeStop.addProximityMatch(nearestSegment, minDistance, StopArea.SegmentMatchType.proximityToOSMWay);
+                        routeStop.addProximityMatch(route.routeLine, nearestSegment, minDistance, StopArea.SegmentMatchType.proximityToOSMWay);
                     }
                 }
             }
