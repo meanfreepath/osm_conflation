@@ -15,7 +15,7 @@ import java.util.ListIterator;
  * Created by nick on 1/27/16.
  */
 public class PathSegment {
-    private final static double SCORE_FOR_DETOUR = -40.0, SCORE_FOR_STOP_ON_WAY = 100.0, SCORE_FOR_ALIGNMENT = 1.0, SCORE_FOR_TRAVEL_DIRECTION = 50.0, SCORE_FACTOR_FOR_CORRECT_ONEWAY_TRAVEL = 2.0, SCORE_FACTOR_FOR_INCORRECT_ONEWAY_TRAVEL = -2.0, SCORE_FACTOR_FOR_NON_ONEWAY_TRAVEL = 1.0;
+    private final static double SCORE_FOR_STOP_ON_WAY = 10000.0, SCORE_FOR_ALIGNMENT = 100.0, SCORE_FACTOR_FOR_CORRECT_ONEWAY_TRAVEL = 200.0, SCORE_FACTOR_FOR_INCORRECT_ONEWAY_TRAVEL = -200.0, SCORE_FACTOR_FOR_NON_ONEWAY_TRAVEL = 100.0;
     public final Junction originJunction;
     private Junction endJunction;
     public final WaySegments line;
@@ -46,7 +46,7 @@ public class PathSegment {
         //System.out.println("Segment of " + line.way.getTag("name") + " (" + line.way.osm_id + "): from " + originJunction.junctionNode.osm_id + " (traveling " + (line.matchObject.getAvgDotProduct() >= 0.0 ? "forward" : "backward") + ")");
         lineMatched = false;
 
-        final int debugWayId = 368670627;
+        final int debugWayId = 243738297;
 
         //determine the direction of this line relative to the direction of route travel
         final List<OSMNode> segmentNodes = new ArrayList<>(line.way.getNodes().size());
@@ -90,7 +90,7 @@ public class PathSegment {
                     alignedPathLength += segment.length;
                     alignedSegmentCount++;
                     if(line.way.osm_id == debugWayId) {
-                        System.out.println("WAY:: " + line.way.osm_id + "/SEG " + segment.bestMatch + ": dm " + directionMultiplier + "/dp " + segment.bestMatch.dotProduct + "/dist " + segment.bestMatch.midPointDistance);
+                        System.out.println("WAY:: " + line.way.osm_id + "/SEG " + segment.bestMatch + ": dm " + directionMultiplier + "/dp " + segment.bestMatch.dotProduct + "/dist " + segment.bestMatch.midPointDistance + ":::score " + pathScore);
                     }
                 }
 
@@ -142,7 +142,7 @@ public class PathSegment {
                 if(segment.bestMatch != null) {
                     pathScore += directionMultiplier * SCORE_FOR_ALIGNMENT * Math.abs(segment.bestMatch.dotProduct) / segment.bestMatch.midPointDistance;
                     if(line.way.osm_id == debugWayId) {
-                        System.out.println("WAY:: " + line.way.osm_id + "/SEG " + segment.bestMatch + ": dm " + directionMultiplier + "/dp " + segment.bestMatch.dotProduct + "/dist " + segment.bestMatch.midPointDistance);
+                        System.out.println("WAY:: " + line.way.osm_id + "/SEG " + segment.bestMatch + ": dm " + directionMultiplier + "/dp " + segment.bestMatch.dotProduct + "/dist " + segment.bestMatch.midPointDistance + ":::score " + pathScore);
                     }
                     alignedPathLength += segment.length;
                     alignedSegmentCount++;
@@ -174,10 +174,18 @@ public class PathSegment {
         //if endJunction wasn't created above, this is a dead-end PathSegment
         if(endJunction != null) {
             lineMatched = true;
-            pathScore /= alignedSegmentCount;
-            lengthFactor = alignedPathLength / traveledSegmentLength;
+            if(alignedPathLength > 0) {
+                pathScore /= alignedPathLength;
+            }
+            if(traveledSegmentLength > 0) {
+                lengthFactor = alignedPathLength / traveledSegmentLength;
+            }
         } else {
             lengthFactor = 0.0;
+        }
+
+        if(line.way.osm_id == debugWayId) {
+            System.out.println("WAY:: " + line.way.osm_id + " matched? " + Boolean.toString(lineMatched) + ", % travelled: " + (Math.round(lengthFactor * 10000.0) / 100.0) + ", score " + waypointScore + "/" + pathScore);
         }
 
         //System.out.println("PROCESSED Segment of " + line.way.getTag("name") + " (" + line.way.osm_id + "): " + originJunction.junctionNode.osm_id + "->" + endJunction.junctionNode.osm_id + ", length: " + Math.round(100.0 * alignedPathLength / traveledSegmentLength) + "%, score " + getScore());

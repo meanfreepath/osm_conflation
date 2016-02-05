@@ -21,7 +21,7 @@ public class PathTree {
             return o1.getTotalScore() > o2.getTotalScore() ? -1 : 1;
         }
     };
-    private final static double scoreThresholdToProcessPathSegment = 0.05;
+    private final static double scoreThresholdToProcessPathSegment = 3.0;
 
     public final OSMNode fromNode, toNode;
     public final WaySegments fromLine, toLine;
@@ -58,7 +58,7 @@ public class PathTree {
 
         int processedSegments = 0;
         for(final Junction.JunctionSegmentStatus segmentStatus : startingJunction.junctionPathSegments) {
-            parentPath.logEvent(RoutePath.RouteLogType.info, "Junction " + startingJunction.junctionNode.osm_id + ": " + segmentStatus.segment + ": " +  Math.round(100.0 * segmentStatus.segment.pathScore)/100.0 + "/" + Math.round(100.0 * segmentStatus.segment.lengthFactor)/100.0 + "/" + Math.round(100.0 * segmentStatus.segment.waypointScore)/100.0 + "=" + Math.round(segmentStatus.segment.getScore())/100.0 + ", STATUS " + segmentStatus.processStatus.name(), this);
+            parentPath.logEvent(RoutePath.RouteLogType.info, "Junction " + startingJunction.junctionNode.osm_id + ": " + segmentStatus.segment + ": " +  Math.round(100.0 * segmentStatus.segment.pathScore)/100.0 + "/" + Math.round(100.0 * segmentStatus.segment.lengthFactor)/100.0 + "%/" + Math.round(100.0 * segmentStatus.segment.waypointScore)/100.0 + "=" + Math.round(segmentStatus.segment.getScore()) + ", STATUS " + segmentStatus.processStatus.name(), this);
             if(segmentStatus.processStatus != Junction.ProcessStatus.yes) {
                 continue;
             }
