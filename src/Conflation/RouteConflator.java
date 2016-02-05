@@ -265,19 +265,19 @@ public class RouteConflator {
         return regions;
     }
     public void conflateRoutePaths(final StopConflator stopConflator) {
-        final int debugRouteId = -1214  ;
+        final int debugRouteId = -1212;
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
-            if (route.routeRelation.osm_id != debugRouteId) {
-                continue;
+            if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
+               // continue;
             }
 
             //get a handle on the WaySegments that intersect the route's routeLine
             final long timeStartLineComparison = new Date().getTime();
             final double latitudeDelta = -wayMatchingOptions.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * route.routeLine.segments.get(0).originPoint.latitude / 180.0);
             final HashMap<Long, WaySegments> routeCandidateLines = new HashMap<>(candidateLines.size());
-            for (final LineSegment mainLineSegment : route.routeLine.segments) {
-                final Region mainBoundingBox = mainLineSegment.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
+            for (final LineSegment routeLineSegment : route.routeLine.segments) {
+                final Region routeSegmentBoundingBox = routeLineSegment.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
                 for (final WaySegments candidateLine : candidateLines.values()) {
                     //don't match against any lines that have been marked as "ignore", such as other gtfs shape lines
                     if (candidateLine.way.hasTag("gtfs:ignore")) {
@@ -285,21 +285,22 @@ public class RouteConflator {
                     }
 
                     //check for candidate lines whose bounding box intersects this segment, and add to the candidate list for this segment
-                    if (Region.intersects(mainBoundingBox, candidateLine.way.getBoundingBox().regionInset(latitudeDelta, longitudeDelta))) {
+                    if (Region.intersects(routeSegmentBoundingBox, candidateLine.way.getBoundingBox().regionInset(latitudeDelta, longitudeDelta))) {
                         if (!routeCandidateLines.containsKey(candidateLine.way.osm_id)) {
                             routeCandidateLines.put(candidateLine.way.osm_id, candidateLine);
                         }
-                        mainLineSegment.candidateWaySegments.add(candidateLine);
+                        routeLineSegment.candidateWaySegments.add(candidateLine);
                         candidateLine.initMatchForLine(route.routeLine);
+                        route.routeLine.initMatchForLine(candidateLine);
                     }
                 }
             }
 
             //now that we have a rough idea of the candidate ways for each segment, run detailed checks on their segments' distance and dot product
-            for (final LineSegment mainSegment : route.routeLine.segments) {
-                for (final WaySegments candidateLine : mainSegment.candidateWaySegments) {
+            for (final LineSegment routeLineSegment : route.routeLine.segments) {
+                for (final WaySegments candidateLine : routeLineSegment.candidateWaySegments) {
                     for (final LineSegment candidateSegment : candidateLine.segments) {
-                        SegmentMatch.checkCandidateForMatch(wayMatchingOptions, mainSegment, candidateSegment, candidateLine.getMatchForLine(route.routeLine));
+                        SegmentMatch.checkCandidateForMatch(wayMatchingOptions, routeLineSegment, candidateSegment);
                     }
                 }
             }
@@ -311,7 +312,7 @@ public class RouteConflator {
             System.out.println("Matched lines in " + (new Date().getTime() - timeStartLineComparison) + "ms");
         }
 
-        //update the route's stop matches to include the match info on the OSM ways
+        //update the route's stop stopSegmentMatches to include the match info on the OSM ways
         final long timeStartStopMatching = new Date().getTime();
         stopConflator.matchStopsToWays();
         stopConflator.createStopPositionsForPlatforms(workingEntitySpace);
@@ -319,11 +320,20 @@ public class RouteConflator {
 
         //with the candidate lines determined, begin the pathfinding stage to lock down the path between the route's stops
         for(final Route route : exportRoutes) {
-            if (route.routeRelation.osm_id != debugRouteId) {
+            /*for (final LineSegment routeLineSegment : route.routeLine.segments) {
+                for (final WaySegments candidateLine : routeLineSegment.candidateWaySegments) {
+                    for (final LineSegment candidateSegment : candidateLine.segments) {
+                        routeLineSegment.matchingSegments.clear();
+                        candidateSegment.matchingSegments.clear();
+                        //SegmentMatch.checkCandidateForMatch(wayMatchingOptions, routeLineSegment, candidateSegment, candidateLine.getMatchForLine(route.routeLine));
+                    }
+                }
+            }*/
+            if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
                 continue;
             }
             final RoutePath routePath = new RoutePath(route, candidateLines);
-            routePath.findPaths();//*/
+            routePath.findPaths();
             if(routePath.getFailedPaths() > 0) {
                 workingEntitySpace.addEntity(route.routePath, OSMEntity.TagMergeStrategy.keepTags, null);
                 route.routeRelation.addMember(route.routePath, "");

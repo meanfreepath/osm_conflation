@@ -16,76 +16,79 @@ public class SegmentMatch {
         midPointDistance = midDistance;
         this.dotProduct = dotProduct;
     }
-    public static boolean checkCandidateForMatch(final RouteConflator.LineComparisonOptions options, final LineSegment segment1, final LineSegment segment2, final LineMatch lineMatch) {
+    public static boolean checkCandidateForMatch(final RouteConflator.LineComparisonOptions options, final LineSegment routeLineSegment, final LineSegment osmLineSegment) {
         //take the dot product
-        final double dotProduct = (segment1.vectorX * segment2.vectorX + segment1.vectorY * segment2.vectorY) / (segment1.vectorMagnitude * segment2.vectorMagnitude);
+        final double dotProduct = (routeLineSegment.vectorX * osmLineSegment.vectorX + routeLineSegment.vectorY * osmLineSegment.vectorY) / (routeLineSegment.vectorMagnitude * osmLineSegment.vectorMagnitude);
 
         //find the intersection of the orthogonal vector with the candidate segment
         final double vecA, vecB, vecC, vecD, xInt, yInt;
-        if(segment1.vectorY == 0.0) { //i.e. segment1 is purely east-west
-            xInt = segment1.midPointX;
-            if(segment2.vectorY == 0.0) { //case where both are parallel
-                yInt = segment2.midPointY;
+        if(routeLineSegment.vectorY == 0.0) { //i.e. routeLineSegment is purely east-west
+            xInt = routeLineSegment.midPointX;
+            if(osmLineSegment.vectorY == 0.0) { //case where both are parallel
+                yInt = osmLineSegment.midPointY;
             } else {
-                vecB = segment2.vectorY / segment2.vectorX;
-                vecD = segment2.midPointY - vecB * segment2.midPointX;
+                vecB = osmLineSegment.vectorY / osmLineSegment.vectorX;
+                vecD = osmLineSegment.midPointY - vecB * osmLineSegment.midPointX;
                 yInt = xInt * vecB + vecD;
             }
-        } else if(segment1.vectorX == 0.0) { //i.e. segment1 is purely north-south
-            yInt = segment1.midPointY;
-            if (segment2.vectorX == 0.0) { //case where both are parallel
-                xInt = segment2.midPointX;
+        } else if(routeLineSegment.vectorX == 0.0) { //i.e. routeLineSegment is purely north-south
+            yInt = routeLineSegment.midPointY;
+            if (osmLineSegment.vectorX == 0.0) { //case where both are parallel
+                xInt = osmLineSegment.midPointX;
             } else {
-                vecB = segment2.vectorY / segment2.vectorX;
-                vecD = segment2.midPointY - vecB * segment2.midPointX;
+                vecB = osmLineSegment.vectorY / osmLineSegment.vectorX;
+                vecD = osmLineSegment.midPointY - vecB * osmLineSegment.midPointX;
                 xInt = (yInt - vecD) / vecB;
             }
-        } else if(segment2.vectorY == 0.0) { //segment2 is east-west
-            yInt = segment2.midPointY;
-            if(segment1.vectorY != 0.0) {
-                vecA = segment1.orthogonalVectorY / segment1.orthogonalVectorX;
-                vecC = segment1.midPointY - vecA * segment1.midPointX;
+        } else if(osmLineSegment.vectorY == 0.0) { //osmLineSegment is east-west
+            yInt = osmLineSegment.midPointY;
+            if(routeLineSegment.vectorY != 0.0) {
+                vecA = routeLineSegment.orthogonalVectorY / routeLineSegment.orthogonalVectorX;
+                vecC = routeLineSegment.midPointY - vecA * routeLineSegment.midPointX;
                 xInt = (yInt - vecA) / vecC;
             } else {
-                xInt = segment1.midPointX;
+                xInt = routeLineSegment.midPointX;
             }
-        } else if(segment2.vectorX == 0.0) { //segment2 is north-south
-            xInt = segment2.midPointX;
-            if(segment1.vectorX != 0.0) {
-                vecA = segment1.orthogonalVectorY / segment1.orthogonalVectorX;
-                vecC = segment1.midPointY - vecA * segment1.midPointX;
+        } else if(osmLineSegment.vectorX == 0.0) { //osmLineSegment is north-south
+            xInt = osmLineSegment.midPointX;
+            if(routeLineSegment.vectorX != 0.0) {
+                vecA = routeLineSegment.orthogonalVectorY / routeLineSegment.orthogonalVectorX;
+                vecC = routeLineSegment.midPointY - vecA * routeLineSegment.midPointX;
                 yInt = xInt * vecA + vecC;
             } else {
-                yInt = segment2.midPointY;
+                yInt = osmLineSegment.midPointY;
             }
         } else {
-            vecA = segment1.orthogonalVectorY / segment1.orthogonalVectorX;
-            vecB = segment2.vectorY / segment2.vectorX;
-            vecC = segment1.midPointY - vecA * segment1.midPointX;
-            vecD = segment2.midPointY - vecB * segment2.midPointX;
+            vecA = routeLineSegment.orthogonalVectorY / routeLineSegment.orthogonalVectorX;
+            vecB = osmLineSegment.vectorY / osmLineSegment.vectorX;
+            vecC = routeLineSegment.midPointY - vecA * routeLineSegment.midPointX;
+            vecD = osmLineSegment.midPointY - vecB * osmLineSegment.midPointX;
             xInt = (vecD - vecC) / (vecA - vecB);
             yInt = xInt * vecA + vecC;
         }
 
-        final double latitudeFactor = Math.cos(segment1.midPointY * Math.PI / 180.0);
-        final double oDiffX = (xInt - segment1.midPointX) * latitudeFactor, oDiffY = yInt - segment1.midPointY, mDiffX = (segment2.midPointX - segment1.midPointX) * latitudeFactor, mDiffY = (segment2.midPointY - segment1.midPointY);
+        final double latitudeFactor = Math.cos(routeLineSegment.midPointY * Math.PI / 180.0);
+        final double oDiffX = (xInt - routeLineSegment.midPointX) * latitudeFactor, oDiffY = yInt - routeLineSegment.midPointY, mDiffX = (osmLineSegment.midPointX - routeLineSegment.midPointX) * latitudeFactor, mDiffY = (osmLineSegment.midPointY - routeLineSegment.midPointY);
 
         final double orthogonalDistance = Point.distance(oDiffY, oDiffX);
         final double midPointDistance = Point.distance(mDiffY, mDiffX);
 
-        /*if(segment2.parentSegments.line.osm_id == 263557332){
+        /*if(osmLineSegment.parentSegments.line.osm_id == 263557332){
             //System.out.println("[" + vectorX + "," + vectorY + "]...A:" + vecA + ", B:" + vecB + ", C:" + vecC + ", D:" + vecD + "::: point:(" + midPointX + "," + midPointY + "/" + ((vecA * midPointX + vecC) + ")"));
-            System.out.println("DP MATCH: " + segment2.parentSegments.line.getTag("name") + ": " + dotProduct + ", dist: (" + oDiffX + "," + oDiffY + ") " + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
+            System.out.println("DP MATCH: " + osmLineSegment.parentSegments.line.getTag("name") + ": " + dotProduct + ", dist: (" + oDiffX + "," + oDiffY + ") " + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
         }*/
 
         //if the segments meet the threshold requirements, store the match in a SegmentMatch object
         if(Math.abs(dotProduct) >= options.getMinSegmentDotProduct() && orthogonalDistance <= options.maxSegmentOrthogonalDistance && midPointDistance <= options.maxSegmentMidPointDistance) {
             //System.out.println("DP MATCH: " + dotProduct + ", dist:" + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
-            //System.out.println("DP MATCH: " + segment2.parentSegments.line.getTag("name") + ": " + dotProduct + ", dist:" + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
-            final SegmentMatch match = new SegmentMatch(segment1, segment2, orthogonalDistance, midPointDistance, dotProduct);
-            segment1.matchingSegments.add(match);
-            segment2.matchingSegments.add(match);
-            lineMatch.addMatch(match);
+            //System.out.println("DP MATCH: " + osmLineSegment.parentSegments.line.getTag("name") + ": " + dotProduct + ", dist:" + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
+            final SegmentMatch match = new SegmentMatch(routeLineSegment, osmLineSegment, orthogonalDistance, midPointDistance, dotProduct);
+            routeLineSegment.matchingSegments.add(match);
+            osmLineSegment.matchingSegments.add(match);
+
+
+            routeLineSegment.parentSegments.addMatchForLine(osmLineSegment.parentSegments, match);
+            osmLineSegment.parentSegments.addMatchForLine(routeLineSegment.parentSegments, match);
             return true;
         }
         return false;
