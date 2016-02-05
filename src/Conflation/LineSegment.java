@@ -6,7 +6,9 @@ import OSM.Region;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Created by nick on 11/9/15.
@@ -23,8 +25,8 @@ public class LineSegment {
     public int nodeIndex;
     public int segmentIndex;
     public final List<WaySegments> candidateWaySegments = new ArrayList<>(16);
-    public final List<SegmentMatch> matchingSegments = new ArrayList<>(16);
-    public SegmentMatch bestMatch = null;
+    public final Map<Long, List<SegmentMatch>> matchingSegments = new HashMap<>(8);
+    public final Map<Long, SegmentMatch> bestMatchForLine = new HashMap<>(8);
     public final double vectorX, vectorY, orthogonalVectorX, orthogonalVectorY, midPointX, midPointY;
     public final double vectorMagnitude;
     public final double length;
@@ -60,9 +62,25 @@ public class LineSegment {
         return new Region(Math.min(originPoint.latitude, destinationPoint.latitude), Math.min(originPoint.longitude, destinationPoint.longitude), Math.abs(vectorY), Math.abs(vectorX));
     }
 
-    public void chooseBestMatch() {
+    public void addMatch(final SegmentMatch match) {
+        List<SegmentMatch> matchesForLine = matchingSegments.get(match.mainSegment.parentSegments.way.osm_id);
+        if(matchesForLine == null) {
+            matchesForLine = new ArrayList<>(8);
+            matchingSegments.put(match.mainSegment.parentSegments.way.osm_id, matchesForLine);
+        }
+        matchesForLine.add(match);
+    }
+    public void chooseBestMatch(final WaySegments routeLine) {
+        //look up the matching segments we have for the given route line
+        final List<SegmentMatch> matchesForLine = matchingSegments.get(routeLine.way.osm_id);
+        if(matchesForLine == null) {
+            return;
+        }
+
+        //and loop through them, picking the one with the best score as the best match
         double minScore = Double.MAX_VALUE, matchScore;
-        for(final SegmentMatch match : matchingSegments) {
+        SegmentMatch bestMatch = null;
+        for(final SegmentMatch match : matchesForLine) {
             //choose the best match based on the product of their dot product and distance score
             matchScore = (match.orthogonalDistance * match.orthogonalDistance + match.midPointDistance * match.midPointDistance) / Math.max(0.000001, Math.abs(match.dotProduct));
             if(bestMatch == null || matchScore < minScore) {
@@ -70,11 +88,18 @@ public class LineSegment {
                 minScore = matchScore;
             }
         }
+        bestMatchForLine.put(routeLine.way.osm_id, bestMatch);
     }
     public void copyMatches(final LineSegment fromSegment) {
         //TODO: may be more accurate to rematch rather than copy
-        matchingSegments.addAll(fromSegment.matchingSegments);
-        bestMatch = fromSegment.bestMatch;
+        matchingSegments.clear();
+        bestMatchForLine.clear();
+        for(final Map.Entry<Long, List<SegmentMatch>> matches : fromSegment.matchingSegments.entrySet()) {
+            final List<SegmentMatch> matchForLine = new ArrayList<>(matches.getValue().size());
+            matchForLine.addAll(matches.getValue());
+            matchingSegments.put(matches.getKey(), matches.getValue());
+        }
+        bestMatchForLine.putAll(fromSegment.bestMatchForLine);
     }
 
     /**

@@ -31,13 +31,15 @@ public class StopArea {
     public class StopWayMatch {
         public class StopSegmentMatch {
             public final LineSegment candidateSegment;
+            public final WaySegments routeLine;
             public final SegmentMatchType matchType;
             public final double distance;
 
-            public StopSegmentMatch(final LineSegment segment, final double distance, final SegmentMatchType matchType) {
+            public StopSegmentMatch(final WaySegments toRouteLine, final LineSegment segment, final double distance, final SegmentMatchType matchType) {
                 this.candidateSegment = segment;
                 this.distance = distance;
                 this.matchType = matchType;
+                this.routeLine = toRouteLine;
             }
         }
 
@@ -49,8 +51,8 @@ public class StopArea {
         public StopWayMatch(final WaySegments candidateLine) {
             line = candidateLine;
         }
-        public void addStopSegmentMatch(final LineSegment segment, final double distance, final SegmentMatchType matchType) {
-            stopSegmentMatches.add(new StopSegmentMatch(segment, distance, matchType));
+        public void addStopSegmentMatch(final WaySegments toRouteLine, final LineSegment segment, final double distance, final SegmentMatchType matchType) {
+            stopSegmentMatches.add(new StopSegmentMatch(toRouteLine, segment, distance, matchType));
         }
         public void summarizeMatches() {
             dpScore = distanceScore = 0.0;
@@ -60,9 +62,10 @@ public class StopArea {
 
             for(final StopSegmentMatch segmentMatch : stopSegmentMatches) {
                 final double dpFactor, odFactor;
-                if(segmentMatch.candidateSegment.bestMatch != null) {
-                    dpFactor = Math.abs(segmentMatch.candidateSegment.bestMatch.dotProduct);
-                    odFactor = segmentMatch.candidateSegment.bestMatch.orthogonalDistance;
+                final SegmentMatch bestMatchForRouteLine = segmentMatch.candidateSegment.bestMatchForLine.get(segmentMatch.routeLine.way.osm_id);
+                if(bestMatchForRouteLine != null) {
+                    dpFactor = Math.abs(bestMatchForRouteLine.dotProduct);
+                    odFactor = bestMatchForRouteLine.orthogonalDistance;
                 } else {
                     dpFactor = 0.01;
                     odFactor = maxDistanceFromPlatformToWay;
@@ -114,12 +117,12 @@ public class StopArea {
         wayMatch.nameScore += scoreFactorForMatchType(matchType);
         wayMatches.put(line.way.osm_id, wayMatch);
     }
-    public void addProximityMatch(final LineSegment segment, final double distance, SegmentMatchType matchType) {
+    public void addProximityMatch(final WaySegments toRouteLine, final LineSegment segment, final double distance, final SegmentMatchType matchType) {
         StopWayMatch wayMatch = wayMatches.get(segment.parentSegments.way.osm_id);
         if(wayMatch == null) {
             wayMatch = new StopWayMatch(segment.parentSegments);
         }
-        wayMatch.addStopSegmentMatch(segment, distance, matchType);
+        wayMatch.addStopSegmentMatch(toRouteLine, segment, distance, matchType);
         wayMatches.put(segment.parentSegments.way.osm_id, wayMatch);
     }
     public void chooseBestWayMatch() {
@@ -134,8 +137,7 @@ public class StopArea {
         Collections.sort(matchList, STOP_WAY_MATCH_COMPARATOR);
         bestWayMatch = matchList.get(0);
 
-        //System.out.println("Platform: " + firstMatch.platformNode.getTag("name") + ":::");
-        System.out.println("Platform: " + platform.getTag("name") + "(" + platform.getTag("ref") + "):: on " + bestWayMatch.line.way.getTag(OSMEntity.KEY_NAME) + "(" + bestWayMatch.line.way.osm_id + ") with score " + bestWayMatch.nameScore + "/" + bestWayMatch.dpScore + "/" + bestWayMatch.distanceScore + ": " + (bestWayMatch.nameScore + bestWayMatch.dpScore + bestWayMatch.distanceScore));
+        System.out.println("BEST PLATFORM MATCH: " + platform.getTag("name") + "(" + platform.getTag("ref") + "):: on " + bestWayMatch.line.way.getTag(OSMEntity.KEY_NAME) + "(" + bestWayMatch.line.way.osm_id + ") with score " + bestWayMatch.nameScore + "/" + bestWayMatch.dpScore + "/" + bestWayMatch.distanceScore + ": " + (bestWayMatch.nameScore + bestWayMatch.dpScore + bestWayMatch.distanceScore));
         if((bestWayMatch.nameScore + bestWayMatch.dpScore + bestWayMatch.distanceScore) < 1000.0) {
             for (final StopWayMatch otherMatch : matchList) {
                 if(otherMatch == bestWayMatch) {

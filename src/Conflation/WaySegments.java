@@ -89,9 +89,9 @@ public class WaySegments {
     public LineMatch getMatchForLine(final WaySegments otherLine) {
         return lineMatches.get(otherLine.way.osm_id);
     }
-    public void summarizeMatchesForLine(final WaySegments otherLine) {
-        final LineMatch curMatch = lineMatches.get(otherLine.way.osm_id);
-        curMatch.summarize();
+    public void summarizeMatchesForLine(final WaySegments routeLine) {
+        final LineMatch curMatch = lineMatches.get(routeLine.way.osm_id);
+        curMatch.summarize(routeLine);
     }
     /**
      * Inserts a node on the given segment, splitting it into two segments

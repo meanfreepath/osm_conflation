@@ -100,7 +100,8 @@ public class Route {
         for (final WaySegments matchingLine : candidateLines) {
             OSMNode matchOriginNode = null, matchLastNode;
             for(final LineSegment matchingSegment : matchingLine.segments) {
-                if(matchingSegment.bestMatch == null) { //skip non-matching segments
+                final SegmentMatch bestMatchForSegment = matchingSegment.bestMatchForLine.get(routeLine.way.osm_id);
+                if(bestMatchForSegment == null) { //skip non-matching segments
                     continue;
                 }
 
@@ -126,8 +127,8 @@ public class Route {
                 OSMEntity.copyTag(matchingSegment.parentSegments.way, matchingSegmentWay, "railway");
                 OSMEntity.copyTag(matchingSegment.parentSegments.way, matchingSegmentWay, OSMEntity.KEY_NAME);
                 OSMEntity.copyTag(matchingSegment.parentSegments.way, matchingSegmentWay, OSMEntity.KEY_NAME);
-                if(matchingSegment.bestMatch != null) {
-                    matchingSegmentWay.setTag("note", "With: " + matchingSegment.bestMatch.mainSegment + ", DP: " + format.format(matchingSegment.bestMatch.dotProduct) + ", DIST: " + format.format(matchingSegment.bestMatch.orthogonalDistance) + "/" + format.format(matchingSegment.bestMatch.midPointDistance));
+                if(bestMatchForSegment != null) {
+                    matchingSegmentWay.setTag("note", "With: " + bestMatchForSegment.mainSegment + ", DP: " + format.format(bestMatchForSegment.dotProduct) + ", DIST: " + format.format(bestMatchForSegment.orthogonalDistance) + "/" + format.format(bestMatchForSegment.midPointDistance));
                 } else {
                     matchingSegmentWay.setTag("note", "No matches");
                     matchingSegmentWay.setTag("tiger:reviewed", "no");

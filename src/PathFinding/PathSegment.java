@@ -1,6 +1,7 @@
 package PathFinding;
 
 import Conflation.LineSegment;
+import Conflation.SegmentMatch;
 import Conflation.WaySegments;
 import OSM.OSMEntity;
 import OSM.OSMNode;
@@ -56,6 +57,8 @@ public class PathSegment {
         }
         final boolean ourDirectionForward = line.getMatchForLine(parentPath.route.routeLine).getAvgDotProduct() >= 0.0;
 
+        final long routeLineId = parentPath.route.routeLine.way.osm_id;
+
         //determine the nodes on this path segment, and calculate their score based on their alignment with the main route's path
         final OSMNode firstNode, lastNode;
         if(ourDirectionForward) { //i.e. we're traveling along the node order of this way
@@ -85,12 +88,13 @@ public class PathSegment {
                 //System.out.println("segment " + line.way.getTag("name") + ":" + (segment.originNode != null? segment.originNode.osm_id : "N/A") + "/" + (segment.destinationNode != null? segment.destinationNode.osm_id + " - " + segment.destinationNode.containingWays.size() + " containing ways" : "N/A"));
 
                 //sum up the score
-                if(segment.bestMatch != null) {
-                    pathScore += directionMultiplier * SCORE_FOR_ALIGNMENT * Math.abs(segment.bestMatch.dotProduct) / segment.bestMatch.midPointDistance;
+                final SegmentMatch bestMatchForSegment = segment.bestMatchForLine.get(routeLineId);
+                if(bestMatchForSegment != null) {
+                    pathScore += directionMultiplier * SCORE_FOR_ALIGNMENT * Math.abs(bestMatchForSegment.dotProduct) / bestMatchForSegment.midPointDistance;
                     alignedPathLength += segment.length;
                     alignedSegmentCount++;
                     if(line.way.osm_id == debugWayId) {
-                        System.out.println("WAY:: " + line.way.osm_id + "/SEG " + segment.bestMatch + ": dm " + directionMultiplier + "/dp " + segment.bestMatch.dotProduct + "/dist " + segment.bestMatch.midPointDistance + ":::score " + pathScore);
+                        System.out.println("WAY:: " + line.way.osm_id + "/SEG " + bestMatchForSegment + ": dm " + directionMultiplier + "/dp " + bestMatchForSegment.dotProduct + "/dist " + bestMatchForSegment.midPointDistance + ":::score " + pathScore);
                     }
                 }
 
@@ -139,10 +143,11 @@ public class PathSegment {
                 traveledSegmentCount++;
 
                 //System.out.println("segment " + line.way.getTag("name") + ":" + (segment.destinationNode != null? segment.destinationNode.osm_id : "N/A") + "/" + (segment.originNode != null? segment.originNode.osm_id : "N/A"));
-                if(segment.bestMatch != null) {
-                    pathScore += directionMultiplier * SCORE_FOR_ALIGNMENT * Math.abs(segment.bestMatch.dotProduct) / segment.bestMatch.midPointDistance;
+                final SegmentMatch bestMatchForSegment = segment.bestMatchForLine.get(routeLineId);
+                if(bestMatchForSegment != null) {
+                    pathScore += directionMultiplier * SCORE_FOR_ALIGNMENT * Math.abs(bestMatchForSegment.dotProduct) / bestMatchForSegment.midPointDistance;
                     if(line.way.osm_id == debugWayId) {
-                        System.out.println("WAY:: " + line.way.osm_id + "/SEG " + segment.bestMatch + ": dm " + directionMultiplier + "/dp " + segment.bestMatch.dotProduct + "/dist " + segment.bestMatch.midPointDistance + ":::score " + pathScore);
+                        System.out.println("WAY:: " + line.way.osm_id + "/SEG " + bestMatchForSegment + ": dm " + directionMultiplier + "/dp " + bestMatchForSegment.dotProduct + "/dist " + bestMatchForSegment.midPointDistance + ":::score " + pathScore);
                     }
                     alignedPathLength += segment.length;
                     alignedSegmentCount++;

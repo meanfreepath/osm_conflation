@@ -83,8 +83,8 @@ public class SegmentMatch {
             //System.out.println("DP MATCH: " + dotProduct + ", dist:" + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
             //System.out.println("DP MATCH: " + osmLineSegment.parentSegments.line.getTag("name") + ": " + dotProduct + ", dist:" + orthogonalDistance + ", intersect: (" + yInt + "," + xInt + ")");
             final SegmentMatch match = new SegmentMatch(routeLineSegment, osmLineSegment, orthogonalDistance, midPointDistance, dotProduct);
-            routeLineSegment.matchingSegments.add(match);
-            osmLineSegment.matchingSegments.add(match);
+            routeLineSegment.addMatch(match);
+            osmLineSegment.addMatch(match);
 
 
             routeLineSegment.parentSegments.addMatchForLine(osmLineSegment.parentSegments, match);

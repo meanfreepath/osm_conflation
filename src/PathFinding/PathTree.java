@@ -43,7 +43,7 @@ public class PathTree {
     }
     private void iteratePath(final Junction startingJunction, final WaySegments routeLine, final RoutePath parentPath, final Path curPath) throws PathIterationException {
         //bail if the junction indicates there's no need to continue processing
-        if(!processJunction(startingJunction, routeLine, parentPath, curPath)) {
+        if(!processJunction(startingJunction, parentPath, curPath)) {
             return;
         }
 
@@ -89,7 +89,7 @@ public class PathTree {
         candidatePaths.add(newPath);
         return newPath;
     }
-    private boolean processJunction(final Junction junction, final WaySegments routeLine, final RoutePath parentPath, final Path currentPath) {
+    private boolean processJunction(final Junction junction, final RoutePath parentPath, final Path currentPath) {
         for(final OSMWay junctionWay : junction.junctionNode.containingWays.values()) {
             //look up the respective WaySegments object for the way
             final WaySegments curLine = parentPath.candidateLines.get(junctionWay.osm_id);
