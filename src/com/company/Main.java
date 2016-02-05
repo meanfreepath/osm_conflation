@@ -18,10 +18,10 @@ public class Main {
         OSMEntitySpace importSpace = new OSMEntitySpace(1024);
 
         //define the options for the comparison routines
-        final RouteConflator.LineComparisonOptions options = new RouteConflator.LineComparisonOptions();
+        final RouteConflator.LineComparisonOptions options = RouteConflator.wayMatchingOptions;
         options.boundingBoxSize = 50.0;
         options.maxSegmentLength = 10.0;
-        options.setMaxSegmentAngle(10.0);
+        options.setMaxSegmentAngle(30.0);
         options.maxSegmentOrthogonalDistance = 3.0 * options.maxSegmentLength;
         options.maxSegmentMidPointDistance = 4.0 * options.maxSegmentLength;
 
@@ -51,7 +51,7 @@ public class Main {
                 final OSMEntitySpace workingEntitySpace = new OSMEntitySpace(32768); //the entity space that all processing will occur on
 
                 //create an object to handle the processing of the data for this route master
-                final RouteConflator routeConflator = new RouteConflator(importRouteMaster, options);
+                final RouteConflator routeConflator = new RouteConflator(importRouteMaster);
 
                 //fetch all ways from OSM that are within the route master's bounding box
                 routeConflator.downloadRegionsForImportDataset(workingEntitySpace);
