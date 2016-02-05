@@ -28,6 +28,7 @@ public class LineSegment {
     public final double vectorX, vectorY, orthogonalVectorX, orthogonalVectorY, midPointX, midPointY;
     public final double vectorMagnitude;
     public final double length;
+    public final Region searchAreaForMatchingOtherSegments;
 
     public LineSegment(final WaySegments parentSegments, final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
         this.parentSegments = parentSegments;
@@ -51,6 +52,9 @@ public class LineSegment {
         midPoint = new Point(midPointY, midPointX);
 
         length = Point.distance(vectorY, vectorX);
+
+        final double latitudeDelta = -RouteConflator.wayMatchingOptions.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * midPointY / 180.0);
+        searchAreaForMatchingOtherSegments = getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
     }
     public Region getBoundingBox() {
         return new Region(Math.min(originPoint.latitude, destinationPoint.latitude), Math.min(originPoint.longitude, destinationPoint.longitude), Math.abs(vectorY), Math.abs(vectorX));

@@ -17,10 +17,13 @@ public class RouteConflator {
         public double maxSegmentLength = 5.0, maxSegmentOrthogonalDistance = 10.0, maxSegmentMidPointDistance = 20.0, boundingBoxSize = 50.0;
         private double minSegmentDotProduct;
         public void setMaxSegmentAngle(final double angle) {
-            minSegmentDotProduct = Math.cos(angle);
+            minSegmentDotProduct = Math.cos(angle * Math.PI / 180.0);
         }
         public double getMinSegmentDotProduct() {
             return minSegmentDotProduct;
+        }
+        public LineComparisonOptions() {
+            minSegmentDotProduct = 0.866; //default to 30 degrees
         }
     }
 
@@ -33,12 +36,11 @@ public class RouteConflator {
     public Point roughCentroid = null; //crappy hack so we can have a latitude value to work with
     public static boolean debugEnabled = false;
     private OSMEntitySpace workingEntitySpace = null;
-    private final LineComparisonOptions wayMatchingOptions;
+    public final static LineComparisonOptions wayMatchingOptions = new LineComparisonOptions();
     private HashMap<Long, WaySegments> candidateLines = null;
 
-    public RouteConflator(final OSMRelation routeMaster, final LineComparisonOptions wayMatchingOptions) throws InvalidArgumentException {
+    public RouteConflator(final OSMRelation routeMaster) throws InvalidArgumentException {
         importRouteMaster = routeMaster;
-        this.wayMatchingOptions = wayMatchingOptions;
         routeType = importRouteMaster.getTag(OSMEntity.KEY_ROUTE_MASTER);
         if(!validateRouteType(routeType)) {
             final String errMsg[] = {"Invalid route type provided"};
@@ -265,11 +267,11 @@ public class RouteConflator {
         return regions;
     }
     public void conflateRoutePaths(final StopConflator stopConflator) {
-        final int debugRouteId = -1212;
+        final int debugRouteId = -1214;
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
-               // continue;
+                continue;
             }
 
             //get a handle on the WaySegments that intersect the route's routeLine
