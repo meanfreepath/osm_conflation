@@ -54,7 +54,11 @@ public class Main {
                 final RouteConflator routeConflator = new RouteConflator(importRouteMaster);
 
                 //fetch all ways from OSM that are within the route master's bounding box
-                routeConflator.downloadRegionsForImportDataset(workingEntitySpace);
+                boolean dataFetched = routeConflator.downloadRegionsForImportDataset(workingEntitySpace);
+                if(!dataFetched) {
+                    System.out.println("Unable to fetch data for Route #" + importRouteMaster.getTag(OSMEntity.KEY_REF) + "(\"" + importRouteMaster.getTag(OSMEntity.KEY_NAME) + "\")");
+                    continue;
+                }
 
                 //fetch all existing stops from OSM in the route's bounding box
                 final StopConflator stopConflator = new StopConflator(routeConflator);
