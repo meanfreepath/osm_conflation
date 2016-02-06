@@ -83,13 +83,17 @@ public class StopConflator {
 
                     final String primaryStreetBaseName = String.join(" ", primaryStreetComponents.baseComponents);
                     final double primaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(primaryStreetBaseName, wayBaseName, 128);
-                    System.out.println("CHECK PLATFORM PRINAME: " + stop.platform.getTag("name") + "(" + stop.platform.getTag("ref") + ") vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + primaryStringDistance + "/" + primaryStreetBaseName.length() + ", ratio " + (primaryStringDistance / primaryStreetBaseName.length()));
+                    if(debugEnabled) {
+                        System.out.println("CHECK PLATFORM PRINAME: " + stop.platform.getTag("name") + "(" + stop.platform.getTag("ref") + ") vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + primaryStringDistance + "/" + primaryStreetBaseName.length() + ", ratio " + (primaryStringDistance / primaryStreetBaseName.length()));
+                    }
                     if (primaryStringDistance / primaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
                         stop.addNameMatch(line, StopArea.SegmentMatchType.primaryStreet);
                     } else if (secondaryStreetComponents != null) {
                         final String secondaryStreetBaseName = String.join(" ", secondaryStreetComponents.baseComponents);
                         final double secondaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(secondaryStreetBaseName, wayBaseName, 128);
-                        System.out.println("CHECK PLATFORM SECNAME: " + stop.platform.getTag("name") + "(" + stop.platform.getTag("ref") + "): vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + secondaryStringDistance + "/" + secondaryStreetBaseName.length() + ", ratio " + (secondaryStringDistance / secondaryStreetBaseName.length()));
+                        if(debugEnabled) {
+                            System.out.println("CHECK PLATFORM SECNAME: " + stop.platform.getTag("name") + "(" + stop.platform.getTag("ref") + "): vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + secondaryStringDistance + "/" + secondaryStreetBaseName.length() + ", ratio " + (secondaryStringDistance / secondaryStreetBaseName.length()));
+                        }
                         if(secondaryStringDistance / secondaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
                             stop.addNameMatch(line, StopArea.SegmentMatchType.crossStreet);
                         }
@@ -164,10 +168,12 @@ public class StopConflator {
         for(final StopArea stop : routeConflator.getAllRouteStops()) {
             stop.chooseBestWayMatch();
 
-            if(stop.bestWayMatch != null) {
-                System.out.println("Best match for " + stop.platform.osm_id + "(ref " + stop.platform.getTag("ref") + "/" + stop.platform.getTag("name") + "):" + stop.bestWayMatch.line.way.getTag("name") + "(" + stop.bestWayMatch.line.way.osm_id + ")");
-            } else {
-                System.out.println("NO MATCH for " + stop.platform.osm_id + "(ref " + stop.platform.getTag("ref") + "/" + stop.platform.getTag("name") + ")");
+            if(debugEnabled) {
+                if (stop.bestWayMatch != null) {
+                    System.out.println("Best match for " + stop.platform.osm_id + "(ref " + stop.platform.getTag("ref") + "/" + stop.platform.getTag("name") + "):" + stop.bestWayMatch.line.way.getTag("name") + "(" + stop.bestWayMatch.line.way.osm_id + ")");
+                } else {
+                    System.out.println("NO MATCH for " + stop.platform.osm_id + "(ref " + stop.platform.getTag("ref") + "/" + stop.platform.getTag("name") + ")");
+                }
             }
         }
     }
