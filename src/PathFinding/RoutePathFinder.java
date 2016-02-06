@@ -4,6 +4,7 @@ import Conflation.Route;
 import Conflation.StopArea;
 import Conflation.WaySegments;
 import OSM.OSMEntity;
+import OSM.OSMEntitySpace;
 import OSM.OSMWay;
 
 import java.util.*;
@@ -12,7 +13,7 @@ import java.util.*;
  * Contains all the stop-to-stop paths for a route
  * Created by nick on 1/27/16.
  */
-public class RoutePath {
+public class RoutePathFinder {
     public final Route route;
     public final List<PathTree> allPathTrees;
     public final List<Path> calculatedPaths;
@@ -37,7 +38,7 @@ public class RoutePath {
     }
     public final List<RouteLog> logs = new ArrayList<>(128);
 
-    public RoutePath(final Route route, final HashMap<Long, WaySegments> candidateLines) {
+    public RoutePathFinder(final Route route, final HashMap<Long, WaySegments> candidateLines) {
         this.route = route;
         this.candidateLines = candidateLines;
         allPathTrees = new ArrayList<>(route.stops.size() + 1);
@@ -45,14 +46,21 @@ public class RoutePath {
 
         //get the stop matches from the route, creating a new
         StopArea lastStop = null;
+        PathTree lastPathTree = null;
         for(final StopArea curStop : route.stops) {
+            PathTree pathTree = null;
             if(lastStop != null) {
-                allPathTrees.add(new PathTree(lastStop, curStop));
+                pathTree = new PathTree(lastStop, curStop, lastPathTree);
+                allPathTrees.add(pathTree);
+            }
+            if(lastPathTree != null) {
+                lastPathTree.nextPathTree = pathTree;
             }
             lastStop = curStop;
+            lastPathTree = pathTree;
         }
     }
-    public void findPaths() {
+    public void findPaths(final OSMEntitySpace entitySpace) {
         //start the pathfinding code for each stop pair (TODO: may be able to multithread)
         for(final PathTree pathTree : allPathTrees) {
             try {
@@ -68,8 +76,7 @@ public class RoutePath {
         PathTree lastPath = null;
         successfulPaths = failedPaths = 0;
         for(final PathTree pathTree : allPathTrees) {
-            final Path bestPath = pathTree.bestPath;
-            if(bestPath == null) {
+            if(pathTree.bestPath == null) {
                 logEvent(RouteLogType.warning, "NO PATH found between " + pathTree.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + pathTree.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
                 lastPath = null;
                 for (final RouteLog event : eventLogsForObject(pathTree, null)) {
@@ -82,11 +89,11 @@ public class RoutePath {
                 logEvent(RouteLogType.info, "SUCCESSFUL PATH found between " + pathTree.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + pathTree.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
             }
 
-            for(final OSMWay way : bestPath.getPathWays()) {
+            /*for(final OSMWay way : bestPath.getPathWays()) {
                 if(!route.routeRelation.containsMember(way)) {
                     route.routeRelation.addMember(way, "");
                 }
-            }
+            }*/
 
             //check the paths are connected (start/end at same node)
             if(lastPath != null) {
@@ -103,9 +110,37 @@ public class RoutePath {
         }
 
         //split ways as needed
-
+        /*for(final PathTree pathTree : allPathTrees) {
+            pathTree.splitWaysAtIntersections(entitySpace);
+        }
 
         //and add the correct ways to the route relation
+        for(final PathTree pathTree : allPathTrees) {
+            for (final PathSegment pathSegment : pathTree.bestPath.getPathSegments()) {
+                if (pathSegment.usedWay != null) {
+                    route.routeRelation.addMember(pathSegment.usedWay, OSMEntity.MEMBERSHIP_DEFAULT);
+                }
+            }
+        }*/
+    }
+    public void splitWaysAtIntersections(final OSMEntitySpace entitySpace) {
+        //split ways as needed
+        for(final PathTree pathTree : allPathTrees) {
+            pathTree.splitWaysAtIntersections(entitySpace);
+        }
+
+        //and add the correct ways to the route relation
+        for(final PathTree pathTree : allPathTrees) {
+            if(pathTree.bestPath == null) {
+                continue;
+            }
+            for (final PathSegment pathSegment : pathTree.bestPath.getPathSegments()) {
+                if (pathSegment.usedWay != null && !route.routeRelation.containsMember(pathSegment.usedWay)) {
+                    System.out.println(pathSegment + ": USED " + pathSegment.usedWay.getTag("name") + "(" + pathSegment.usedWay.osm_id + ")");
+                    route.routeRelation.addMember(pathSegment.usedWay, OSMEntity.MEMBERSHIP_DEFAULT);
+                }
+            }
+        }
     }
     public void logEvent(final RouteLogType type, final String message, final Object sender) {
         logs.add(new RouteLog(type, message, sender));

@@ -25,6 +25,9 @@ public class PathSegment {
     private int traveledSegmentCount = 0, alignedSegmentCount = 0;
     public double lengthFactor, pathScore, waypointScore;
     private boolean containsPathOriginNode = false, containsPathDestinationNode = false;
+
+    public OSMWay usedWay = null;
+
     /**
      * Whether the contained line has a good enough match to process
      */
@@ -43,7 +46,7 @@ public class PathSegment {
         return String.format("%d:%d", way.osm_id, node.osm_id);
     }
 
-    public void determineScore(final RoutePath parentPath, final OSMNode initialOriginNode, final OSMNode finalDestinationNode) {
+    public void determineScore(final RoutePathFinder parentPath, final OSMNode initialOriginNode, final OSMNode finalDestinationNode) {
         //System.out.println("Segment of " + line.way.getTag("name") + " (" + line.way.osm_id + "): from " + originJunction.junctionNode.osm_id + " (traveling " + (line.matchObject.getAvgDotProduct() >= 0.0 ? "forward" : "backward") + ")");
         lineMatched = false;
 
@@ -52,7 +55,7 @@ public class PathSegment {
         //determine the direction of this line relative to the direction of route travel
         final List<OSMNode> segmentNodes = new ArrayList<>(line.way.getNodes().size());
         if(line.getMatchForLine(parentPath.route.routeLine) == null) {
-            parentPath.logEvent(RoutePath.RouteLogType.error, "No match for line " + line.way.getTag(OSMEntity.KEY_NAME) + "(" + line.way.osm_id + ")", this);
+            parentPath.logEvent(RoutePathFinder.RouteLogType.error, "No match for line " + line.way.getTag(OSMEntity.KEY_NAME) + "(" + line.way.osm_id + ")", this);
             return;
         }
         final boolean ourDirectionForward = line.getMatchForLine(parentPath.route.routeLine).getAvgDotProduct() >= 0.0;
@@ -230,15 +233,15 @@ public class PathSegment {
             }
         }
     }*/
-    private double calculateDirectionMultiplier(final WaySegments.OneWayDirection travelDirection, final OSMNode originatingNodeForTravel, final RoutePath parentPath) {
+    private double calculateDirectionMultiplier(final WaySegments.OneWayDirection travelDirection, final OSMNode originatingNodeForTravel, final RoutePathFinder parentPath) {
         final double directionMultiplier;
         final boolean wayIsOneWay = line.oneWayDirection != WaySegments.OneWayDirection.none;
         if(wayIsOneWay) {
             if(line.oneWayDirection != travelDirection) { //if a oneway is present, and runs counter our direction of travel
-                //parentPath.logEvent(RoutePath.RouteLogType.notice, "PATH BLOCKS ENTRY TO " + line.way.getTag("name") + " (" + line.way.osm_id + "): " + line.oneWayDirection.name() + "/" + travelDirection.name(), this);
+                //parentPath.logEvent(RoutePathFinder.RouteLogType.notice, "PATH BLOCKS ENTRY TO " + line.way.getTag("name") + " (" + line.way.osm_id + "): " + line.oneWayDirection.name() + "/" + travelDirection.name(), this);
                 directionMultiplier = SCORE_FACTOR_FOR_INCORRECT_ONEWAY_TRAVEL;
             } else if(originJunction.junctionNode == originatingNodeForTravel) { //if entering from the originating node would cause us to go counter to the oneway, also bail
-                //parentPath.logEvent(RoutePath.RouteLogType.notice, "REVPATH BLOCKS ENTRY TO " + line.way.getTag("name") + " (" + line.way.osm_id + ")", this);
+                //parentPath.logEvent(RoutePathFinder.RouteLogType.notice, "REVPATH BLOCKS ENTRY TO " + line.way.getTag("name") + " (" + line.way.osm_id + ")", this);
                 directionMultiplier = SCORE_FACTOR_FOR_INCORRECT_ONEWAY_TRAVEL;
             } else {
                 directionMultiplier = SCORE_FACTOR_FOR_CORRECT_ONEWAY_TRAVEL;

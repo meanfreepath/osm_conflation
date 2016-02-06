@@ -2,7 +2,7 @@ package Conflation;
 
 import OSM.*;
 import Overpass.OverpassConverter;
-import PathFinding.RoutePath;
+import PathFinding.RoutePathFinder;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
@@ -267,7 +267,7 @@ public class RouteConflator {
         return regions;
     }
     public void conflateRoutePaths(final StopConflator stopConflator) {
-        final int debugRouteId = -1214;
+        final int debugRouteId = -1367;
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
@@ -321,22 +321,15 @@ public class RouteConflator {
         System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
 
         //with the candidate lines determined, begin the pathfinding stage to lock down the path between the route's stops
+        final List<RoutePathFinder> routePathFinderFinders = new ArrayList<>(exportRoutes.size());
         for(final Route route : exportRoutes) {
-            /*for (final LineSegment routeLineSegment : route.routeLine.segments) {
-                for (final WaySegments candidateLine : routeLineSegment.candidateWaySegments) {
-                    for (final LineSegment candidateSegment : candidateLine.segments) {
-                        routeLineSegment.matchingSegments.clear();
-                        candidateSegment.matchingSegments.clear();
-                        //SegmentMatch.checkCandidateForMatch(wayMatchingOptions, routeLineSegment, candidateSegment, candidateLine.getMatchForLine(route.routeLine));
-                    }
-                }
-            }*/
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
                 continue;
             }
-            final RoutePath routePath = new RoutePath(route, candidateLines);
-            routePath.findPaths();
-            if(routePath.getFailedPaths() > 0) {
+            final RoutePathFinder routePathFinder = new RoutePathFinder(route, candidateLines);
+            routePathFinderFinders.add(routePathFinder);
+            routePathFinder.findPaths(workingEntitySpace);
+            if(routePathFinder.getFailedPaths() > 0) {
                 workingEntitySpace.addEntity(route.routePath, OSMEntity.TagMergeStrategy.keepTags, null);
                 route.routeRelation.addMember(route.routePath, "");
             }
@@ -352,6 +345,10 @@ public class RouteConflator {
                     e.printStackTrace();
                 }
             }
+        }
+
+        for(final RoutePathFinder routePathFinder : routePathFinderFinders) {
+            routePathFinder.splitWaysAtIntersections(workingEntitySpace);
         }
     }
     public Collection<StopArea> getAllRouteStops() {
