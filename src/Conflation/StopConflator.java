@@ -134,36 +134,6 @@ public class StopConflator {
             }
         }
 
-        //we also do a comparison based on proximity to the GTFS route lines
-        /*for(final Route route : routeConflator.getExportRoutes()) {
-            for(final StopArea routeStop : route.stops) {
-                final Point platformCentroid = routeStop.platform.getCentroid();
-                LineSegment nearestSegment = null;
-                double minDistance = StopArea.maxDistanceFromPlatformToWay;
-                Point closestPoint;
-
-                for(final LineSegment routeLineSegment : route.routeLine.segments) {
-                    //check the segment's bounding box intersects
-                    if (!Region.intersects(routeLineSegment.getBoundingBox().regionInset(latitudeDelta, longitudeDelta), routeStop.nearbyWaySearchRegion)) {
-                        continue;
-                    }
-
-                    closestPoint = routeLineSegment.closestPointToPoint(platformCentroid);
-                    final double segmentDistance = Point.distance(closestPoint, platformCentroid);
-                    if(segmentDistance < minDistance) {
-                        nearestSegment = routeLineSegment;
-                        minDistance = segmentDistance;
-                    }
-                }
-
-                //skip this line if not within the maximum distance to the stop
-                if(nearestSegment != null) {
-                    //System.out.println("ROUTELINE MATCH for platform " + routeStop.platform.osm_id + "(ref " + routeStop.platform.getTag("ref") + "/" + routeStop.platform.getTag("name") + ")");
-                    routeStop.addProximityMatch(nearestSegment, minDistance, StopArea.SegmentMatchType.proximityToRouteLine);
-                }
-            }
-        }*/
-
         //now pick the best stopSegmentMatches for each platform
         for(final StopArea stop : routeConflator.getAllRouteStops()) {
             stop.chooseBestWayMatch();
