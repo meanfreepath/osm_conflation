@@ -102,6 +102,7 @@ public class Route {
             for(final LineSegment matchingSegment : matchingLine.segments) {
                 final SegmentMatch bestMatchForSegment = matchingSegment.bestMatchForLine.get(routeLine.way.osm_id);
                 if(bestMatchForSegment == null) { //skip non-matching segments
+                    matchOriginNode = null; //reset so unconnected segments aren't "reconnected" on output
                     continue;
                 }
 
