@@ -12,7 +12,7 @@ import java.util.*;
  * Tracks and processes a route_master-type OSM relation
  * Created by nick on 1/27/16.
  */
-public class RouteConflator {
+public class RouteConflator implements WaySegmentsObserver {
     public static class LineComparisonOptions {
         public double maxSegmentLength = 5.0, maxSegmentOrthogonalDistance = 10.0, maxSegmentMidPointDistance = 20.0, boundingBoxSize = 50.0;
         private double minSegmentDotProduct;
@@ -157,7 +157,9 @@ public class RouteConflator {
         //create WaySegments objects for all downloaded ways
         candidateLines = new HashMap<>(workingEntitySpace.allWays.size());
         for(final OSMWay way : workingEntitySpace.allWays.values()) {
-            candidateLines.put(way.osm_id, new WaySegments(way, WaySegments.LineType.osmLine, wayMatchingOptions.maxSegmentLength));
+            final WaySegments line = new WaySegments(way, WaySegments.LineType.osmLine, wayMatchingOptions.maxSegmentLength);
+            candidateLines.put(way.osm_id, line);
+            line.addObserver(this);
         }
 
         return true;
@@ -314,7 +316,7 @@ public class RouteConflator {
             System.out.println("Matched lines in " + (new Date().getTime() - timeStartLineComparison) + "ms");
         }
 
-        //update the route's stop stopSegmentMatches to include the match info on the OSM ways
+        //update the route's stop proximity matches to include the match info on the OSM ways
         final long timeStartStopMatching = new Date().getTime();
         stopConflator.matchStopsToWays();
         stopConflator.createStopPositionsForPlatforms(workingEntitySpace);
@@ -365,5 +367,18 @@ public class RouteConflator {
     }
     public HashMap<Long, WaySegments> getCandidateLines() {
         return candidateLines;
+    }
+
+    @Override
+    public void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
+        for(final WaySegments ws : splitWaySegments) {
+            if(ws != originalWaySegments) {
+                candidateLines.put(ws.way.osm_id, ws);
+            }
+        }
+    }
+    @Override
+    public void waySegmentsWasDeleted(final WaySegments waySegments) {
+        candidateLines.remove(waySegments.way.osm_id);
     }
 }

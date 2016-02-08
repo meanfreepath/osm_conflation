@@ -4,6 +4,7 @@ import OSM.OSMEntity;
 import OSM.OSMNode;
 import OSM.Point;
 import OSM.Region;
+import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.util.*;
 
@@ -11,7 +12,7 @@ import java.util.*;
  * Class that associates stop platforms with their respective node on the appropriate way
  * Created by nick on 1/27/16.
  */
-public class StopArea {
+public class StopArea implements WaySegmentsObserver {
     private final static Comparator<StopWayMatch> STOP_WAY_MATCH_COMPARATOR = new Comparator<StopWayMatch>() {
         @Override
         public int compare(final StopWayMatch o1, final StopWayMatch o2) {
@@ -46,22 +47,22 @@ public class StopArea {
 
         public final WaySegments line;
         public LineSegment closestSegmentToStop = null;
-        public final List<StopSegmentMatch> stopSegmentMatches = new ArrayList<>(8);
+        public final List<StopSegmentMatch> proximityMatches = new ArrayList<>(8);
         private double nameScore = 0.0, dpScore = 0.0, distanceScore = 0.0;
 
         public StopWayMatch(final WaySegments candidateLine) {
             line = candidateLine;
         }
         public void addStopSegmentMatch(final WaySegments toRouteLine, final LineSegment segment, final double distance, final SegmentMatchType matchType) {
-            stopSegmentMatches.add(new StopSegmentMatch(toRouteLine, segment, distance, matchType));
+            proximityMatches.add(new StopSegmentMatch(toRouteLine, segment, distance, matchType));
         }
         public void summarizeMatches() {
             dpScore = distanceScore = 0.0;
-            if(stopSegmentMatches.size() == 0) {
+            if(proximityMatches.size() == 0) {
                 return;
             }
 
-            for(final StopSegmentMatch segmentMatch : stopSegmentMatches) {
+            for(final StopSegmentMatch segmentMatch : proximityMatches) {
                 final double dpFactor, odFactor;
                 final SegmentMatch bestMatchForRouteLine = segmentMatch.candidateSegment.bestMatchForLine.get(segmentMatch.routeLine.way.osm_id);
                 if(bestMatchForRouteLine != null) {
@@ -114,17 +115,21 @@ public class StopArea {
         StopWayMatch wayMatch = wayMatches.get(line.way.osm_id);
         if(wayMatch == null) {
             wayMatch = new StopWayMatch(line);
+            wayMatches.put(line.way.osm_id, wayMatch);
         }
         wayMatch.nameScore += scoreFactorForMatchType(matchType);
-        wayMatches.put(line.way.osm_id, wayMatch);
+
+        line.addObserver(this);
     }
     public void addProximityMatch(final WaySegments toRouteLine, final LineSegment segment, final double distance, final SegmentMatchType matchType) {
         StopWayMatch wayMatch = wayMatches.get(segment.parentSegments.way.osm_id);
         if(wayMatch == null) {
             wayMatch = new StopWayMatch(segment.parentSegments);
+            wayMatches.put(segment.parentSegments.way.osm_id, wayMatch);
         }
         wayMatch.addStopSegmentMatch(toRouteLine, segment, distance, matchType);
-        wayMatches.put(segment.parentSegments.way.osm_id, wayMatch);
+
+        segment.parentSegments.addObserver(this);
     }
     public void chooseBestWayMatch() {
         if(wayMatches.size() == 0) {
@@ -152,7 +157,7 @@ public class StopArea {
     }
     private static double scoreFactorForMatchType(final SegmentMatchType type) {
         switch (type) {
-            case primaryStreet: //prioritize name stopSegmentMatches
+            case primaryStreet: //prioritize name matches
                 return 100.0;
             case crossStreet:
                 return 50.0;
@@ -161,5 +166,50 @@ public class StopArea {
             default:
                 return 0.0;
         }
+    }
+    @Override
+    public void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
+        //first find the match to the original way
+        final StopWayMatch originalWayMatch = wayMatches.get(originalWaySegments.way.osm_id);
+        if(originalWayMatch == null) { //shouldn't happen
+            String[] errMsg = {"Received observation message for untracked line!"};
+            throw new InvalidArgumentException(errMsg);
+        }
+
+        System.out.println("Stop " + platform.getTag("name") + " observed split: " + originalWaySegments.way.getTag("name"));
+
+        //remove the proximity matches from segments that are no longer on the original line
+        final List<StopWayMatch.StopSegmentMatch> oldProximityMatches = new ArrayList<>(originalWayMatch.proximityMatches.size());
+        for(final StopWayMatch.StopSegmentMatch segmentMatch : originalWayMatch.proximityMatches) {
+            if(!originalWayMatch.line.segments.contains(segmentMatch.candidateSegment)) {
+                oldProximityMatches.add(segmentMatch);
+            }
+        }
+        originalWayMatch.proximityMatches.removeAll(oldProximityMatches);
+
+        //update the proximity matches to refer to the correct line
+        System.out.println("removed " + oldProximityMatches.size() + " stale proximity matches");
+        for(final WaySegments ws : splitWaySegments) {
+            for(final StopWayMatch.StopSegmentMatch segmentMatch : oldProximityMatches) {
+                if(ws.segments.contains(segmentMatch.candidateSegment)) {
+                    addProximityMatch(segmentMatch.routeLine, segmentMatch.candidateSegment, segmentMatch.distance, segmentMatch.matchType);
+                    System.out.println("Moved proximity for segment from " + originalWayMatch.line.way.osm_id + " to line " + segmentMatch.candidateSegment.parentSegments.way.osm_id + "/" + ws.way.osm_id);
+                }
+            }
+        }
+
+        //and re-summarize the matches
+        for(final StopWayMatch wayMatch : wayMatches.values()) {
+            wayMatch.nameScore = originalWayMatch.nameScore; //also copy name score
+            wayMatch.summarizeMatches();
+        }
+
+        //and re-choose the best match
+        chooseBestWayMatch();
+    }
+
+    @Override
+    public void waySegmentsWasDeleted(WaySegments waySegments) {
+
     }
 }

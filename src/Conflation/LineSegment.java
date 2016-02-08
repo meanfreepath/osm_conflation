@@ -17,7 +17,7 @@ public class LineSegment {
     private final static DecimalFormat DEBUG_OUTPUT_FORMATTER = new DecimalFormat("#.####");
     public Point originPoint, midPoint, destinationPoint;
     public OSMNode originNode, destinationNode;
-    public final WaySegments parentSegments;
+    public WaySegments parentSegments;
 
     /**
      * The index of the originNode in the parent Way (if originNode is null, should be the index of the most recent node in the way)
@@ -123,6 +123,6 @@ public class LineSegment {
         return new Point(originPoint.latitude + vectorY * t, originPoint.longitude + vectorX * t);
     }
     public String toString() {
-        return "wayseg " + parentSegments.way.osm_id + " #" + nodeIndex + "/" + segmentIndex + " ([" + DEBUG_OUTPUT_FORMATTER.format(originPoint.latitude) + "," + DEBUG_OUTPUT_FORMATTER.format(originPoint.longitude) + "], [" + DEBUG_OUTPUT_FORMATTER.format(destinationPoint.latitude) + "," + DEBUG_OUTPUT_FORMATTER.format(destinationPoint.longitude) + "])";
+        return "wayseg " + parentSegments.way.osm_id + " #" + nodeIndex + "/" + segmentIndex + " ([" + DEBUG_OUTPUT_FORMATTER.format(originPoint.latitude) + "," + DEBUG_OUTPUT_FORMATTER.format(originPoint.longitude) + "], [" + DEBUG_OUTPUT_FORMATTER.format(destinationPoint.latitude) + "," + DEBUG_OUTPUT_FORMATTER.format(destinationPoint.longitude) + "]) NODES " + (originNode != null ? originNode.osm_id : "NULL") + "/" +  (destinationNode != null ? destinationNode.osm_id : "NULL");
     }
 }

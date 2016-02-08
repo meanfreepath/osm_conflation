@@ -134,7 +134,7 @@ public class StopConflator {
             }
         }
 
-        //now pick the best stopSegmentMatches for each platform
+        //now pick the best matches for each platform
         for(final StopArea stop : routeConflator.getAllRouteStops()) {
             stop.chooseBestWayMatch();
 
@@ -150,8 +150,12 @@ public class StopConflator {
     private void matchStopsToWaysUsingNames() {
 
     }
+
+    /**
+     * Adds the best match for each stop platform to their best-matched nearby way
+     * @param entitySpace
+     */
     public void createStopPositionsForPlatforms(final OSMEntitySpace entitySpace) {
-        //now pick the best stopSegmentMatches for each platform
         for(final StopArea stopArea : routeConflator.getAllRouteStops()) {
             if(stopArea.bestWayMatch == null) {
                 continue;
@@ -161,7 +165,7 @@ public class StopConflator {
             final LineSegment bestSegment = stopArea.bestWayMatch.closestSegmentToStop;
             final Point nearestPointOnSegment = bestSegment.closestPointToPoint(stopArea.platform.getCentroid());
 
-            OSMNode nearestNodeOnWay = bestSegment.parentSegments.way.nearestNodeAtPoint(nearestPointOnSegment, stopArea.stopNodeTolerance);
+            OSMNode nearestNodeOnWay = bestSegment.parentSegments.way.nearestNodeAtPoint(nearestPointOnSegment, StopArea.stopNodeTolerance);
             if(nearestNodeOnWay == null) {
                 nearestNodeOnWay = bestSegment.parentSegments.insertNode(entitySpace.createNode(nearestPointOnSegment.latitude, nearestPointOnSegment.longitude, null), bestSegment);
             }
