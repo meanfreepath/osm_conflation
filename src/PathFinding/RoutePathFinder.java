@@ -1,9 +1,6 @@
 package PathFinding;
 
-import Conflation.Route;
-import Conflation.StopArea;
-import Conflation.WaySegments;
-import Conflation.WaySegmentsObserver;
+import Conflation.*;
 import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMWay;
@@ -211,5 +208,9 @@ public class RoutePathFinder implements WaySegmentsObserver {
     @Override
     public void waySegmentsWasDeleted(final WaySegments waySegments) {
         candidateLines.remove(waySegments.way.osm_id);
+    }
+    @Override
+    public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment newSegment) {
+
     }
 }

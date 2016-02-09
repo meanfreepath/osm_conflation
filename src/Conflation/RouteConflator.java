@@ -382,4 +382,8 @@ public class RouteConflator implements WaySegmentsObserver {
     public void waySegmentsWasDeleted(final WaySegments waySegments) {
         candidateLines.remove(waySegments.way.osm_id);
     }
+    @Override
+    public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment newSegment) {
+
+    }
 }

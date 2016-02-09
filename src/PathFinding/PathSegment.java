@@ -312,4 +312,8 @@ public class PathSegment implements WaySegmentsObserver {
     public void waySegmentsWasDeleted(final WaySegments waySegments) throws InvalidArgumentException {
 
     }
+    @Override
+    public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment newSegment) {
+
+    }
 }

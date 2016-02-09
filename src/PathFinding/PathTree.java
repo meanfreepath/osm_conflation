@@ -1,5 +1,6 @@
 package PathFinding;
 
+import Conflation.LineSegment;
 import Conflation.StopArea;
 import Conflation.WaySegmentsObserver;
 import OSM.OSMEntity;
@@ -238,5 +239,9 @@ public class PathTree implements WaySegmentsObserver {
         }
 
         //check if the path should be deleted
+    }
+    @Override
+    public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment newSegment) {
+
     }
 }

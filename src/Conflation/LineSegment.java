@@ -15,8 +15,8 @@ import java.util.Map;
  */
 public class LineSegment {
     private final static DecimalFormat DEBUG_OUTPUT_FORMATTER = new DecimalFormat("#.####");
-    public Point originPoint, midPoint, destinationPoint;
-    public OSMNode originNode, destinationNode;
+    public final Point originPoint, midPoint, destinationPoint;
+    public final OSMNode originNode, destinationNode;
     public WaySegments parentSegments;
 
     /**
@@ -24,9 +24,9 @@ public class LineSegment {
      */
     public int nodeIndex;
     public int segmentIndex;
-    public final List<WaySegments> candidateWaySegments = new ArrayList<>(16);
-    public final Map<Long, List<SegmentMatch>> matchingSegments = new HashMap<>(8);
-    public final Map<Long, SegmentMatch> bestMatchForLine = new HashMap<>(8);
+    public final List<WaySegments> candidateWaySegments;
+    public final Map<Long, List<SegmentMatch>> matchingSegments;
+    public final Map<Long, SegmentMatch> bestMatchForLine;
     public final double vectorX, vectorY, orthogonalVectorX, orthogonalVectorY, midPointX, midPointY;
     public final double vectorMagnitude;
     public final double length;
@@ -41,6 +41,10 @@ public class LineSegment {
         this.nodeIndex = nodeIndex;
         this.segmentIndex = segmentIndex;
 
+        candidateWaySegments = new ArrayList<>(16);
+        matchingSegments = new HashMap<>(8);
+        bestMatchForLine = new HashMap<>(8);
+
         vectorX = destination.longitude - origin.longitude;
         vectorY = destination.latitude - origin.latitude;
         vectorMagnitude = Math.sqrt(vectorX * vectorX + vectorY * vectorY);
@@ -51,6 +55,36 @@ public class LineSegment {
 
         midPointX = origin.longitude + 0.5 * vectorX;
         midPointY = origin.latitude + 0.5 * vectorY;
+        midPoint = new Point(midPointY, midPointX);
+
+        length = Point.distance(vectorY, vectorX);
+
+        final double latitudeDelta = -RouteConflator.wayMatchingOptions.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * midPointY / 180.0);
+        searchAreaForMatchingOtherSegments = getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
+    }
+    public LineSegment(final LineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
+        this.parentSegments = segmentToCopy.parentSegments;
+        this.originPoint = segmentToCopy.originPoint;
+        this.destinationPoint = destination;
+        this.originNode = segmentToCopy.originNode;
+        this.destinationNode = destinationNode;
+        this.nodeIndex = segmentToCopy.nodeIndex;
+        this.segmentIndex = segmentToCopy.segmentIndex;
+
+        candidateWaySegments = new ArrayList<>(segmentToCopy.candidateWaySegments);
+        matchingSegments = new HashMap<>(segmentToCopy.matchingSegments);
+        bestMatchForLine = new HashMap<>(segmentToCopy.bestMatchForLine);
+
+        vectorX = destination.longitude - originPoint.longitude;
+        vectorY = destination.latitude - originPoint.latitude;
+        vectorMagnitude = Math.sqrt(vectorX * vectorX + vectorY * vectorY);
+
+        orthogonalVectorX = -vectorY;
+        //noinspection SuspiciousNameCombination
+        orthogonalVectorY = vectorX;
+
+        midPointX = originPoint.longitude + 0.5 * vectorX;
+        midPointY = originPoint.latitude + 0.5 * vectorY;
         midPoint = new Point(midPointY, midPointX);
 
         length = Point.distance(vectorY, vectorX);

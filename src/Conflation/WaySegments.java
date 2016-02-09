@@ -233,16 +233,16 @@ public class WaySegments {
      * @param onSegment The segment to add the node to
      * @return If an existing node is within the tolerance distance, that node, otherwise the input node
      */
-    public OSMNode insertNode(final OSMNode node, final LineSegment onSegment) {
+    public OSMNode insertNode(final OSMNode node, LineSegment onSegment) {
         final Point nodePoint = node.getCentroid();
 
         //create a new segment starting from the node, and ending at onSegment's destination Point
         final LineSegment insertedSegment = new LineSegment(this, nodePoint, onSegment.destinationPoint, node, onSegment.destinationNode, onSegment.segmentIndex + 1, onSegment.nodeIndex + 1);
         insertedSegment.copyMatches(onSegment);
 
-        //and truncate onSegment to the new node's position
-        onSegment.destinationPoint = nodePoint;
-        onSegment.destinationNode = node;
+        //and replace onSegment with a version of itself that's truncated to the new node's position
+        final LineSegment newOnSegment = new LineSegment(onSegment, nodePoint, node);
+        segments.set(segments.indexOf(onSegment), newOnSegment);
 
         //increment the node index of all following segments
         for(final LineSegment segment : segments) {
@@ -252,8 +252,16 @@ public class WaySegments {
             }
         }
 
+        //add the segment and node to this line and its way
         segments.add(insertedSegment.segmentIndex, insertedSegment);
         way.insertNode(node, insertedSegment.nodeIndex);
+
+        //and notify any observers
+        if(observers != null) {
+            for (final WaySegmentsObserver observer : observers) {
+                observer.waySegmentsAddedSegment(this, insertedSegment);
+            }
+        }
 
         return node;
     }
@@ -402,5 +410,26 @@ public class WaySegments {
     }
     public String outputSegments() {
         return outputSegments(segments);
+    }
+
+    /**
+     * Returns the segment which is closest to the given point
+     * @param point
+     * @param maxSearchDistance
+     * @return
+     */
+    public final LineSegment closestSegmentToPoint(final Point point, final double maxSearchDistance) {
+        double minDistance = maxSearchDistance, curDistance;
+        LineSegment closestSegment = null;
+        Point closestPointOnSegment;
+        for(final LineSegment segment : segments) {
+            closestPointOnSegment = segment.closestPointToPoint(point);
+            curDistance = Point.distance(point, closestPointOnSegment);
+            if(curDistance < minDistance) {
+                minDistance = curDistance;
+                closestSegment = segment;
+            }
+        }
+        return closestSegment;
     }
 }

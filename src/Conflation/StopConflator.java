@@ -6,6 +6,7 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 
@@ -54,21 +55,8 @@ public class StopConflator {
                     continue;
                 }
 
-                //find the nearest segment to the platform on the way
-                LineSegment nearestSegment = null;
-                double minDistance = StopArea.maxDistanceFromPlatformToWay;
-                Point closestPoint;
-                for(final LineSegment segment : line.segments) {
-                    closestPoint = segment.closestPointToPoint(platformCentroid);
-                    final double segmentDistance = Point.distance(closestPoint, platformCentroid);
-                    if(segmentDistance < minDistance) {
-                        nearestSegment = segment;
-                        minDistance = segmentDistance;
-                    }
-                }
-
-                //skip this line if not within the maximum distance to the stop
-                if(nearestSegment == null) {
+                //skip this line if the nearest segment is not within the maximum distance to the stop
+                if(line.closestSegmentToPoint(platformCentroid, StopArea.maxDistanceFromPlatformToWay) == null) {
                     //System.out.println("NO MATCH for platform " + stopPlatform.osm_id + "(ref " + stopPlatform.getTag("ref") + "/" + stopPlatform.getTag("name") + ")");
                     continue;
                 }
@@ -113,22 +101,12 @@ public class StopConflator {
                     }
 
                     //find the nearest segment to the platform on the way
-                    LineSegment nearestSegment = null;
-                    double minDistance = StopArea.maxDistanceFromPlatformToWay;
-                    Point closestPoint;
-                    for (final LineSegment segment : osmLine.segments) {
-                        closestPoint = segment.closestPointToPoint(platformCentroid);
-                        final double segmentDistance = Point.distance(closestPoint, platformCentroid);
-                        if (segmentDistance < minDistance) {
-                            nearestSegment = segment;
-                            minDistance = segmentDistance;
-                        }
-                    }
+                    final LineSegment nearestSegment = osmLine.closestSegmentToPoint(platformCentroid, StopArea.maxDistanceFromPlatformToWay);
 
                     //skip this line if not within the maximum distance to the stop
                     if (nearestSegment != null) {
                         //System.out.println("OSMLINE MATCH for platform " + routeStop.platform.osm_id + "(ref " + routeStop.platform.getTag("ref") + "/" + routeStop.platform.getTag("name") + ")");
-                        routeStop.addProximityMatch(route.routeLine, nearestSegment, minDistance, StopArea.SegmentMatchType.proximityToOSMWay);
+                        routeStop.addProximityMatch(route.routeLine, nearestSegment, Point.distance(nearestSegment.closestPointToPoint(platformCentroid), platformCentroid), StopArea.SegmentMatchType.proximityToOSMWay);
                     }
                 }
             }
@@ -146,9 +124,6 @@ public class StopConflator {
                 }
             }
         }
-    }
-    private void matchStopsToWaysUsingNames() {
-
     }
 
     /**
@@ -168,6 +143,7 @@ public class StopConflator {
             OSMNode nearestNodeOnWay = bestSegment.parentSegments.way.nearestNodeAtPoint(nearestPointOnSegment, StopArea.stopNodeTolerance);
             if(nearestNodeOnWay == null) {
                 nearestNodeOnWay = bestSegment.parentSegments.insertNode(entitySpace.createNode(nearestPointOnSegment.latitude, nearestPointOnSegment.longitude, null), bestSegment);
+                stopArea.chooseBestWayMatch();
             }
 
             //then add a node on the nearest point and add to the relation and the way

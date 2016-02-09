@@ -96,18 +96,7 @@ public class StopArea implements WaySegmentsObserver {
             }
 
             //determine the closest segment on the line to this stop
-            LineSegment nearestSegment = null;
-            double minDistance = StopArea.maxDistanceFromPlatformToWay;
-            Point closestPoint;
-            for(final LineSegment segment : line.segments) {
-                closestPoint = segment.closestPointToPoint(platform.getCentroid());
-                final double segmentDistance = Point.distance(closestPoint, platform.getCentroid());
-                if(segmentDistance < minDistance) {
-                    nearestSegment = segment;
-                    minDistance = segmentDistance;
-                }
-            }
-            closestSegmentToStop = nearestSegment;
+            closestSegmentToStop = line.closestSegmentToPoint(platform.getCentroid(), StopArea.maxDistanceFromPlatformToWay);
         }
         public double getScore() {
             return nameScore + dpScore + distanceScore;
@@ -246,5 +235,18 @@ public class StopArea implements WaySegmentsObserver {
     @Override
     public void waySegmentsWasDeleted(WaySegments waySegments) {
 
+    }
+    @Override
+    public void waySegmentsAddedSegment(final WaySegments waySegments, final LineSegment newSegment) {
+        //update the way matches to include the new segment
+        for(final StopWayMatch wayMatch : wayMatches.values()) {
+            for(final StopWayMatch.SegmentProximityMatch proximityMatch : wayMatch.proximityMatches) {
+                if(proximityMatch.candidateSegment.parentSegments == waySegments) {
+                    addProximityMatch(proximityMatch.routeLine, newSegment, Point.distance(newSegment.midPoint, platform.getCentroid()), SegmentMatchType.proximityToOSMWay);
+                    break;
+                }
+            }
+        }
+        chooseBestWayMatch();
     }
 }
