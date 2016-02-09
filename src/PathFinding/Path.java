@@ -96,8 +96,6 @@ public class Path {
      * Only needs to be called on the "best" path
      */
     public void splitWaysAtIntersections(final OSMEntitySpace entitySpace, final Path previousPath) throws InvalidArgumentException {
-//        final WaySegments previousPathTreeLine = parentPathTree.previousPathTree != null ? parentPathTree.previousPathTree.getToLine() : null;
-        final WaySegments nextPathTreeLine = parentPathTree.nextPathTree != null ? parentPathTree.nextPathTree.getFromLine(): null;
         int segmentIndex = 0;
         PathSegment previousSegment = null;
         final List<OSMNode> splitNodes = new ArrayList<>(2);
@@ -105,7 +103,8 @@ public class Path {
         boolean isLastRoutePath = parentPathTree.nextPathTree == null;
 
         //check if the line is the same as the previous path's line
-        System.out.println("SPLIT " + this.toString());
+        System.out.println("------------------------------------------------------------------------------------------------");
+        System.out.println("SPLIT PATH: " + this.toString());
         System.out.print("FIRST PATH segment " + firstPathSegment + "::");
         if(parentPathTree.previousPathTree == null) { //split at first stop
             System.out.println("FIRST ON ROUTE");
@@ -127,7 +126,7 @@ public class Path {
              * - this is a node on a continuing path which is on a different way than the last path's final way
              */
             if(previousSegment != null) { //skip the first segment on the path
-                System.out.println("CHECK SPLIT FOR CONTINUING " + previousSegment);
+                System.out.println("CHECK SPLIT FOR CONTINUING #" + segmentIndex + ": " + previousSegment);
                 //if previous path used a different line than the current path
                 final boolean previousLineSegmentHasSameLine = previousSegment.getLine() == pathSegment.getLine();
                 if(previousLineSegmentHasSameLine) { //if not, don't split the previous path at its end
@@ -147,16 +146,28 @@ public class Path {
             //and add the end node (will be removed
             splitNodes.add(pathSegment.getEndJunction().junctionNode);
             previousSegment = pathSegment;
+            segmentIndex++;
         }
 
-        //finally, split the last PathSegment if it's not continuing
-        assert previousSegment != null;
-        System.out.println("SPLIT LAST SEGMENT " + previousSegment + "?");
-        if(previousSegment.getLine() == nextPathTreeLine) {
-            splitNodes.remove(splitNodes.size() - 1);
+        /*finally, split the last PathSegment at its end if needed.  Right now it *may* be set to split at its first node,
+          and is definitely set to split at its end node.  Cancel the end node split if the path will continue on the same way*/
+        System.out.println("SPLIT LAST SEGMENT " + lastPathSegment + "?");
+        if(parentPathTree.nextPathTree != null) { //i.e. there's another path after this
+            final Path nextPathTreeBestPath = parentPathTree.nextPathTree.bestPath;
+            if(nextPathTreeBestPath == null) { //don't split at the end if the next path wasn't determined
+                System.out.print("NEXT PATH IS NULL, NO END SPLIT: ");
+                splitNodes.remove(splitNodes.size() - 1);
+            } else if(nextPathTreeBestPath.firstPathSegment.getLine() == lastPathSegment.getLine()) { //don't split at the end if the path starts on the same way
+                System.out.print("NEXT PATH IS SAME, NO END SPLIT: ");
+                splitNodes.remove(splitNodes.size() - 1);
+            } else {
+                System.out.print("NEXT PATH IS DIFFERENT, SHOULD END SPLIT: ");
+            }
+        } else { //i.e. this is the last path on the entire route: definitely split
+            System.out.println("LAST ON ROUTE!");
         }
 
-        runSplit(previousSegment, splitNodes, entitySpace);
+        runSplit(lastPathSegment, splitNodes, entitySpace);
     }
     private static void runSplit(final PathSegment pathSegmentToSplit, final List<OSMNode> splitNodes, final OSMEntitySpace entitySpace) throws InvalidArgumentException {
         if(splitNodes.size() > 0) {
