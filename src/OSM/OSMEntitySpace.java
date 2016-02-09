@@ -71,6 +71,7 @@ public class OSMEntitySpace {
                 newNode.setTag(tag.getKey(), tag.getValue());
             }
         }
+        //newNode.setTag("origid", Long.toString(newNode.osm_id));
         return (OSMNode) addEntity(newNode, OSMEntity.TagMergeStrategy.keepTags, null);
     }
 
@@ -93,6 +94,7 @@ public class OSMEntitySpace {
                 newWay.appendNode(node);
             }
         }
+        //newWay.setTag("origid", Long.toString(newWay.osm_id));
         return (OSMWay) addEntity(newWay, OSMEntity.TagMergeStrategy.keepTags, null);
     }
 
@@ -115,6 +117,7 @@ public class OSMEntitySpace {
                 newRelation.addMember(member.member, member.role);
             }
         }
+        //newRelation.setTag("origid", Long.toString(newRelation.osm_id));
         return (OSMRelation) addEntity(newRelation, OSMEntity.TagMergeStrategy.keepTags, null);
     }
 
@@ -378,31 +381,31 @@ public class OSMEntitySpace {
 
     /**
      * Split the given way at the given node, returning the new way(s)
-     * @param way the way to split
+     * @param originalWay the way to split
      * @param splitNodes the node(s) to split it at
      * @return the split ways
      * @throws InvalidArgumentException
      */
-    public OSMWay[] splitWay(final OSMWay way, final OSMNode[] splitNodes) throws InvalidArgumentException {
+    public OSMWay[] splitWay(final OSMWay originalWay, final OSMNode[] splitNodes) throws InvalidArgumentException {
         //basic checks
-        final List<OSMNode> curNodes = way.getNodes();
+        final List<OSMNode> curNodes = originalWay.getNodes();
         List<NodeIndexer> actualSplitNodes = new ArrayList<>(splitNodes.length);
         for(final OSMNode splitNode : splitNodes) {
             final int nodeIndex = curNodes.indexOf(splitNode);
             if (nodeIndex < 0) {
-                final String errMsg[] = {"splitNode " + splitNode.osm_id + " is not a member of the way \"" + way.getTag("name") + "\" (" + way.osm_id + ")"};
+                final String errMsg[] = {"splitNode " + splitNode.osm_id + " is not a member of the originalWay \"" + originalWay.getTag("name") + "\" (" + originalWay.osm_id + ")"};
                 throw new InvalidArgumentException(errMsg);
             }
             //no need to split at first/last nodes
-            if (splitNode == way.getFirstNode() || splitNode == way.getLastNode()) {
+            if (splitNode == originalWay.getFirstNode() || splitNode == originalWay.getLastNode()) {
                 continue;
             }
             actualSplitNodes.add(new NodeIndexer(splitNode, nodeIndex));
         }
         if(actualSplitNodes.size() == 0) {
-            return new OSMWay[]{way};
+            return new OSMWay[]{originalWay};
         }
-        actualSplitNodes.sort(nodeIndexComparator); //sort the split nodes so their order matches the order of the way's nodes
+        actualSplitNodes.sort(nodeIndexComparator); //sort the split nodes so their order matches the order of originalWay's nodes
         final int splitWayCount = actualSplitNodes.size() + 1;
 
         //generate the arrays of nodes that will belong to the newly-split ways
@@ -429,7 +432,7 @@ public class OSMEntitySpace {
             }
         }
 
-        //chose which portion will retain the history of the current way - we'll use the split way with the most nodes
+        //chose which portion will retain the history of originalWay - we'll use the split way with the most nodes
         List<OSMNode> oldWayNewNodes = null;
         int largestNodeSize = -1;
         for(final List<OSMNode> wayNodes : splitWayNodes) {
@@ -440,42 +443,39 @@ public class OSMEntitySpace {
         }
         assert oldWayNewNodes != null;
 
-        //and create the new split way(s), removing the new ways' non-intersecting nodes from the old way
+        //and create the new split way(s), removing the new ways' non-intersecting nodes from originalWay
         final OSMWay[] allSplitWays = new OSMWay[splitWayCount];
         final List<OSMWay> newWays = new ArrayList<>(actualSplitNodes.size() + 1);
-        int splitWayIndex = 0;
+        int splitWayIndex = 0, originalWayNewIndex = 0;
         for(final List<OSMNode> wayNodes : splitWayNodes) {
             final OSMWay curWay;
-            if(wayNodes == oldWayNewNodes) { //the old way: just edit its node list
-                curWay = way;
+            if(wayNodes == oldWayNewNodes) { //originalWay: just edit its node list
+                curWay = originalWay;
 
-                //remove all the nodes that aren't in the NEW node list for the old way
-                final List<OSMNode> nodesToRemove = new ArrayList<>(way.getNodes().size() - oldWayNewNodes.size());
-                for(final OSMNode oldWayNode : way.getNodes()) {
+                //remove all the nodes that aren't in the NEW node list for originalWay
+                final List<OSMNode> nodesToRemove = new ArrayList<>(originalWay.getNodes().size() - oldWayNewNodes.size());
+                for(final OSMNode oldWayNode : originalWay.getNodes()) {
                     if(!oldWayNewNodes.contains(oldWayNode)) {
                         nodesToRemove.add(oldWayNode);
                     }
                 }
                 for(final OSMNode nodeToRemove : nodesToRemove) {
-                    way.removeNode(nodeToRemove);
+                    originalWay.removeNode(nodeToRemove);
                 }
-            } else { //a new way: create an OSMWay (which is added to this space) with the old way's tags, and add the split nodes
-                curWay = createWay(way.getTags(), wayNodes);
+                originalWayNewIndex = splitWayIndex;
+            } else { //a new way: create an OSMWay (which is added to this space) with originalWay's tags, and add the split nodes
+                curWay = createWay(originalWay.getTags(), wayNodes);
                 newWays.add(curWay);
             }
             allSplitWays[splitWayIndex++] = curWay;
         }
 
         //now we need to handle membership of any relations
-        for(final OSMRelation containingRelation : way.containingRelations.values()) {
+        for(final OSMRelation containingRelation : originalWay.containingRelations.values()) {
             //get the relation's type
-            final String relationType = containingRelation.getTag(OSMEntity.KEY_TYPE);
-            if(relationType == null) { //If not set (which is an error), add the new way to it and continue to the next relation
-                final int index = containingRelation.indexOfMember(way);
-                for(final OSMWay newWay : newWays) {
-                    containingRelation.addMember(newWay, containingRelation.members.get(index).role, index);
-                }
-                continue;
+            String relationType = containingRelation.getTag(OSMEntity.KEY_TYPE);
+            if(relationType == null) { //If not set (which is an error), use the default handling
+                relationType = "";
             }
 
             switch (relationType) {
@@ -483,27 +483,90 @@ public class OSMEntitySpace {
                     //if the restriction is valid, check if the new way should be added to it or not
                   /*  if(containingRelation.isValid()) {
                         final OSMEntity viaEntity = containingRelation.getMembers("via").get(0).member;
-                        if(viaEntity instanceof OSMNode && newWay.getNodes().contains(viaEntity)) { //"via" member is a node, and the new way contains it, replace the old way with the new way in the relation
-                            containingRelation.replaceMember(way, newWay);
-                        } else if(viaEntity instanceof OSMWay) { //"via" member is a way
+                        if(viaEntity instanceof OSMNode && newWay.getNodes().contains(viaEntity)) { //"via" member is a node, and the new originalWay contains it, replace the old originalWay with the new originalWay in the relation
+                            containingRelation.replaceMember(originalWay, newWay);
+                        } else if(viaEntity instanceof OSMWay) { //"via" member is a originalWay
                             final OSMWay viaWay = (OSMWay) viaEntity;
 
-                            //if the new way intersects the "via" way, replace the old way with it in the relation
+                            //if the new originalWay intersects the "via" originalWay, replace the old originalWay with it in the relation
                             if(newWay.getNodes().contains(viaWay.getFirstNode()) || newWay.getNodes().contains(viaWay.getLastNode())) {
-                                containingRelation.replaceMember(way, newWay);
+                                containingRelation.replaceMember(originalWay, newWay);
                             }
                         }
-                    } else { //if the restriction is invalid, just add the new way to it and log a warning
-                        final int index = containingRelation.indexOfMember(way);
+                    } else { //if the restriction is invalid, just add the new originalWay to it and log a warning
+                        final int index = containingRelation.indexOfMember(originalWay);
                         containingRelation.addMember(newWay, containingRelation.members.get(index).role, index);
                     }*/
                 case "turnlanes:turns":
                     break;
-                default: //all other types: just add the new way to the relation
-                    final int index = containingRelation.indexOfMember(way);
-                    for(final OSMWay newWay : newWays) {
-                        System.out.println("Adding new way " + newWay.getTag("name") + " to relation " + containingRelation.getTag("name"));
-                        containingRelation.addMember(newWay, containingRelation.members.get(index).role, index);
+                default: //all other types: just add the new ways to the relation, in the correct order if possible
+                    //get the order of originalWay in the relation
+                    final int index = containingRelation.indexOfMember(originalWay);
+                    final OSMRelation.OSMRelationMember originalWayMember = containingRelation.getMemberForEntity(originalWay);
+
+                    //determine the order in which we should add the new ways to the relation, to ensure they are continuous
+                    //check the previous member to determine the order
+                    Boolean addForward = null;
+                    if(index > 0) {
+                        final OSMRelation.OSMRelationMember previousMember = containingRelation.members.get(index - 1);
+                        if(previousMember.member instanceof OSMWay) {
+                            final OSMWay prevMember = (OSMWay) previousMember.member;
+                            //if the previous member connects with the first node of originalWay, the direction is forward.  If last, the direction is backward
+                            if(prevMember.getLastNode() == originalWay.getFirstNode() || prevMember.getFirstNode() == originalWay.getFirstNode()) {
+                                addForward = true;
+                            } else if(prevMember.getFirstNode() == originalWay.getLastNode() || prevMember.getLastNode() == originalWay.getLastNode()) {
+                                addForward = false;
+                            }
+                        }
+                    }
+
+                    //if unable to determine the order by checking the previous member, try checking the next member
+                    if(addForward == null && index < containingRelation.members.size()) {
+                        final OSMRelation.OSMRelationMember nextMember = containingRelation.members.get(index + 1);
+                        if(nextMember.member instanceof OSMWay) {
+                            final OSMWay nexMember = (OSMWay) nextMember.member;
+                            //if the next member connects with the last node of originalWay, the direction is forward
+                            if(nexMember.getFirstNode() == originalWay.getLastNode() || nexMember.getLastNode() == originalWay.getLastNode()) {
+                                addForward = true;
+                            } else if(nexMember.getFirstNode() == originalWay.getFirstNode() || nexMember.getLastNode() == originalWay.getFirstNode()) {
+                                addForward = false;
+                            }
+                        }
+                    }
+
+                    //and add all the newly-split ways to the relation
+                    if(addForward == null || addForward) { //add in the forward direction
+                        boolean hitOriginal = false;
+                        for (final OSMWay splitWay : allSplitWays) {
+                            if(splitWay == originalWay) { //don't re-add the originalWay
+                                hitOriginal = true;
+                                continue;
+                            }
+                            //System.out.println("Adding new originalWay FORWARD " + (hitOriginal ? "AFTER" : "BEFORE") + ": " + splitWay.getTag("name") + " to relation " + containingRelation.getTag("name"));
+                            if(hitOriginal) {
+                                containingRelation.insertAfterMember(splitWay, originalWayMember.role, originalWay);
+                            } else {
+                                containingRelation.insertBeforeMember(splitWay, originalWayMember.role, originalWay);
+                            }
+                        }
+                    } else { //add in the backward direction
+                        final List<OSMWay> splitWaysForRelation = new ArrayList<>(allSplitWays.length);
+                        Collections.addAll(splitWaysForRelation, allSplitWays);
+                        Collections.reverse(splitWaysForRelation);
+
+                        boolean hitOriginal = false;
+                        for (final OSMWay splitWay : splitWaysForRelation) {
+                            if(splitWay == originalWay) { //don't re-add the originalWay
+                                hitOriginal = true;
+                                continue;
+                            }
+                            //System.out.println("Adding new originalWay BACKWARD "  + (hitOriginal ? "AFTER" : "BEFORE") + splitWay.getTag("name") + " to relation " + containingRelation.getTag("name"));
+                            if(hitOriginal) {
+                                containingRelation.insertBeforeMember(splitWay, originalWayMember.role, originalWay);
+                            } else {
+                                containingRelation.insertAfterMember(splitWay, originalWayMember.role, originalWay);
+                            }
+                        }
                     }
                     break;
             }
