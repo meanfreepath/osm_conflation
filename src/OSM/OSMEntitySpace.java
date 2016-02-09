@@ -51,7 +51,7 @@ public class OSMEntitySpace {
     public final HashMap<Long, OSMRelation> allRelations;
     public String name;
 
-    private void setIdSequence(long sequence) {
+    private static void setIdSequence(long sequence) {
         osmIdSequence = sequence;
     }
 
@@ -442,7 +442,7 @@ public class OSMEntitySpace {
 
         //and create the new split way(s), removing the new ways' non-intersecting nodes from the old way
         final OSMWay[] allSplitWays = new OSMWay[splitWayCount];
-        final List<OSMWay> newWays = new ArrayList<>(actualSplitNodes.size());
+        final List<OSMWay> newWays = new ArrayList<>(actualSplitNodes.size() + 1);
         int splitWayIndex = 0;
         for(final List<OSMNode> wayNodes : splitWayNodes) {
             final OSMWay curWay;
