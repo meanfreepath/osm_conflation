@@ -219,4 +219,11 @@ public class OSMWay extends OSMEntity {
             }
         }
     }
+    public String debugOutput() {
+        final List<String> nodeIds = new ArrayList<>(nodes.size());
+        for(final OSMNode node : nodes) {
+            nodeIds.add(Long.toString(node.osm_id));
+        }
+        return "Way(" + osm_id + "): [" + String.join(",", nodeIds) + "]";
+    }
 }
