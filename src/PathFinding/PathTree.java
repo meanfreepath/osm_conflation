@@ -1,11 +1,13 @@
 package PathFinding;
 
 import Conflation.StopArea;
+import Conflation.WaySegmentsObserver;
 import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMNode;
 import Conflation.WaySegments;
 import OSM.OSMWay;
+import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.util.*;
 
@@ -13,7 +15,7 @@ import java.util.*;
  * Represents the possible paths between 2 nodes
  * Created by nick on 1/27/16.
  */
-public class PathTree {
+public class PathTree implements WaySegmentsObserver {
     public final static int MAX_PATHS_TO_CONSIDER = 32;
     private final static Comparator<Path> pathScoreComparator = new Comparator<Path>() {
         @Override
@@ -25,7 +27,7 @@ public class PathTree {
 
     public final StopArea fromStop, toStop;
     public final OSMNode fromNode, toNode;
-    public final WaySegments fromLine, toLine;
+    private WaySegments fromLine, toLine;
     public final PathTree previousPathTree;
     public PathTree nextPathTree = null;
 
@@ -47,6 +49,9 @@ public class PathTree {
         toNode = toStop.getStopPosition();
         fromLine = fromStop.bestWayMatch.line;
         toLine = toStop.bestWayMatch.line;
+
+        fromLine.addObserver(this);
+        toLine.addObserver(this);
     }
     private void iteratePath(final Junction startingJunction, final WaySegments routeLine, final RoutePathFinder parentPath, final Path curPath) throws PathIterationException {
         //bail if the junction indicates there's no need to continue processing
@@ -54,12 +59,12 @@ public class PathTree {
             return;
         }
 
-        System.out.println("FROM " + (startingJunction.originatingPathSegment != null ? startingJunction.originatingPathSegment.line.way.getTag("name") + " (" + startingJunction.originatingPathSegment.line.way.osm_id + "): " : "BEGIN: ") + startingJunction.junctionPathSegments.size() + " TO PROCESS: ordered list:");
+        System.out.println("FROM " + (startingJunction.originatingPathSegment != null ? startingJunction.originatingPathSegment.getLine().way.getTag("name") + " (" + startingJunction.originatingPathSegment.getLine().way.osm_id + "): " : "BEGIN: ") + startingJunction.junctionPathSegments.size() + " TO PROCESS: ordered list:");
         for(final Junction.JunctionSegmentStatus segmentStatus : startingJunction.junctionPathSegments) {
             if(segmentStatus.segment.isLineMatchedWithRoutePath()) {
-                System.out.println("\t" + segmentStatus.segment.line.way.getTag("name") + "(" + segmentStatus.segment.originJunction.junctionNode.osm_id + "/" + segmentStatus.segment.getEndJunction().junctionNode.osm_id + "): " + segmentStatus.segment.getScore() + ":" + segmentStatus.processStatus.name());
+                System.out.println("\t" + segmentStatus.segment.getLine().way.getTag("name") + "(" + segmentStatus.segment.originJunction.junctionNode.osm_id + "/" + segmentStatus.segment.getEndJunction().junctionNode.osm_id + "): " + segmentStatus.segment.getScore() + ":" + segmentStatus.processStatus.name());
             } else {
-                System.out.println("\t" + segmentStatus.segment.line.way.getTag("name") + "(" + segmentStatus.segment.originJunction.junctionNode.osm_id + "/NoMatch): " + segmentStatus.segment.getScore() + ":" + segmentStatus.processStatus.name());
+                System.out.println("\t" + segmentStatus.segment.getLine().way.getTag("name") + "(" + segmentStatus.segment.originJunction.junctionNode.osm_id + "/NoMatch): " + segmentStatus.segment.getScore() + ":" + segmentStatus.processStatus.name());
             }
         }
 
@@ -81,7 +86,8 @@ public class PathTree {
                 final Path newPath = createPath(curPath, segmentStatus.segment);
                 iteratePath(segmentStatus.segment.getEndJunction(), routeLine, parentPath, newPath);
             } else {
-                parentPath.logEvent(RoutePathFinder.RouteLogType.warning, "PathSegment for " + segmentStatus.segment.line.way.getTag(OSMEntity.KEY_NAME) + "(" + segmentStatus.segment.line.way.osm_id + ") doesn't match route line - skipping", this);
+                System.out.println("NOROUTEMATCH");
+                parentPath.logEvent(RoutePathFinder.RouteLogType.warning, "PathSegment for " + segmentStatus.segment.getLine().way.getTag(OSMEntity.KEY_NAME) + "(" + segmentStatus.segment.getLine().way.osm_id + ") doesn't match route line - skipping", this);
             }
             processedSegments++;
         }
@@ -114,7 +120,7 @@ public class PathTree {
             final PathSegment wayPathSegment = new PathSegment(curLine, junction);
 
             //don't double-back on the PathSegment we came from
-            if(junction.originatingPathSegment == wayPathSegment) {
+            if(junction.originatingPathSegment == wayPathSegment) { //TODO is never actually true
                 continue;
             }
             wayPathSegment.determineScore(parentPath, fromNode, toNode);
@@ -122,12 +128,12 @@ public class PathTree {
             //if wayPathSegment contains toNode, we've found a successful path.  Mark it and bail
             if(wayPathSegment.containsPathDestinationNode()) {
                 if(currentPath != null) {
-                    parentPath.logEvent(RoutePathFinder.RouteLogType.info, "FOUND destination on " + wayPathSegment.line.way.getTag(OSMEntity.KEY_NAME)  + "(" + wayPathSegment.line.way.osm_id + "), node " + toNode.getTag(OSMEntity.KEY_NAME), this);
+                    parentPath.logEvent(RoutePathFinder.RouteLogType.info, "FOUND destination on " + wayPathSegment.getLine().way.getTag(OSMEntity.KEY_NAME)  + "(" + wayPathSegment.getLine().way.osm_id + "), node " + toNode.getTag(OSMEntity.KEY_NAME), this);
                     currentPath.markAsSuccessful(wayPathSegment);
                 } else { //if currentPath isn't present, it's because we've found a stop on the first segment.  Create the path and bail
                     final Path newPath = createPath(null, null);
                     newPath.markAsSuccessful(wayPathSegment);
-                    parentPath.logEvent(RoutePathFinder.RouteLogType.info, "FOUND destination on first segment: " + wayPathSegment.line.way.getTag(OSMEntity.KEY_NAME) + "(" + wayPathSegment.line.way.osm_id + "), node " + toNode.getTag(OSMEntity.KEY_NAME), this);
+                    parentPath.logEvent(RoutePathFinder.RouteLogType.info, "FOUND destination on first segment: " + wayPathSegment.getLine().way.getTag(OSMEntity.KEY_NAME) + "(" + wayPathSegment.getLine().way.osm_id + "), node " + toNode.getTag(OSMEntity.KEY_NAME), this);
                 }
                 return false;
             }
@@ -180,10 +186,57 @@ public class PathTree {
         //we then determine the best path based on score (TODO maybe try shortcuts etc here)
         //bestPath =
     }
-    public void splitWaysAtIntersections(final OSMEntitySpace entitySpace) {
-        if(bestPath == null) {
-            return;
+    public Path splitWaysAtIntersections(final OSMEntitySpace entitySpace, final Path previousPath) throws InvalidArgumentException {
+        if(bestPath == null || bestPath.outcome != Path.PathOutcome.waypointReached) {
+            return null;
         }
-        bestPath.splitWaysAtIntersections(entitySpace);
+        bestPath.splitWaysAtIntersections(entitySpace, previousPath);
+        return bestPath;
+    }
+    public void debugOutputPaths(final OSMEntitySpace entitySpace, final int pathIndex) {
+        /*for(final Path path : candidatePaths) {
+            path.debugOutputPathSegments(entitySpace, pathIndex);
+        }*/
+        if(bestPath != null) {
+            bestPath.debugOutputPathSegments(entitySpace, pathIndex);
+        }
+    }
+    public WaySegments getFromLine() {
+        return fromLine;
+    }
+    public WaySegments getToLine() {
+        return toLine;
+    }
+    @Override
+    public void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
+        //reassign the from/to lines as needed, depending on whether they contain the from/to nodes
+        if(originalWaySegments == fromLine) {
+            if(!fromLine.way.getNodes().contains(fromNode)) {
+                for (final WaySegments ws : splitWaySegments) {
+                    if(ws.way.getNodes().contains(fromNode)) {
+                        fromLine = ws;
+                        break;
+                    }
+                }
+            }
+        } else if(originalWaySegments == toLine) {
+            if(!toLine.way.getNodes().contains(toNode)) {
+                for (final WaySegments ws : splitWaySegments) {
+                    if(ws.way.getNodes().contains(toNode)) {
+                        toLine = ws;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    @Override
+    public void waySegmentsWasDeleted(final WaySegments waySegments) throws InvalidArgumentException {
+        if(fromLine == waySegments || toLine == waySegments) {
+            final String[] errMsg = {"Can't delete line - referred to by this PathTree"};
+            throw new InvalidArgumentException(errMsg);
+        }
+
+        //check if the path should be deleted
     }
 }

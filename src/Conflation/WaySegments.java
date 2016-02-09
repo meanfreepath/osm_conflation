@@ -105,8 +105,6 @@ public class WaySegments {
     public final double maxSegmentLength;
     private List<WaySegmentsObserver> observers = null;
 
-    public boolean wasSplit = false;
-
     public WaySegments(final OSMWay way, final LineType type, final double maxSegmentLength) {
         this.way = way;
         this.lineType = type;
@@ -157,73 +155,25 @@ public class WaySegments {
             nodeIndex++;
         }
     }
-    private WaySegments(final WaySegments originalSegments, final OSMWay splitWay) {
+    private WaySegments(final WaySegments originalSegments, final OSMWay splitWay, final List<LineSegment> splitSegments) {
         this.way = splitWay;
         this.lineType = originalSegments.lineType;
         this.maxSegmentLength = originalSegments.maxSegmentLength;
         this.oneWayDirection = originalSegments.oneWayDirection;
-        this.segments = new ArrayList<>(splitWay.getNodes().size() - 1); //TODO base on total line length, to handle the newly-created segments
-        wasSplit = true;
+        this.segments = new ArrayList<>(splitSegments);
 
         //copy the appropriate segments from the originalSegments
-        boolean inSplitLineNodes;
-        final OSMNode splitWayFirstNode = splitWay.getFirstNode(), splitWayLastNode = splitWay.getLastNode();
-        int originalSegmentIndex = 0, originalNodeIndex = 0, newSegmentIndex = 0, newNodeIndex = 0;
-        if(originalSegments.way.getFirstNode() == originalSegments.segments.get(0).originNode) {
-            inSplitLineNodes = false;
-            for(final LineSegment segment : originalSegments.segments) {
-                if(inSplitLineNodes) { //copy the segment over if we're in the new line's node list
-                    segments.add(segment);
-                    segment.parentSegments = this;
-                    segment.segmentIndex = newSegmentIndex++;
-                    segment.nodeIndex = newNodeIndex;
-                    if(segment.originNode != null) {
-                        ++newNodeIndex;
-                    }
-                } else {
-                    if(segment.destinationNode == splitWayFirstNode) {
-                        inSplitLineNodes = true;
-                    }
-                }
-            }
-        } else {
-            inSplitLineNodes = true;
-            for (final LineSegment segment : originalSegments.segments) {
-                if (inSplitLineNodes) { //copy the segment over if we're in the new line's node list
-                    segments.add(segment);
-                    segment.parentSegments = this;
-                    segment.segmentIndex = newSegmentIndex++;
-                    segment.nodeIndex = newNodeIndex;
-                    if (segment.originNode != null) {
-                        ++newNodeIndex;
-                    }
-
-                    if (segment.destinationNode == splitWayLastNode) {
-                        inSplitLineNodes = false;
-                    }
-                } else {
-                    segment.segmentIndex = originalSegmentIndex++;
-                    segment.nodeIndex = originalNodeIndex;
-                    if(segment.originNode != null) {
-                        ++originalNodeIndex;
-                    }
-                }
+        int newSegmentIndex = 0, newNodeIndex = 0;
+        for(final LineSegment segment : segments) {
+            segment.parentSegments = this;
+            segment.segmentIndex = newSegmentIndex++;
+            segment.nodeIndex = newNodeIndex;
+            if (segment.originNode != null) {
+                ++newNodeIndex;
             }
         }
 
-        //and remove this line's segments from the original
-        int origSegs = originalSegments.segments.size();
-        originalSegments.segments.removeAll(segments);
-
-        //System.out.println("Finished segment split: was " + origSegs + ", now " + originalSegments.segments.size() + "/" + segments.size() + "(" + originalSegments.way.osm_id + "/" + way.osm_id + ")");
-        if(originalSegments.segments.size() == 0 || segments.size() == 0) {
-            System.out.println("WARNING: 0 segments!");
-            for(final LineSegment segment : originalSegments.segments) {
-                System.out.println("\t" + segment);
-            }
-        }
-
-        //compile the matches for the segments
+        //compile the matches for the segments, also building a LineMatch summary
         for(final LineSegment segment : segments) {
             for(final List<SegmentMatch> matchesForLine : segment.matchingSegments.values()) {
                 for(final SegmentMatch match : matchesForLine) {
@@ -238,10 +188,7 @@ public class WaySegments {
             lineMatch.summarize();
         }
 
-        //System.out.println("HAS " + lineMatches.size() + " line matches");
-        originalSegments.resyncLineMatches();
-
-        //also copy the observers
+        //also copy any observers
         if(originalSegments.observers != null) {
             observers = new ArrayList<>(originalSegments.observers);
         }
@@ -356,8 +303,9 @@ public class WaySegments {
             actualSplitNodes.add(node);
         }
 
+        System.out.println("Run split on " + way.getTag("name") + "? " + actualSplitNodes.size());
+
         if(actualSplitNodes.size() == 0) {
-            System.out.println("NO SPLITTER!");
             return new WaySegments[]{this};
         }
 
@@ -369,23 +317,62 @@ public class WaySegments {
             }
         }
 
+        final List<String> nodeIds = new ArrayList<>(actualSplitNodes.size());
+        for(final OSMNode node : actualSplitNodes) {
+            nodeIds.add(Long.toString(node.osm_id));
+        }
+        //System.out.println("Line " + way.getTag("name") + "(" + way.debugOutput() + "), " + segments.size() + " segments, split at " + String.join(",", nodeIds) + ": ");
+
         //run the split on the underlying way
         final OSMWay[] splitWays = entitySpace.splitWay(way, actualSplitNodes.toArray(new OSMNode[actualSplitNodes.size()]));
+        System.out.println(splitWays.length + " split ways:");
 
         //create a WaySegments object for each way
-        System.out.println("Line " + way.getTag("name") + "(" + way.osm_id + ") split: ");
         final WaySegments[] splitWaySegments = new WaySegments[splitWays.length];
         int idx = 0;
+        final List<LineSegment> originalLineSegments = new ArrayList<>(segments);
         for(final OSMWay splitWay : splitWays) {
+            System.out.println("check way " + splitWay.debugOutput());
+            List<LineSegment> curLineSegments = new ArrayList<>(originalLineSegments.size());
+
+            boolean inWay = false;
+            for(final LineSegment segment : originalLineSegments) {
+                if(inWay) {
+                    curLineSegments.add(segment);
+                } else if(segment.originNode == splitWay.getFirstNode()) {
+                    inWay = true;
+                    curLineSegments.add(segment);
+                }
+
+                if(segment.destinationNode == splitWay.getLastNode()) {
+                    break;
+                }
+            }
+            //System.out.println(outputSegments(curLineSegments));
+
             final WaySegments ws;
-            if(splitWay != way) {
-                ws = new WaySegments(this, splitWay);
-            } else {
+            if(splitWay != way) {  //for the new ways, create a new WaySegments, copying the appropriate properties over
+                ws = new WaySegments(this, splitWay, curLineSegments);
+            } else { //otherwise, just reassign the line segments
                 ws = this;
+
+                segments.clear();
+                segments.addAll(curLineSegments);
+
+                int newSegmentIndex = 0, newNodeIndex = 0;
+                for(final LineSegment segment : curLineSegments) {
+                    segment.segmentIndex = newSegmentIndex++;
+                    segment.nodeIndex = newNodeIndex;
+                    if (segment.originNode != null) {
+                        ++newNodeIndex;
+                    }
+                }
+
+                resyncLineMatches();
             }
             splitWaySegments[idx++] = ws;
 
-            System.out.println("\t" + ws.way.osm_id + ": from " + ws.way.getFirstNode().osm_id + " to " + ws.way.getLastNode().osm_id + ": " + ws.segments.size() + " segments, " + ws.way.getNodes().size() + " nodes");
+//            System.out.println("\t" + ws.way.osm_id + ": from " + ws.way.getFirstNode().osm_id + " to " + ws.way.getLastNode().osm_id + ": " + ws.segments.size() + " segments, " + ws.way.getNodes().size() + " nodes");
         }
 
 
@@ -405,5 +392,15 @@ public class WaySegments {
         if(!observers.contains(observer)) {
             observers.add(observer);
         }
+    }
+    public static String outputSegments(final List<LineSegment> segments) {
+        final List<String> segs = new ArrayList<>(segments.size());
+        for(final LineSegment segment : segments) {
+            segs.add(segment.toString());
+        }
+        return String.join("\n\t", segs);
+    }
+    public String outputSegments() {
+        return outputSegments(segments);
     }
 }

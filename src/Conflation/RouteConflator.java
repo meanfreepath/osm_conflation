@@ -339,18 +339,19 @@ public class RouteConflator implements WaySegmentsObserver {
             //and add the stops data to the OSMRelation for the route
             route.syncStopsWithRelation();
 
+            //split any ways that aren't fully contained by the route path
+            routePathFinder.splitWaysAtIntersections(workingEntitySpace);
+
             if(debugEnabled) {
                 try {
                     workingEntitySpace.outputXml("newresult" + route.routePath.osm_id + ".osm");
                     route.debugOutputSegments(workingEntitySpace, candidateLines.values());
+                    routePathFinder.debugOutputPaths(workingEntitySpace);
                 } catch (IOException | InvalidArgumentException e) {
                     e.printStackTrace();
                 }
             }
-        }
-
-        for(final RoutePathFinder routePathFinder : routePathFinderFinders) {
-            routePathFinder.splitWaysAtIntersections(workingEntitySpace);
+//          routePathFinder.splitWaysAtIntersections(workingEntitySpace);
         }
     }
     public Collection<StopArea> getAllRouteStops() {

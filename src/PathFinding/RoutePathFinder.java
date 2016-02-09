@@ -3,17 +3,20 @@ package PathFinding;
 import Conflation.Route;
 import Conflation.StopArea;
 import Conflation.WaySegments;
+import Conflation.WaySegmentsObserver;
 import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMWay;
+import com.sun.javaws.exceptions.InvalidArgumentException;
 
+import java.io.IOException;
 import java.util.*;
 
 /**
  * Contains all the stop-to-stop paths for a route
  * Created by nick on 1/27/16.
  */
-public class RoutePathFinder {
+public class RoutePathFinder implements WaySegmentsObserver {
     public final Route route;
     public final List<PathTree> allPathTrees;
     public final List<Path> calculatedPaths;
@@ -33,7 +36,7 @@ public class RoutePathFinder {
             this.message = message;
             this.sender = sender;
             logTime = new Date();
-            System.out.println(logTime.toString() + ": " + type.name() + ": " + message);
+            //System.out.println(logTime.toString() + ": " + type.name() + ": " + message);
         }
     }
     public final List<RouteLog> logs = new ArrayList<>(128);
@@ -125,8 +128,17 @@ public class RoutePathFinder {
     }
     public void splitWaysAtIntersections(final OSMEntitySpace entitySpace) {
         //split ways as needed
+        Path previousPath = null;
         for(final PathTree pathTree : allPathTrees) {
-            pathTree.splitWaysAtIntersections(entitySpace);
+            if(pathTree.bestPath == null) {
+                previousPath = null;
+                continue;
+            }
+            try {
+                previousPath = pathTree.splitWaysAtIntersections(entitySpace, previousPath);
+            } catch (InvalidArgumentException e) {
+                e.printStackTrace();
+            }
         }
 
         //and add the correct ways to the route relation
@@ -135,9 +147,10 @@ public class RoutePathFinder {
                 continue;
             }
             for (final PathSegment pathSegment : pathTree.bestPath.getPathSegments()) {
-                if (pathSegment.usedWay != null && !route.routeRelation.containsMember(pathSegment.usedWay)) {
-                    System.out.println(pathSegment + ": USED " + pathSegment.usedWay.getTag("name") + "(" + pathSegment.usedWay.osm_id + ")");
-                    route.routeRelation.addMember(pathSegment.usedWay, OSMEntity.MEMBERSHIP_DEFAULT);
+                final OSMWay pathWay = pathSegment.getLine().way;
+                if (!route.routeRelation.containsMember(pathWay)) {
+                    //System.out.println(pathSegment + ": USED " + pathWay.getTag("name") + "(" + pathWay.osm_id + ")");
+                    route.routeRelation.addMember(pathWay, OSMEntity.MEMBERSHIP_DEFAULT);
                 }
             }
         }
@@ -167,5 +180,36 @@ public class RoutePathFinder {
     }
     public int getFailedPaths() {
         return failedPaths;
+    }
+
+    /**
+     * Outputs the paths to an OSM xml file for debugging purposes
+     * @param entitySpace
+     */
+    public void debugOutputPaths(final OSMEntitySpace entitySpace) {
+        final OSMEntitySpace segmentSpace = new OSMEntitySpace(entitySpace.allWays.size() + entitySpace.allNodes.size());
+
+        int pathIndex = 0;
+        for(final PathTree pathTree : allPathTrees) {
+            pathTree.debugOutputPaths(segmentSpace, pathIndex++);
+        }
+
+        try {
+            segmentSpace.outputXml("pathdebug" + route.routeLine.way.osm_id + ".osm");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    @Override
+    public void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
+        for(final WaySegments ws : splitWaySegments) {
+            if(ws != originalWaySegments) {
+                candidateLines.put(ws.way.osm_id, ws);
+            }
+        }
+    }
+    @Override
+    public void waySegmentsWasDeleted(final WaySegments waySegments) {
+        candidateLines.remove(waySegments.way.osm_id);
     }
 }

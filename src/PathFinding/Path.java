@@ -1,15 +1,14 @@
 package PathFinding;
 
+import Conflation.LineSegment;
 import Conflation.WaySegments;
-import OSM.OSMEntity;
-import OSM.OSMEntitySpace;
-import OSM.OSMNode;
-import OSM.OSMWay;
+import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 
 /**
  * Represents a possible (non-branched) path between two junctions
@@ -73,12 +72,13 @@ public class Path {
         List<OSMWay> ways = new ArrayList<>(pathSegments.size());
         PathSegment lastPathSegment = null;
         for(final PathSegment pathSegment : pathSegments) {
+            final OSMWay curWay = pathSegment.getLine().way;
             if(lastPathSegment != null) {
-                if(pathSegment.line.way != lastPathSegment.line.way) {
-                    ways.add(pathSegment.line.way);
+                if(curWay != lastPathSegment.getLine().way) {
+                    ways.add(curWay);
                 }
             } else {
-                ways.add(pathSegment.line.way);
+                ways.add(curWay);
             }
             lastPathSegment = pathSegment;
         }
@@ -87,7 +87,7 @@ public class Path {
     public String toString() {
         final List<String> streets = new ArrayList<>(pathSegments.size());
         for(final PathSegment segment : pathSegments) {
-            streets.add(segment.line.way.getTag(OSMEntity.KEY_NAME) + "(" + segment.line.way.osm_id + ": " + segment.originJunction.junctionNode.osm_id + " to " + (segment.getEndJunction() != null ? segment.getEndJunction().junctionNode.osm_id : "(MATCH-END)")+ ")");
+            streets.add(segment.getLine().way.getTag(OSMEntity.KEY_NAME) + "(" + segment.getLine().way.osm_id + ": " + segment.originJunction.junctionNode.osm_id + " to " + (segment.getEndJunction() != null ? segment.getEndJunction().junctionNode.osm_id : "(MATCH-END)")+ ")");
         }
         return String.join("->", streets);
     }
@@ -95,99 +95,80 @@ public class Path {
      * Checks the PathSegments' originating/ending nodes and splits any ways that extend past them
      * Only needs to be called on the "best" path
      */
-    public void splitWaysAtIntersections(final OSMEntitySpace entitySpace) {
-        //only split ways on successful paths
-        if(outcome != PathOutcome.waypointReached) {
-            return; //TODO check prev/next pathTrees as well?
+    public void splitWaysAtIntersections(final OSMEntitySpace entitySpace, final Path previousPath) throws InvalidArgumentException {
+//        final WaySegments previousPathTreeLine = parentPathTree.previousPathTree != null ? parentPathTree.previousPathTree.getToLine() : null;
+        final WaySegments nextPathTreeLine = parentPathTree.nextPathTree != null ? parentPathTree.nextPathTree.getFromLine(): null;
+        int segmentIndex = 0;
+        PathSegment previousSegment = null;
+        final List<OSMNode> splitNodes = new ArrayList<>(2);
+
+        boolean isLastRoutePath = parentPathTree.nextPathTree == null;
+
+        //check if the line is the same as the previous path's line
+        System.out.println("SPLIT " + this.toString());
+        System.out.print("FIRST PATH segment " + firstPathSegment + "::");
+        if(parentPathTree.previousPathTree == null) { //split at first stop
+            System.out.println("FIRST ON ROUTE");
+            splitNodes.add(firstPathSegment.originJunction.junctionNode);
+        } else if(previousPath != null) { //continuing a previous path
+            System.out.println("CONTINUING ROUTE FROM " + previousPath.lastPathSegment);
+            if(previousPath.lastPathSegment.getLine() != firstPathSegment.getLine()) {
+                System.out.println("USING NEW LINE");
+                splitNodes.add(firstPathSegment.originJunction.junctionNode);
+            } else {
+                System.out.println("USING SAME LINE");
+            }
         }
 
-        final WaySegments previousPathTreeLine = parentPathTree.previousPathTree != null ? parentPathTree.previousPathTree.toLine : null;
-        final WaySegments nextPathTreeLine = parentPathTree.nextPathTree != null ? parentPathTree.nextPathTree.fromLine: null;
-        int segmentIndex = 0;
-        final int lastSegmentIndex = pathSegments.size() - 1;
-        PathSegment previousSegment = null;
-        for(final PathSegment segment : pathSegments) {
-            segment.usedWay = segment.line.way;
-            final List<OSMNode> splitNodes = new ArrayList<>(2);
-
-            final boolean isFirstSegmentOnPath = segmentIndex == 0, isLastSegmentOnPath = segmentIndex == lastSegmentIndex;
-            boolean splitAtFirstNode = false, splitAtLastNode = false;
-            //final boolean sharesPreviousSegmentWay
+        for(final PathSegment pathSegment : pathSegments) {
             /**
              * Check if we should split at the origin node:
              * - this is the first node on the entire route path
              * - this is a node on a continuing path which is on a different way than the last path's final way
              */
-            if(!isFirstSegmentOnPath) { //"middle" path segments only check for splitting based on first/last nodes
-                if(previousSegment != null && previousSegment.line.way.osm_id != segment.line.way.osm_id && segment.originJunction.junctionNode != segment.line.way.getFirstNode() && segment.originJunction.junctionNode != segment.line.way.getLastNode()) {
-                    if (PathTree.debugEnabled) {
-                        segment.originJunction.junctionNode.setTag("split", "begin");
-                    }
-                    splitAtFirstNode = true;
-                    splitNodes.add(segment.originJunction.junctionNode);
+            if(previousSegment != null) { //skip the first segment on the path
+                System.out.println("CHECK SPLIT FOR CONTINUING " + previousSegment);
+                //if previous path used a different line than the current path
+                final boolean previousLineSegmentHasSameLine = previousSegment.getLine() == pathSegment.getLine();
+                if(previousLineSegmentHasSameLine) { //if not, don't split the previous path at its end
+                    System.out.println("SAME AS LAST, removing split there");
+                    splitNodes.remove(splitNodes.size() - 1);
                 }
-            } else { //the first path segment also checks whether we're continuing on the same way as the last path: if so, no need to split.
-                //if this is the first path segment on the entire route, or we're continuing on the route path from a different way than the last path, we split
-                if (previousPathTreeLine == null || previousPathTreeLine.way.osm_id != segment.line.way.osm_id && segment.originJunction.junctionNode != segment.line.way.getFirstNode() && segment.originJunction.junctionNode != segment.line.way.getLastNode()) {
-                    if (PathTree.debugEnabled) {
-                        segment.originJunction.junctionNode.setTag("split", "begin");
-                    }
-                    splitAtFirstNode = true;
-                    splitNodes.add(segment.originJunction.junctionNode);
-                }
-            }
 
-            //and at the ending node (only check on last segment, since above code block handles splitting for all other segments
-            if(isLastSegmentOnPath) {
-                final OSMNode endingNode = segment.getEndJunction() != null ? segment.getEndJunction().junctionNode : null;
-                //check if the next path's starting way is the same as this segments, or if this is the last segment on the entire route path
-                if(nextPathTreeLine == null || nextPathTreeLine.way.osm_id != segment.line.way.osm_id && endingNode != segment.line.way.getFirstNode() && endingNode != segment.line.way.getLastNode()) {
-                    if (PathTree.debugEnabled) {
-                        endingNode.setTag("split", "end");
-                    }
-                    splitNodes.add(endingNode);
-                    splitAtLastNode = true;
+                //run the split on the *previous* segment now that we've got the info on its start/end points
+                runSplit(previousSegment, splitNodes, entitySpace);
+
+                //if the current and previous paths don't share the same line, mark the current path as needing a split for the next round
+                if(!previousLineSegmentHasSameLine) {
+                    splitNodes.add(pathSegment.originJunction.junctionNode);
                 }
             }
 
-            segmentIndex++;
-            previousSegment = segment;
+            //and add the end node (will be removed
+            splitNodes.add(pathSegment.getEndJunction().junctionNode);
+            previousSegment = pathSegment;
+        }
 
-            if(splitNodes.size() == 0) {
-                //System.out.println("DON'T SPLIT " + segment.line.way.getTag("name") + " (" + segment.line.way.osm_id + ")");
-                continue;
-            }
+        //finally, split the last PathSegment if it's not continuing
+        assert previousSegment != null;
+        System.out.println("SPLIT LAST SEGMENT " + previousSegment + "?");
+        if(previousSegment.getLine() == nextPathTreeLine) {
+            splitNodes.remove(splitNodes.size() - 1);
+        }
 
-            //and run the split
+        runSplit(previousSegment, splitNodes, entitySpace);
+    }
+    private static void runSplit(final PathSegment pathSegmentToSplit, final List<OSMNode> splitNodes, final OSMEntitySpace entitySpace) throws InvalidArgumentException {
+        if(splitNodes.size() > 0) {
             final ArrayList<String> splitNodeIds = new ArrayList<>(splitNodes.size());
             for(final OSMNode splitNode : splitNodes) {
                 splitNodeIds.add(Long.toString(splitNode.osm_id));
             }
-            System.out.println("SPLIT " + segment /*segment.line.way.getTag("name") + " (" + segment.line.way.osm_id + ")"*/ + " with " + splitNodes.size() + " nodes (f/l " + Boolean.toString(splitAtFirstNode) + "/" + Boolean.toString(splitAtLastNode) + "): " + String.join(",", splitNodeIds));
-            try {
-                final OSMWay splitWays[] = entitySpace.splitWay(segment.line.way, splitNodes.toArray(new OSMNode[splitNodes.size()]));
-
-                //determine which of the newly-split ways to use for the PathSegment's usedWay property
-                if(splitAtFirstNode) { //if split at the beginning, the way should begin/end at the origin junction, and contain the end junction
-                    System.out.println("IS FIRST SEGMENT");
-                    for(final OSMWay splitWay : splitWays) {
-                        if((splitWay.getFirstNode() == segment.originJunction.junctionNode || splitWay.getLastNode() == segment.originJunction.junctionNode) && splitWay.getNodes().contains(segment.getEndJunction().junctionNode)) {
-                            segment.usedWay = splitWay;
-                            break;
-                        }
-                    }
-                } else if(splitAtLastNode) {
-                    System.out.println("IS LAST SEGMENT");
-                    for(final OSMWay splitWay : splitWays) {
-                        if((splitWay.getFirstNode() == segment.getEndJunction().junctionNode || splitWay.getLastNode() == segment.getEndJunction().junctionNode) && splitWay.getNodes().contains(segment.originJunction.junctionNode)) {
-                            segment.usedWay = splitWay;
-                            break;
-                        }
-                    }
-                }
-            } catch (InvalidArgumentException e) {
-                e.printStackTrace();
-            }
+            pathSegmentToSplit.getLine().split(splitNodes.toArray(new OSMNode[splitNodes.size()]), entitySpace);
+            System.out.println("SPLIT with " + splitNodes.size() + " nodes at " + String.join(",", splitNodeIds) + ", was matched? " + Boolean.toString(pathSegmentToSplit.isLineMatchedWithRoutePath()));
+            splitNodes.clear();
+        } else {
+            System.out.println("NO SPLIT");
         }
     }
     public String scoreSummary() {
@@ -216,5 +197,92 @@ public class Path {
         output.append("\n");
 
         return output.toString();
+    }
+    public void debugOutputPathSegments(final OSMEntitySpace entitySpace, final int pathIndex) {
+        int segmentIndex = 0;
+        final OSMNode pathBeginNode = (OSMNode) entitySpace.addEntity(parentPathTree.fromNode, OSMEntity.TagMergeStrategy.keepTags, null);
+        OSMNode matchOriginNode = pathBeginNode, matchLastNode;
+        for (final PathSegment pathSegment : pathSegments) {
+            final OSMRelation pathRelation = entitySpace.createRelation(null, null);
+            pathRelation.setTag("name", "PathSegment " + pathIndex + ":" + segmentIndex++  + ": " + pathSegment.getId());
+
+            boolean inPathSegment = false;
+            if(pathSegment.getTravelDirection() == PathSegment.TravelDirection.forward) {
+                final OSMNode destinationNode = pathSegment.getEndJunction() != null ? pathSegment.getEndJunction().junctionNode : pathSegment.getLine().way.getLastNode();
+                final ListIterator<LineSegment> iterator = pathSegment.getLine().segments.listIterator();
+
+                while (iterator.hasNext()) {
+                    final LineSegment lineSegment = iterator.next();
+
+                    //skip processing until we reach the contained part of the PathSegment
+                    if(!inPathSegment) {
+                        if(lineSegment.originNode == pathSegment.originJunction.junctionNode) {
+                            inPathSegment = true;
+                        } else {
+                            continue;
+                        }
+                    }
+
+                    if (lineSegment.destinationNode != null) {
+                        matchLastNode = (OSMNode) entitySpace.addEntity(lineSegment.destinationNode, OSMEntity.TagMergeStrategy.keepTags, null);
+                    } else {
+                        matchLastNode = entitySpace.createNode(lineSegment.destinationPoint.latitude, lineSegment.destinationPoint.longitude, null);
+                    }
+
+                    final OSMWay pathSegmentWay = entitySpace.createWay(null, null);
+                    pathSegmentWay.appendNode(matchOriginNode);
+                    pathSegmentWay.appendNode(matchLastNode);
+                    pathSegmentWay.setTag("highway", lineSegment.parentSegments.way.getTag("highway"));
+                    pathSegmentWay.setTag("segment", lineSegment.segmentIndex + "/" + lineSegment.nodeIndex);
+                    matchOriginNode.removeTag("wcount");
+                    matchLastNode.removeTag("wcount");
+                    pathRelation.addMember(pathSegmentWay, "");
+
+                    matchOriginNode = matchLastNode;
+
+                    //bail once we exit the contained part of the PathSegment
+                    if(lineSegment.destinationNode == destinationNode) {
+                        break;
+                    }
+                }
+            } else {
+                final ListIterator<LineSegment> iterator = pathSegment.getLine().segments.listIterator(pathSegment.getLine().segments.size());
+                final OSMNode destinationNode = pathSegment.getEndJunction() != null ? pathSegment.getEndJunction().junctionNode : pathSegment.getLine().way.getFirstNode();
+
+                while (iterator.hasPrevious()) {
+                    final LineSegment lineSegment = iterator.previous();
+
+                    if(!inPathSegment) { //skip processing until we reach the contained part of the PathSegment
+                        if(lineSegment.destinationNode == pathSegment.originJunction.junctionNode) {
+                            inPathSegment = true;
+                        } else {
+                            continue;
+                        }
+                    }
+
+                    if (lineSegment.originNode != null) {
+                        matchLastNode = (OSMNode) entitySpace.addEntity(lineSegment.originNode, OSMEntity.TagMergeStrategy.keepTags, null);
+                    } else {
+                        matchLastNode = entitySpace.createNode(lineSegment.originPoint.latitude, lineSegment.originPoint.longitude, null);
+                    }
+
+                    final OSMWay pathSegmentWay = entitySpace.createWay(null, null);
+                    pathSegmentWay.appendNode(matchOriginNode);
+                    pathSegmentWay.appendNode(matchLastNode);
+                    pathSegmentWay.setTag("highway", lineSegment.parentSegments.way.getTag("highway"));
+                    pathSegmentWay.setTag("segment", lineSegment.segmentIndex + "/" + lineSegment.nodeIndex);
+                    pathRelation.addMember(pathSegmentWay, "");
+                    matchOriginNode.removeTag("wcount");
+                    matchLastNode.removeTag("wcount");
+
+                    matchOriginNode = matchLastNode;
+
+                    //bail once we exit the contained part of the PathSegment
+                    if(lineSegment.originNode == destinationNode) {
+                        break;
+                    }
+                }
+            }
+        }
     }
 }
