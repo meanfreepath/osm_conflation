@@ -50,7 +50,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
         for(final StopArea curStop : route.stops) {
             PathTree pathTree = null;
             if(lastStop != null) {
-                pathTree = new PathTree(lastStop, curStop, lastPathTree);
+                pathTree = new PathTree(lastStop, curStop, lastPathTree, this);
                 allPathTrees.add(pathTree);
             }
             if(lastPathTree != null) {
@@ -64,7 +64,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
         //start the pathfinding code for each stop pair (TODO: may be able to multithread)
         for(final PathTree pathTree : allPathTrees) {
             try {
-                pathTree.findPaths(this, route.routeLine);
+                pathTree.findPaths(this);
             }catch (Exception e) {
                 e.printStackTrace();
             }
@@ -97,7 +97,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
 
             //check the paths are connected (start/end at same node)
             if(lastPath != null) {
-                if(lastPath.bestPath.lastPathSegment.getEndJunction().junctionNode == pathTree.bestPath.firstPathSegment.originJunction.junctionNode) {
+                if(lastPath.bestPath.lastPathSegment.endJunction.processStatus == Junction.JunctionProcessStatus.continuePath && lastPath.bestPath.lastPathSegment.endJunction.junctionNode == pathTree.bestPath.firstPathSegment.originJunction.junctionNode) {
                     calculatedPaths.add(pathTree.bestPath);
                 } else {
                     logEvent(RouteLogType.warning, "Ends don't match for paths (" + lastPath.bestPath + ") and (" + pathTree.bestPath + ")", this);
@@ -132,7 +132,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
                 continue;
             }
             try {
-                previousPath = pathTree.splitWaysAtIntersections(entitySpace, previousPath);
+                previousPath = pathTree.splitWaysAtIntersections(entitySpace, previousPath, this);
             } catch (InvalidArgumentException e) {
                 e.printStackTrace();
             }

@@ -31,6 +31,7 @@ public class PathTree implements WaySegmentsObserver {
     private WaySegments fromLine, toLine;
     public final PathTree previousPathTree;
     public PathTree nextPathTree = null;
+    public final RoutePathFinder parentPathFinder;
 
     public final List<Path> candidatePaths = new ArrayList<>(MAX_PATHS_TO_CONSIDER);
     public Path bestPath = null;
@@ -42,10 +43,11 @@ public class PathTree implements WaySegmentsObserver {
         }
     }
 
-    public PathTree(final StopArea fromStop, final StopArea toStop, final PathTree previousPath) {
+    public PathTree(final StopArea fromStop, final StopArea toStop, final PathTree previousPath, final RoutePathFinder parentPathFinder) {
         this.fromStop = fromStop;
         this.toStop = toStop;
         this.previousPathTree = previousPath;
+        this.parentPathFinder = parentPathFinder;
         fromNode = fromStop.getStopPosition();
         toNode = toStop.getStopPosition();
         fromLine = fromStop.bestWayMatch.line;
@@ -54,7 +56,7 @@ public class PathTree implements WaySegmentsObserver {
         fromLine.addObserver(this);
         toLine.addObserver(this);
     }
-    private void iteratePath(final Junction startingJunction, final WaySegments routeLine, final RoutePathFinder parentPath, final Path curPath) throws PathIterationException {
+    private void iteratePath(final Junction startingJunction, final RoutePathFinder parentPath, final Path curPath) throws PathIterationException {
         //bail if the junction indicates there's no need to continue processing
         if(!processJunction(startingJunction, parentPath, curPath)) {
             return;
@@ -63,7 +65,7 @@ public class PathTree implements WaySegmentsObserver {
         System.out.println("FROM " + (startingJunction.originatingPathSegment != null ? startingJunction.originatingPathSegment.getLine().way.getTag("name") + " (" + startingJunction.originatingPathSegment.getLine().way.osm_id + "): " : "BEGIN: ") + startingJunction.junctionPathSegments.size() + " TO PROCESS: ordered list:");
         for(final Junction.JunctionSegmentStatus segmentStatus : startingJunction.junctionPathSegments) {
             if(segmentStatus.segment.isLineMatchedWithRoutePath()) {
-                System.out.println("\t" + segmentStatus.segment.getLine().way.getTag("name") + "(" + segmentStatus.segment.originJunction.junctionNode.osm_id + "/" + segmentStatus.segment.getEndJunction().junctionNode.osm_id + "): " + segmentStatus.segment.getScore() + ":" + segmentStatus.processStatus.name());
+                System.out.println("\t" + segmentStatus.segment.getLine().way.getTag("name") + "(" + segmentStatus.segment.originJunction.junctionNode.osm_id + "/" + segmentStatus.segment.endJunction.junctionNode.osm_id + "): " + segmentStatus.segment.getScore() + ":" + segmentStatus.processStatus.name());
             } else {
                 System.out.println("\t" + segmentStatus.segment.getLine().way.getTag("name") + "(" + segmentStatus.segment.originJunction.junctionNode.osm_id + "/NoMatch): " + segmentStatus.segment.getScore() + ":" + segmentStatus.processStatus.name());
             }
@@ -72,7 +74,7 @@ public class PathTree implements WaySegmentsObserver {
         int processedSegments = 0;
         for(final Junction.JunctionSegmentStatus segmentStatus : startingJunction.junctionPathSegments) {
             parentPath.logEvent(RoutePathFinder.RouteLogType.info, "Junction " + startingJunction.junctionNode.osm_id + ": " + segmentStatus.segment + ": " +  Math.round(100.0 * segmentStatus.segment.pathScore)/100.0 + "/" + Math.round(100.0 * segmentStatus.segment.lengthFactor)/100.0 + "%/" + Math.round(100.0 * segmentStatus.segment.waypointScore)/100.0 + "=" + Math.round(segmentStatus.segment.getScore()) + ", STATUS " + segmentStatus.processStatus.name(), this);
-            if(segmentStatus.processStatus != Junction.ProcessStatus.yes) {
+            if(segmentStatus.processStatus != Junction.PathSegmentProcessStatus.yes) { //don't process the segment if it's a bad match, or if it's the originating segment for the junction
                 continue;
             }
 
@@ -85,7 +87,7 @@ public class PathTree implements WaySegmentsObserver {
             //process the ending junction of the current segment, but only if its line is properly matched with the route path
             if(segmentStatus.segment.isLineMatchedWithRoutePath()) {
                 final Path newPath = createPath(curPath, segmentStatus.segment);
-                iteratePath(segmentStatus.segment.getEndJunction(), routeLine, parentPath, newPath);
+                iteratePath(segmentStatus.segment.endJunction, parentPath, newPath);
             } else {
                 System.out.println("NOROUTEMATCH");
                 parentPath.logEvent(RoutePathFinder.RouteLogType.warning, "PathSegment for " + segmentStatus.segment.getLine().way.getTag(OSMEntity.KEY_NAME) + "(" + segmentStatus.segment.getLine().way.osm_id + ") doesn't match route line - skipping", this);
@@ -109,6 +111,11 @@ public class PathTree implements WaySegmentsObserver {
         return newPath;
     }
     private boolean processJunction(final Junction junction, final RoutePathFinder parentPath, final Path currentPath) {
+        if(junction.processStatus == Junction.JunctionProcessStatus.deadEnd) {
+            System.out.println("ZOMG SHOULDNT PROCESS");
+            return false;
+        }
+
         for(final OSMWay junctionWay : junction.junctionNode.containingWays.values()) {
             //look up the respective WaySegments object for the way
             final WaySegments curLine = parentPath.candidateLines.get(junctionWay.osm_id);
@@ -118,13 +125,7 @@ public class PathTree implements WaySegmentsObserver {
             }
 
             //create a PathSegment for it
-            final PathSegment wayPathSegment = new PathSegment(curLine, junction);
-
-            //don't double-back on the PathSegment we came from
-            if(junction.originatingPathSegment == wayPathSegment) { //TODO is never actually true
-                continue;
-            }
-            wayPathSegment.determineScore(parentPath, fromNode, toNode);
+            final PathSegment wayPathSegment = new PathSegment(curLine, junction, this);
 
             //if wayPathSegment contains toNode, we've found a successful path.  Mark it and bail
             if(wayPathSegment.containsPathDestinationNode()) {
@@ -143,12 +144,12 @@ public class PathTree implements WaySegmentsObserver {
             if(wayPathSegment.isLineMatchedWithRoutePath()) {
                 //if(wayPathSegment.)
                 if (wayPathSegment.getScore() >= scoreThresholdToProcessPathSegment) {
-                    segmentStatus.processStatus = Junction.ProcessStatus.yes;
+                    segmentStatus.processStatus = Junction.PathSegmentProcessStatus.yes;
                 } else {
-                    segmentStatus.processStatus = Junction.ProcessStatus.belowScoreThreshold;
+                    segmentStatus.processStatus = Junction.PathSegmentProcessStatus.belowScoreThreshold;
                 }
             } else {
-                segmentStatus.processStatus = Junction.ProcessStatus.nonMatchingLine;
+                segmentStatus.processStatus = Junction.PathSegmentProcessStatus.nonMatchingLine;
             }
             junction.junctionPathSegments.add(segmentStatus);
         }
@@ -156,11 +157,11 @@ public class PathTree implements WaySegmentsObserver {
 
         return true; //indicate further processing is necessary
     }
-    public void findPaths(final RoutePathFinder parentPath, final WaySegments routeLine) {
+    public void findPaths(final RoutePathFinder parentPath) {
         //starting with the first line, determine the initial direction of travel
-        final Junction startingJunction = new Junction(fromNode, null);
+        final Junction startingJunction = new Junction(fromNode, null, Junction.JunctionProcessStatus.continuePath);
         try {
-            iteratePath(startingJunction, routeLine, parentPath, null);
+            iteratePath(startingJunction, parentPath, null);
         } catch (PathIterationException ignored) {}
 
         //compile a list of the paths that successfully reached their destination
@@ -181,17 +182,17 @@ public class PathTree implements WaySegmentsObserver {
 
 
         //get the closest segment on the routeLine to fromNode
-        fromLine.getMatchForLine(routeLine).getAvgDotProduct();
+        fromLine.getMatchForLine(parentPath.route.routeLine).getAvgDotProduct();
 
 
         //we then determine the best path based on score (TODO maybe try shortcuts etc here)
         //bestPath =
     }
-    public Path splitWaysAtIntersections(final OSMEntitySpace entitySpace, final Path previousPath) throws InvalidArgumentException {
+    public Path splitWaysAtIntersections(final OSMEntitySpace entitySpace, final Path previousPath, final RoutePathFinder parentPathFinder) throws InvalidArgumentException {
         if(bestPath == null || bestPath.outcome != Path.PathOutcome.waypointReached) {
             return null;
         }
-        bestPath.splitWaysAtIntersections(entitySpace, previousPath);
+        bestPath.splitWaysAtIntersections(entitySpace, previousPath, parentPathFinder);
         return bestPath;
     }
     public void debugOutputPaths(final OSMEntitySpace entitySpace, final int pathIndex) {

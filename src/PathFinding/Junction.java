@@ -1,9 +1,6 @@
 package PathFinding;
 
-import Conflation.WaySegments;
-import OSM.OSMEntity;
 import OSM.OSMNode;
-import OSM.OSMWay;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -14,12 +11,15 @@ import java.util.List;
  * Created by nick on 1/27/16.
  */
 public class Junction {
-    public enum ProcessStatus {
+    public enum PathSegmentProcessStatus {
         none, yes, belowScoreThreshold, isOriginatingWay, nonMatchingLine
+    }
+    public enum JunctionProcessStatus {
+        continuePath, deadEnd
     }
     public static class JunctionSegmentStatus {
         public final PathSegment segment;
-        public ProcessStatus processStatus = ProcessStatus.none;
+        public PathSegmentProcessStatus processStatus = PathSegmentProcessStatus.none;
         public JunctionSegmentStatus(final PathSegment segment) {
             this.segment = segment;
         }
@@ -28,6 +28,7 @@ public class Junction {
     public final OSMNode junctionNode;
     public final List<JunctionSegmentStatus> junctionPathSegments;
     public final PathSegment originatingPathSegment;
+    public final JunctionProcessStatus processStatus;
     private final static Comparator<JunctionSegmentStatus> pathSegmentComparator = new Comparator<JunctionSegmentStatus>() {
         @Override
         public int compare(final JunctionSegmentStatus o1, final JunctionSegmentStatus o2) {
@@ -35,13 +36,14 @@ public class Junction {
         }
     };
 
-    public Junction(final OSMNode node, final PathSegment originatingPathSegment) {
+    public Junction(final OSMNode node, final PathSegment originatingPathSegment, final JunctionProcessStatus processStatus) {
         junctionNode = node;
         this.originatingPathSegment = originatingPathSegment;
+        this.processStatus = processStatus;
         junctionPathSegments = new ArrayList<>(node.containingWayCount);
         if (this.originatingPathSegment != null) {
             final JunctionSegmentStatus status = new JunctionSegmentStatus(this.originatingPathSegment);
-            status.processStatus = ProcessStatus.isOriginatingWay;
+            status.processStatus = PathSegmentProcessStatus.isOriginatingWay;
             junctionPathSegments.add(status);
         }
     }
