@@ -311,7 +311,7 @@ public class WaySegments {
             actualSplitNodes.add(node);
         }
 
-        System.out.println("Run split on " + way.getTag("name") + "? " + actualSplitNodes.size());
+        //System.out.println("Run split on " + way.getTag("name") + "? " + actualSplitNodes.size());
 
         if(actualSplitNodes.size() == 0) {
             return new WaySegments[]{this};

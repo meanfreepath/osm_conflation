@@ -269,7 +269,7 @@ public class RouteConflator implements WaySegmentsObserver {
         return regions;
     }
     public void conflateRoutePaths(final StopConflator stopConflator) {
-        final int debugRouteId = -1367;
+        final int debugRouteId = -1367*0;
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
@@ -344,14 +344,13 @@ public class RouteConflator implements WaySegmentsObserver {
 
             if(debugEnabled) {
                 try {
-                    workingEntitySpace.outputXml("newresult" + route.routePath.osm_id + ".osm");
+                    workingEntitySpace.outputXml("newresult" + route.routeRelation.osm_id + ".osm");
                     route.debugOutputSegments(workingEntitySpace, candidateLines.values());
                     routePathFinder.debugOutputPaths(workingEntitySpace);
                 } catch (IOException | InvalidArgumentException e) {
                     e.printStackTrace();
                 }
             }
-//          routePathFinder.splitWaysAtIntersections(workingEntitySpace);
         }
     }
     public Collection<StopArea> getAllRouteStops() {

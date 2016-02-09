@@ -142,6 +142,6 @@ public class Route {
                 }
             }*/
         }
-        segmentSpace.outputXml("segments" + routeLine.way.osm_id + ".osm");
+        segmentSpace.outputXml("segments" + routeRelation.osm_id + ".osm");
     }
 }
