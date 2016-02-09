@@ -143,12 +143,19 @@ public class RoutePathFinder implements WaySegmentsObserver {
             if(pathTree.bestPath == null) {
                 continue;
             }
+            //System.out.println("OUTPUT PATH FOR " + pathTree.parentPathFinder.route.routeRelation.osm_id + "::" + pathTree.bestPath);
+            PathSegment previousPathSegment = null;
             for (final PathSegment pathSegment : pathTree.bestPath.getPathSegments()) {
                 final OSMWay pathWay = pathSegment.getLine().way;
+                //double-check the current and previous PathSegments are connected to each other
+                if(previousPathSegment != null && previousPathSegment.endJunction.junctionNode != pathSegment.originJunction.junctionNode) {
+                    System.err.println("PathSegments don't connect:: " + previousPathSegment +"//" + pathSegment);
+                }
                 if (!route.routeRelation.containsMember(pathWay)) {
                     //System.out.println(pathSegment + ": USED " + pathWay.getTag("name") + "(" + pathWay.osm_id + ")");
                     route.routeRelation.addMember(pathWay, OSMEntity.MEMBERSHIP_DEFAULT);
                 }
+                previousPathSegment = pathSegment;
             }
         }
     }
@@ -192,7 +199,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
         }
 
         try {
-            segmentSpace.outputXml("pathdebug" + route.routeLine.way.osm_id + ".osm");
+            segmentSpace.outputXml("pathdebug" + route.routeRelation.osm_id + ".osm");
         } catch (IOException e) {
             e.printStackTrace();
         }

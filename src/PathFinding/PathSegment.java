@@ -288,6 +288,7 @@ public class PathSegment implements WaySegmentsObserver {
     public void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
         final OSMNode originNode = originJunction.junctionNode, destinationNode = endJunction != null ? endJunction.junctionNode : lastCheckedNode;
 
+        //TODO NOTE: because PathSegments only start/end at way junctions, the only time it's likely for a PathSegment to experience a split in the middle of its line is when another route splits it at a start/end stop
         for(final WaySegments splitLine : splitWaySegments) {
             if(splitLine != line && splitLine.way.getNodes().contains(originNode) && splitLine.way.getNodes().contains(destinationNode)) {
                 System.out.println("Reassigned " + id + "(" + line.way.getTag("name") + ") from " + line.way.osm_id + " to " + splitLine.way.osm_id);
