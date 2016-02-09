@@ -143,7 +143,7 @@ public class Path {
                 }
             }
 
-            //and add the end node (will be removed
+            //and add the end node (will be removed on the next iteration if the PathSegment after this uses the same way)
             splitNodes.add(pathSegment.getEndJunction().junctionNode);
             previousSegment = pathSegment;
             segmentIndex++;

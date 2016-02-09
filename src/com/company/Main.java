@@ -8,12 +8,17 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.*;
 
 public class Main {
     private final static boolean debugEnabled = true;
     public static void main(String[] args) {
+        if(args.length == 0) {
+            System.err.println("Missing file name argument!");
+            return;
+        }
 
         OSMEntitySpace importSpace = new OSMEntitySpace(1024);
 
@@ -28,8 +33,10 @@ public class Main {
         //propagate the debug value as needed
         RouteConflator.debugEnabled = debugEnabled;
 
+        final String importFileName = args[0];
+
         try {
-            importSpace.loadFromXML("routes.osm");
+            importSpace.loadFromXML(importFileName);
 
             /*OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace);
             exporter.outputForOSMTaskingManager("boxes", "https://www.meanfreepath.com/kcstops/");
@@ -108,6 +115,9 @@ public class Main {
                 relationSpace.outputXml("relation.osm");
             }
             //importSpace.outputXml("newresult.osm");
+        } catch (FileNotFoundException e) {
+            System.err.println("Cannot find file \"" + importFileName + "\", exiting...");
+            System.exit(1);
         } catch (IOException | ParserConfigurationException | SAXException | InvalidArgumentException e) {
             e.printStackTrace();
         }
