@@ -196,10 +196,39 @@ public class OSMRelation extends OSMEntity {
         }
         return false;
     }
+
+    /**
+     * Adds a member to the end of the relation list
+     * @param member
+     * @param role
+     * @return
+     */
     public boolean addMember(final OSMEntity member, final String role) {
-        return addMember(member, role, members.size());
+        return addMemberInternal(member, role, members.size());
     }
-    public boolean addMember(final OSMEntity member, final String role, int index) {
+    /**
+     * Add a new member before the given existing member in the member list
+     * @param member
+     * @param role
+     * @param existingMember
+     * @return
+     */
+    public boolean insertBeforeMember(final OSMEntity member, final String role, final OSMEntity existingMember) {
+        final int existingMemberIndex = existingMember != null ? indexOfMember(existingMember) : 0; //default to the first if no existingMember provided
+        return addMemberInternal(member, role, existingMemberIndex);
+    }
+    /**
+     * Add a new member after the given existing member in the member list
+     * @param member
+     * @param role
+     * @param existingMember
+     * @return
+     */
+    public boolean insertAfterMember(final OSMEntity member, final String role, final OSMEntity existingMember) {
+        final int existingMemberIndex = existingMember != null ? indexOfMember(existingMember) : members.size() - 2; //default to the last if no existingMember provided
+        return addMemberInternal(member, role, existingMemberIndex + 1);
+    }
+    private boolean addMemberInternal(final OSMEntity member, final String role, final int index) {
         members.add(index, new OSMRelationMember(member, role));
         member.didAddToRelation(this);
         return true;
