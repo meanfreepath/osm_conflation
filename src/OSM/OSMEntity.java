@@ -4,6 +4,7 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -77,6 +78,8 @@ public abstract class OSMEntity {
         if(entityToCopy.tags != null) {
             tags = new HashMap<>(entityToCopy.tags);
         }
+
+        markAsModified();
     }
 
     /**
@@ -98,6 +101,7 @@ public abstract class OSMEntity {
         to.user = from.user;
         to.timestamp = from.timestamp;
         to.boundingBox = from.boundingBox;
+        to.markAsModified();
     }
     /**
      * Sets the given tag on this entity, only if it doesn't already exist
@@ -115,6 +119,7 @@ public abstract class OSMEntity {
             throw new InvalidArgumentException(msg);
         }
         tags.put(name, value.trim());
+        markAsModified();
     }
 
     /**
@@ -131,12 +136,18 @@ public abstract class OSMEntity {
         } else {
             removeTag(name);
         }
+        markAsModified();
     }
     public boolean removeTag(final String name) {
         if(tags == null) {
             return false;
         }
-        return tags.remove(name) != null;
+        final String removedTag = tags.remove(name);
+        if(removedTag != null) {
+            markAsModified();
+            return true;
+        }
+        return false;
     }
     /**
      *
@@ -175,10 +186,15 @@ public abstract class OSMEntity {
                 }
                 break;
         }
+        markAsModified();
 
         return conflictingTags != null && conflictingTags.size() > 0 ? conflictingTags : null;
     }
     public void markAsModified() {
+        if(action == ChangeAction.none && version > 0) {
+            version++;
+            //timestamp = new Date().toString();
+        }
         action = ChangeAction.modify;
     }
     public void markAsDeleted() {

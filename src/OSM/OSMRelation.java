@@ -64,6 +64,7 @@ public class OSMRelation extends OSMEntity {
             case none:
                 break;
         }
+        markAsModified();
     }
 
     @Override
@@ -131,6 +132,10 @@ public class OSMRelation extends OSMEntity {
         }
     }
     public void clearMembers() {
+        if(members.size() > 0) {
+            markAsModified();
+        }
+
         for(final OSMRelationMember member : members) {
             member.member.didRemoveFromRelation(this);
         }
@@ -188,11 +193,10 @@ public class OSMRelation extends OSMEntity {
             }
         }
 
-        if(relationMemberToRemove != null) {
-            if(members.remove(relationMemberToRemove)) {
-                relationMemberToRemove.member.didRemoveFromRelation(this);
-                return true;
-            }
+        if(relationMemberToRemove != null && members.remove(relationMemberToRemove)) {
+            markAsModified();
+            relationMemberToRemove.member.didRemoveFromRelation(this);
+            return true;
         }
         return false;
     }
@@ -231,6 +235,7 @@ public class OSMRelation extends OSMEntity {
     private boolean addMemberInternal(final OSMEntity member, final String role, final int index) {
         members.add(index, new OSMRelationMember(member, role));
         member.didAddToRelation(this);
+        markAsModified();
         return true;
     }
     /**
@@ -249,6 +254,7 @@ public class OSMRelation extends OSMEntity {
             newMember.member.didAddToRelation(this);
 
             boundingBox = null; //invalidate the bounding box
+            markAsModified();
         }
     }
     public List<OSMRelationMember> getMembers() {
@@ -283,11 +289,11 @@ public class OSMRelation extends OSMEntity {
                 boolean restrictionIsValid = viaEntities.size() == 1 && fromWays.size() == 1 && toWays.size() == 1;
                 //and the "from" and "to" members must be ways, and the "via" member must be a node or way
                 if(!restrictionIsValid) {
-                    return restrictionIsValid;
+                    return false;
                 }
                 restrictionIsValid = fromWays.get(0).member instanceof OSMWay && toWays.get(0).member instanceof OSMWay && (viaEntities.get(0).member instanceof OSMNode || viaEntities.get(0).member instanceof OSMWay);
                 if(!restrictionIsValid) {
-                    return restrictionIsValid;
+                    return false;
                 }
 
                 //check the intersection of the members

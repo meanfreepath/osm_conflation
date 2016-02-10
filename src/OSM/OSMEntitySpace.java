@@ -71,6 +71,7 @@ public class OSMEntitySpace {
     public OSMNode createNode(final double latitude, final double longitude, final Map<String, String> withTags) {
         final OSMNode newNode = new OSMNode(--osmIdSequence);
         newNode.setCoordinate(latitude, longitude);
+        newNode.markAsModified();
 
         if(withTags != null) {
             for(Map.Entry<String, String> tag : withTags.entrySet()) {
@@ -89,6 +90,7 @@ public class OSMEntitySpace {
      */
     public OSMWay createWay(final Map<String, String> withTags, final List<OSMNode> withNodes) {
         final OSMWay newWay = new OSMWay(--osmIdSequence);
+        newWay.markAsModified();
 
         if(withTags != null) {
             for(Map.Entry<String, String> tag : withTags.entrySet()) {
@@ -112,6 +114,7 @@ public class OSMEntitySpace {
      */
     public OSMRelation createRelation(final Map<String, String> withTags, final List<OSMRelation.OSMRelationMember> withMembers) {
         final OSMRelation newRelation = new OSMRelation(--osmIdSequence);
+        newRelation.markAsModified();
 
         if(withTags != null) {
             for(Map.Entry<String, String> tag : withTags.entrySet()) {

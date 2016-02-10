@@ -29,6 +29,7 @@ public class OSMNode extends OSMEntity {
     public OSMNode(final OSMNode nodeToCopy, final Long idOverride) {
         super(nodeToCopy, idOverride);
         setCoordinate(nodeToCopy.coordinate);
+        markAsModified();
     }
     /**
      * Notifies this node it's been added to the given way's node list
@@ -70,12 +71,18 @@ public class OSMNode extends OSMEntity {
     }
 
     public void setCoordinate(final double lat, final double lon) {
+        if(this.coordinate != null) { //mark as modified if changing (vs initial assignment)
+            markAsModified();
+        }
         this.lat = lat;
         this.lon = lon;
         coordinate = new Point(lat, lon);
         boundingBox = null; //invalidate the bounding box
     }
     public void setCoordinate(final Point coordinate) {
+        if(this.coordinate != null) { //mark as modified if changing (vs initial assignment)
+            markAsModified();
+        }
         lat = coordinate.latitude;
         lon = coordinate.longitude;
         this.coordinate = new Point(lat, lon);

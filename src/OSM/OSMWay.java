@@ -52,6 +52,7 @@ public class OSMWay extends OSMEntity {
         }
 
         updateFirstAndLastNodes();
+        markAsModified();
     }
     private void updateFirstAndLastNodes() {
         if(nodes.size() > 0) {
@@ -71,6 +72,8 @@ public class OSMWay extends OSMEntity {
         updateFirstAndLastNodes();
 
         boundingBox = null; //invalidate the bounding box
+
+        markAsModified();
     }
     /**
      * Appends a node to the end of the way
@@ -81,6 +84,7 @@ public class OSMWay extends OSMEntity {
         node.didAddToWay(this);
         updateFirstAndLastNodes();
         boundingBox = null; //invalidate the bounding box
+        markAsModified();
     }
     public boolean removeNode(final OSMNode node) {
         return replaceNode(node, null);
@@ -103,6 +107,7 @@ public class OSMWay extends OSMEntity {
             oldNode.didRemoveFromWay(this);
             updateFirstAndLastNodes();
             boundingBox = null; //invalidate the bounding box
+            markAsModified();
             return true;
         }
         return false;
@@ -150,6 +155,9 @@ public class OSMWay extends OSMEntity {
         Collections.reverse(nodes);
         firstNode = lastNode;
         lastNode = lastLastNode;
+        markAsModified();
+
+        //TODO: check relations, tags that need to be modified to reflect the change
     }
 
     @Override
