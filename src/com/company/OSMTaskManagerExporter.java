@@ -100,7 +100,7 @@ public class OSMTaskManagerExporter {
 
             try {
                 boxSpace.outputXml(destinationDir + box.osmFileName);
-            } catch (InvalidArgumentException e) {
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
