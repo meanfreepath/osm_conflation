@@ -269,7 +269,7 @@ public class RouteConflator implements WaySegmentsObserver {
         return regions;
     }
     public void conflateRoutePaths(final StopConflator stopConflator) {
-        final int debugRouteId = -1367*0;
+        final int debugRouteId = -1212;
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
@@ -341,6 +341,9 @@ public class RouteConflator implements WaySegmentsObserver {
 
             //split any ways that aren't fully contained by the route path
             routePathFinder.splitWaysAtIntersections(workingEntitySpace);
+
+            //and finally, add the ways associated with the routeFinder's best path to the OSM route relation
+            routePathFinder.addWaysToRouteRelation();
 
             if(debugEnabled) {
                 try {

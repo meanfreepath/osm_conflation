@@ -120,8 +120,8 @@ public class RoutePathFinder implements WaySegmentsObserver {
     public void splitWaysAtIntersections(final OSMEntitySpace entitySpace) {
         //split ways as needed
         Path previousPath = null;
-        for(final PathTree pathTree : allPathTrees) {
-            if(pathTree.bestPath == null) {
+        for (final PathTree pathTree : allPathTrees) {
+            if (pathTree.bestPath == null) {
                 previousPath = null;
                 continue;
             }
@@ -131,7 +131,8 @@ public class RoutePathFinder implements WaySegmentsObserver {
                 e.printStackTrace();
             }
         }
-
+    }
+    public void addWaysToRouteRelation() {
         //and add the correct ways to the route relation
         for(final PathTree pathTree : allPathTrees) {
             if(pathTree.bestPath == null) {
