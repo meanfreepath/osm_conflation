@@ -104,6 +104,7 @@ public class WaySegments {
     public final OneWayDirection oneWayDirection;
     public final double maxSegmentLength;
     private List<WaySegmentsObserver> observers = null;
+    private List<WaySegmentsObserver> observersPendingRemoval = null;
 
     public WaySegments(final OSMWay way, final LineType type, final double maxSegmentLength) {
         this.way = way;
@@ -261,6 +262,11 @@ public class WaySegments {
             for (final WaySegmentsObserver observer : observers) {
                 observer.waySegmentsAddedSegment(this, insertedSegment);
             }
+            //remove any observers that indicated they are no longer observing
+            if(observersPendingRemoval != null) {
+                observers.removeAll(observersPendingRemoval);
+                observersPendingRemoval = null;
+            }
         }
 
         return node;
@@ -389,17 +395,33 @@ public class WaySegments {
             for (final WaySegmentsObserver observer : observers) {
                 observer.waySegmentsWasSplit(this, splitWaySegments);
             }
+            //remove any observers that indicated they are no longer observing
+            if(observersPendingRemoval != null) {
+                observers.removeAll(observersPendingRemoval);
+                observersPendingRemoval = null;
+            }
         }
 
         return splitWaySegments;
     }
-    public void addObserver(final WaySegmentsObserver observer) {
+    public boolean addObserver(final WaySegmentsObserver observer) {
         if(observers == null) {
             observers = new ArrayList<>(64);
         }
         if(!observers.contains(observer)) {
-            observers.add(observer);
+            return observers.add(observer);
         }
+        return false;
+    }
+    public boolean removeObserver(final WaySegmentsObserver observer) {
+        if(!observers.contains(observer)) {
+            return false;
+        }
+        if(observersPendingRemoval == null) {
+            observersPendingRemoval = new ArrayList<>(64);
+        }
+        observersPendingRemoval.add(observer);
+        return true;
     }
     public static String outputSegments(final List<LineSegment> segments) {
         final List<String> segs = new ArrayList<>(segments.size());
@@ -431,5 +453,8 @@ public class WaySegments {
             }
         }
         return closestSegment;
+    }
+    public String toString() {
+        return "WaySegments " + way.getTag(OSMEntity.KEY_NAME) + "(" + way.osm_id + ":" + way.getFirstNode().osm_id + "->" + way.getLastNode().osm_id + "): " + segments.size() + " segments";
     }
 }
