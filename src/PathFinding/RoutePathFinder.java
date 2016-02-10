@@ -63,13 +63,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
     public void findPaths(final OSMEntitySpace entitySpace) {
         //start the pathfinding code for each stop pair (TODO: may be able to multithread)
         for(final PathTree pathTree : allPathTrees) {
-            try {
-                pathTree.findPaths(this);
-            }catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            //break;
+            pathTree.findPaths(this);
         }
 
         //and consolidate into a single path
