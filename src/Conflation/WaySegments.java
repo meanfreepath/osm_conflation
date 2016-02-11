@@ -104,7 +104,7 @@ public class WaySegments {
     public final OneWayDirection oneWayDirection;
     public final double maxSegmentLength;
     private List<WaySegmentsObserver> observers = null;
-    private List<WaySegmentsObserver> observersPendingRemoval = null;
+    private List<WaySegmentsObserver> observersPendingAddition = null, observersPendingRemoval = null;
 
     public WaySegments(final OSMWay way, final LineType type, final double maxSegmentLength) {
         this.way = way;
@@ -258,6 +258,17 @@ public class WaySegments {
         way.insertNode(node, insertedSegment.nodeIndex);
 
         //and notify any observers
+        if(observersPendingAddition != null) { //add any pending observers here
+            if(observers == null) {
+                observers = new ArrayList<>(64);
+            }
+            for(final WaySegmentsObserver observer : observersPendingAddition) {
+                if(!observers.contains(observer)) {
+                    observers.add(observer);
+                }
+            }
+            observersPendingAddition = null;
+        }
         if(observers != null) {
             for (final WaySegmentsObserver observer : observers) {
                 observer.waySegmentsAddedSegment(this, insertedSegment);
@@ -391,6 +402,17 @@ public class WaySegments {
 
 
         //notify the observers of the split
+        if(observersPendingAddition != null) { //add any pending observers here
+            if(observers == null) {
+                observers = new ArrayList<>(64);
+            }
+            for(final WaySegmentsObserver observer : observersPendingAddition) {
+                if(!observers.contains(observer)) {
+                    observers.add(observer);
+                }
+            }
+            observersPendingAddition = null;
+        }
         if(observers != null) {
             for (final WaySegmentsObserver observer : observers) {
                 observer.waySegmentsWasSplit(this, splitWaySegments);
@@ -405,11 +427,11 @@ public class WaySegments {
         return splitWaySegments;
     }
     public boolean addObserver(final WaySegmentsObserver observer) {
-        if(observers == null) {
-            observers = new ArrayList<>(64);
+        if(observersPendingAddition == null) {
+            observersPendingAddition = new ArrayList<>(64);
         }
-        if(!observers.contains(observer)) {
-            return observers.add(observer);
+        if(!observersPendingAddition.contains(observer)) {
+            return observersPendingAddition.add(observer);
         }
         return false;
     }
