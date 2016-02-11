@@ -41,6 +41,9 @@ public class Path {
         parentPathTree = pathToClone.parentPathTree;
         pathSegments = new ArrayList<>(pathToClone.pathSegments.size() + INITIAL_PATH_SEGMENT_CAPACITY);
         pathSegments.addAll(pathToClone.pathSegments);
+        for(final PathSegment pathSegment : pathSegments) {
+            pathSegment.addContainingPath(this);
+        }
         firstPathSegment = pathToClone.firstPathSegment;
         lastPathSegment = pathToClone.lastPathSegment;
 
@@ -48,12 +51,36 @@ public class Path {
             addPathSegment(segmentToAdd);
         }
     }
-    private void addPathSegment(final PathSegment segment) {
+    public void addPathSegment(final PathSegment segment) {
         pathSegments.add(segment);
         if(firstPathSegment == null) {
             firstPathSegment = pathSegments.get(0);
         }
         lastPathSegment = segment;
+        segment.addContainingPath(this);
+    }
+
+    /**
+     * Replace the given original segments in this path's list with newly-split PathSegments belonging to it
+     * @param originalSegment
+     * @param splitPathSegments
+     */
+    public void replaceSplitPathSegment(final PathSegment originalSegment, final List<PathSegment> splitPathSegments) {
+        final int originalSegmentIndex = pathSegments.indexOf(originalSegment);
+        pathSegments.remove(originalSegmentIndex);
+
+        //add the PathSegments in reverse order, so the segment replacing the original segment is always last (just for consistency's sake)
+        final ListIterator<PathSegment> iterator = splitPathSegments.listIterator(splitPathSegments.size());
+        while (iterator.hasPrevious()) {
+            final PathSegment splitPathSegment = iterator.previous();
+            pathSegments.add(originalSegmentIndex, splitPathSegment);
+            splitPathSegment.addContainingPath(this);
+        }
+
+        if(firstPathSegment == null) {
+            firstPathSegment = pathSegments.get(0);
+        }
+        lastPathSegment = pathSegments.get(pathSegments.size() - 1);
     }
     public List<PathSegment> getPathSegments() {
         return pathSegments;
