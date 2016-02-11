@@ -17,37 +17,53 @@ public class Junction {
     public enum JunctionProcessStatus {
         continuePath, deadEnd
     }
-    public static class JunctionSegmentStatus {
+    public static class PathSegmentStatus {
         public final PathSegment segment;
-        public PathSegmentProcessStatus processStatus = PathSegmentProcessStatus.none;
-        public JunctionSegmentStatus(final PathSegment segment) {
+        public final PathSegmentProcessStatus processStatus;
+        public PathSegmentStatus(final PathSegment segment, final PathSegmentProcessStatus processStatus) {
             this.segment = segment;
+            this.processStatus = processStatus != null ? processStatus : PathSegmentProcessStatus.none;
         }
     }
 
     public final OSMNode junctionNode;
-    public final List<JunctionSegmentStatus> junctionPathSegments;
-    public final PathSegment originatingPathSegment;
+    public final List<PathSegmentStatus> junctionPathSegments;
+    public final PathSegmentStatus originatingPathSegment;
     public final JunctionProcessStatus processStatus;
-    private final static Comparator<JunctionSegmentStatus> pathSegmentComparator = new Comparator<JunctionSegmentStatus>() {
+    private final static Comparator<PathSegmentStatus> pathSegmentComparator = new Comparator<PathSegmentStatus>() {
         @Override
-        public int compare(final JunctionSegmentStatus o1, final JunctionSegmentStatus o2) {
+        public int compare(final PathSegmentStatus o1, final PathSegmentStatus o2) {
             return o1.segment.getScore() > o2.segment.getScore() ? -1 : 1;
         }
     };
 
     public Junction(final OSMNode node, final PathSegment originatingPathSegment, final JunctionProcessStatus processStatus) {
         junctionNode = node;
-        this.originatingPathSegment = originatingPathSegment;
         this.processStatus = processStatus;
         junctionPathSegments = new ArrayList<>(node.containingWayCount);
-        if (this.originatingPathSegment != null) {
-            final JunctionSegmentStatus status = new JunctionSegmentStatus(this.originatingPathSegment);
-            status.processStatus = PathSegmentProcessStatus.isOriginatingWay;
-            junctionPathSegments.add(status);
+        if (originatingPathSegment != null) {
+            this.originatingPathSegment = addPathSegment(originatingPathSegment, PathSegmentProcessStatus.isOriginatingWay);
+        } else {
+            this.originatingPathSegment = null;
         }
     }
     public void sortPathSegmentsByScore() {
         junctionPathSegments.sort(pathSegmentComparator);
+    }
+    public PathSegmentStatus addPathSegment(final PathSegment pathSegment, final Junction.PathSegmentProcessStatus processStatus) {
+        final PathSegmentStatus segmentStatus = new PathSegmentStatus(pathSegment, processStatus);
+        junctionPathSegments.add(segmentStatus);
+        return segmentStatus;
+    }
+    public void replacePathSegment(final PathSegment originalPathSegment, final PathSegment newPathSegment) {
+        PathSegmentStatus originalSegmentStatus = null;
+        for(final PathSegmentStatus segmentStatus : junctionPathSegments) {
+            if(segmentStatus.segment == originalPathSegment) {
+                originalSegmentStatus = segmentStatus;
+                break;
+            }
+        }
+        assert originalSegmentStatus != null;
+        junctionPathSegments.set(junctionPathSegments.indexOf(originalSegmentStatus), new PathSegmentStatus(newPathSegment, originalSegmentStatus.processStatus));
     }
 }
