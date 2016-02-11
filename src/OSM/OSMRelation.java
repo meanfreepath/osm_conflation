@@ -322,21 +322,21 @@ public class OSMRelation extends OSMEntity {
         switch (relationType) {
             case "restriction": //turn restriction: use the way that contains the "via" node
                 //if the restriction is valid, check if the new way should be added to it or not
-                  /*  if(containingRelation.isValid()) {
-                        final OSMEntity viaEntity = containingRelation.getMembers("via").get(0).member;
+                  /*  if(isValid()) {
+                        final OSMEntity viaEntity = getMembers("via").get(0).member;
                         if(viaEntity instanceof OSMNode && newWay.getNodes().contains(viaEntity)) { //"via" member is a node, and the new originalWay contains it, replace the old originalWay with the new originalWay in the relation
-                            containingRelation.replaceMember(originalWay, newWay);
+                            replaceMember(originalWay, newWay);
                         } else if(viaEntity instanceof OSMWay) { //"via" member is a originalWay
                             final OSMWay viaWay = (OSMWay) viaEntity;
 
                             //if the new originalWay intersects the "via" originalWay, replace the old originalWay with it in the relation
                             if(newWay.getNodes().contains(viaWay.getFirstNode()) || newWay.getNodes().contains(viaWay.getLastNode())) {
-                                containingRelation.replaceMember(originalWay, newWay);
+                                replaceMember(originalWay, newWay);
                             }
                         }
                     } else { //if the restriction is invalid, just add the new originalWay to it and log a warning
-                        final int index = containingRelation.indexOfMember(originalWay);
-                        containingRelation.addMember(newWay, containingRelation.members.get(index).role, index);
+                        final int index = indexOfMember(originalWay);
+                        addMember(newWay, members.get(index).role, index);
                     }*/
             case "turnlanes:turns":
                 break;
@@ -383,7 +383,7 @@ public class OSMRelation extends OSMEntity {
                             hitOriginal = true;
                             continue;
                         }
-                        //System.out.println("Adding new originalWay FORWARD " + (hitOriginal ? "AFTER" : "BEFORE") + ": " + splitWay.getTag("name") + " to relation " + containingRelation.getTag("name"));
+                        //System.out.println("Adding new originalWay FORWARD " + (hitOriginal ? "AFTER" : "BEFORE") + ": " + splitWay.getTag("name") + " to relation " + getTag("name"));
                         if(hitOriginal) {
                             insertAfterMember(splitWay, originalWayMember.role, originalWay);
                         } else {
@@ -401,7 +401,7 @@ public class OSMRelation extends OSMEntity {
                             hitOriginal = true;
                             continue;
                         }
-                        //System.out.println("Adding new originalWay BACKWARD "  + (hitOriginal ? "AFTER" : "BEFORE") + splitWay.getTag("name") + " to relation " + containingRelation.getTag("name"));
+                        //System.out.println("Adding new originalWay BACKWARD "  + (hitOriginal ? "AFTER" : "BEFORE") + splitWay.getTag("name") + " to relation " + getTag("name"));
                         if(hitOriginal) {
                             insertBeforeMember(splitWay, originalWayMember.role, originalWay);
                         } else {

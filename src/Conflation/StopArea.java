@@ -183,7 +183,7 @@ public class StopArea implements WaySegmentsObserver {
             throw new InvalidArgumentException(errMsg);
         }
 
-        System.out.println("Stop " + platform.getTag("name") + " observed split: " + originalWaySegments.way.getTag("name"));
+        //System.out.println("Stop " + platform.getTag("name") + " observed split: " + originalWaySegments.way.getTag("name"));
 
         //copy the name matches to the new lines, if present.  No need to check for proximity here
         StopWayMatch.NameMatch existingNameMatch = null;
@@ -212,12 +212,12 @@ public class StopArea implements WaySegmentsObserver {
         originalWayMatch.proximityMatches.removeAll(oldProximityMatches);
 
         //update the proximity matches to refer to the correct line
-        System.out.println("removed " + oldProximityMatches.size() + " stale proximity matches");
+        //System.out.println("removed " + oldProximityMatches.size() + " stale proximity matches");
         for(final WaySegments ws : splitWaySegments) {
             for(final StopWayMatch.SegmentProximityMatch segmentMatch : oldProximityMatches) {
                 if(ws.segments.contains(segmentMatch.candidateSegment)) {
                     addProximityMatch(segmentMatch.routeLine, segmentMatch.candidateSegment, segmentMatch.distance, segmentMatch.matchType);
-                    System.out.println("Moved proximity for segment from " + originalWayMatch.line.way.osm_id + " to line " + segmentMatch.candidateSegment.parentSegments.way.osm_id + "/" + ws.way.osm_id);
+                    //System.out.println("Moved proximity for segment from " + originalWayMatch.line.way.osm_id + " to line " + segmentMatch.candidateSegment.parentSegments.way.osm_id + "/" + ws.way.osm_id);
                 }
             }
         }

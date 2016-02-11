@@ -329,49 +329,41 @@ public class PathSegment implements WaySegmentsObserver {
 
         assert travelDirection != null;
 
-        System.out.println("-----------------------------------------------------------------------------");
-        System.out.println("CHECK PathSegment SPLIT FOR " + this + ": " + splitWaySegments.length + " splitLines");
+        //System.out.println("-----------------------------------------------------------------------------");
+        //System.out.println("CHECK PathSegment SPLIT FOR " + this + ": " + splitWaySegments.length + " splitLines");
         final List<SplitInfo> overlappingLines = new ArrayList<>(splitWaySegments.length - 1); //populated if this PathSegment is being split in the middle
         for(final WaySegments splitLine : splitWaySegments) {
             final List<OSMNode> splitWayNodesOnPathSegment = splitLine.way.getNodes();
 
-            System.out.println("CHECK " + splitLine + ": " + splitLine.way.debugOutput());
+            //System.out.println("CHECK " + splitLine + ": " + splitLine.way.debugOutput());
             //check the overlap of the newly-split lines - if one or more lines begin/end within this PathSegment, it needs to be split
             final boolean wayContainsOriginNode = splitWayNodesOnPathSegment.contains(originJunction.junctionNode), wayContainsEndNode = splitWayNodesOnPathSegment.contains(endJunction.junctionNode);
             if (wayContainsOriginNode && wayContainsEndNode) { //line encompasses (or is equal to) entire PathSegment
-                System.out.println("CONTAINS ORIGIN AND END: " + (splitLine != line ? "DIFFERENT" : "SAME"));
                 if(splitLine != line) {
                     setLine(splitLine);
                 }
                 return; //bail, since we've found the line that fully contains this PathSegment
             } else if(wayContainsOriginNode) { //if the splitLine contains this PathSegment's origin node, make sure splitLine starts or ends at that node
-                System.out.println("CONTAINS ORIGIN AT INDEX " + splitLine.way.getNodes().indexOf(originJunction.junctionNode));
                 /*check if the way intrudes partially into this PathSegment via the originJunction:
                   traveling forward: way ends somewhere in the middle of this PathSegment (i.e. not on the originJunction)
                   traveling backward: way starts somewhere in the middle of this PathSegment (i.e. not on the originJunction)
                   */
                 if(travelDirection == TravelDirection.forward && splitLine.way.getLastNode() != originJunction.junctionNode) {
-                    System.out.println(splitLine.toString() + ":: MIDDLE ORIGIN FORWARD!!!!");
                     overlappingLines.add(new SplitInfo(splitLine, originJunction.junctionNode, splitLine.way.getLastNode()));
                 } else if(travelDirection == TravelDirection.backward && splitLine.way.getFirstNode() != originJunction.junctionNode) {
-                    System.out.println(splitLine.toString() + ":: MIDDLE ORIGIN BACKWARD!!!!");
                     overlappingLines.add(new SplitInfo(splitLine, originJunction.junctionNode, splitLine.way.getFirstNode()));
                 }
             } else if(wayContainsEndNode) { //if the splitLine contains this PathSegment's end node, make sure splitLine starts or ends at that node
-                System.out.println("CONTAINS END AT INDEX " + splitLine.way.getNodes().indexOf(endJunction.junctionNode));
                 /*check if the way intrudes partially into this PathSegment via the endJunction:
                   traveling forward: way starts somewhere in the middle of this PathSegment (i.e. not on the endJunction)
                   traveling backward: way ends somewhere in the middle of this PathSegment (i.e. not on the endJunction)
                   */
                 if(travelDirection == TravelDirection.forward && splitLine.way.getFirstNode() != endJunction.junctionNode) {
-                    System.out.println(splitLine.toString() + ":: MIDDLE END FORWARD!!!!");
                     overlappingLines.add(new SplitInfo(splitLine, splitLine.way.getFirstNode(), endJunction.junctionNode));
                 } else if(travelDirection == TravelDirection.backward && splitLine.way.getLastNode() != endJunction.junctionNode) {
-                    System.out.println(splitLine.toString() + ":: MIDDLE END BACKWARD!!!!");
                     overlappingLines.add(new SplitInfo(splitLine, splitLine.way.getLastNode(), endJunction.junctionNode));
                 }
             } else { //if the splitLine is fully contained within this PathSegment
-                System.out.println("FULLY CONTAINED WITHIN: " + splitLine.toString());
                 if(travelDirection == TravelDirection.forward) {
                     overlappingLines.add(new SplitInfo(splitLine, splitLine.way.getFirstNode(), splitLine.way.getLastNode()));
                 } else if(travelDirection == TravelDirection.backward){
@@ -383,17 +375,16 @@ public class PathSegment implements WaySegmentsObserver {
         //if we've reached this stage, one or more of the split lines doesn't full contain this PathSegment: we need to split it
         if(overlappingLines.size() > 0) {
             //if travelling forward on the original line, we want to keep the last line in the split list
-            System.out.println(splitWaySegments.length + "/" + overlappingLines.size() +  " NEW PS REQUIRED");
+            //System.out.println(splitWaySegments.length + "/" + overlappingLines.size() +  " NEW PS REQUIRED");
             final List<PathSegment> splitPathSegments = new ArrayList<>(overlappingLines.size());
 
             Junction.PathSegmentStatus originatingPathSegmentStatus = originJunction.originatingPathSegment;
             PathSegment pathSegmentReplacementOrigin = null, pathSegmentReplacementEnd = null;
             for(final SplitInfo overlappingLine : overlappingLines) {
-                System.out.println(overlappingLine + "::" + overlappingLine.line.way.debugOutput());
                 final Junction startingJunction = new Junction(overlappingLine.fromNode, originatingPathSegmentStatus.segment, Junction.JunctionProcessStatus.continuePath);
                 final PathSegment splitPathSegment = new PathSegment(overlappingLine.line, startingJunction, parentPathTree);
                 originatingPathSegmentStatus = startingJunction.addPathSegment(splitPathSegment, originatingPathSegmentStatus.processStatus);
-                System.out.println("New PS " + splitPathSegment + ":vs:" + overlappingLine.fromNode.osm_id + "->" + overlappingLine.toNode.osm_id);
+                //System.out.println("New PS " + splitPathSegment + ":vs:" + overlappingLine.fromNode.osm_id + "->" + overlappingLine.toNode.osm_id + ", " + overlappingLine.line.way.debugOutput());
                 splitPathSegments.add(splitPathSegment);
 
                 //update the origin/end junction objects of this PathSe
@@ -404,11 +395,12 @@ public class PathSegment implements WaySegmentsObserver {
                 }
             }
 
+            //reverse the order of the PathSegment array if travelling backward
             if(travelDirection == TravelDirection.backward) {
                 Collections.reverse(splitPathSegments);
             }
 
-            System.out.println("Notifying " + containingPaths.size() + " paths");
+            //and add the newly-split PathSegments to their respective paths
             for(final Path path : containingPaths) {
                 path.replaceSplitPathSegment(this, splitPathSegments);
             }

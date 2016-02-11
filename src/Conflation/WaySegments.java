@@ -350,14 +350,14 @@ public class WaySegments {
 
         //run the split on the underlying way
         final OSMWay[] splitWays = entitySpace.splitWay(way, actualSplitNodes.toArray(new OSMNode[actualSplitNodes.size()]));
-        System.out.println(splitWays.length + " split ways:");
+        //System.out.println(splitWays.length + " split ways:");
 
         //create a WaySegments object for each way
         final WaySegments[] splitWaySegments = new WaySegments[splitWays.length];
         int idx = 0;
         final List<LineSegment> originalLineSegments = new ArrayList<>(segments);
         for(final OSMWay splitWay : splitWays) {
-            System.out.println("check way " + splitWay.debugOutput());
+            //System.out.println("check way " + splitWay.debugOutput());
             List<LineSegment> curLineSegments = new ArrayList<>(originalLineSegments.size());
 
             boolean inWay = false;
