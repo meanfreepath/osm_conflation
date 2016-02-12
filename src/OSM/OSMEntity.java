@@ -4,6 +4,7 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,6 +26,9 @@ public abstract class OSMEntity {
     public enum TagMergeStrategy {
         keepTags, replaceTags, copyTags, copyNonexistentTags, mergeTags
     }
+    public enum ChangeAction {
+        none, modify, delete
+    }
 
     public final static boolean debug = true;
 
@@ -34,6 +38,9 @@ public abstract class OSMEntity {
     public int uid = -1, version = -1, changeset = -1;
     public boolean visible = true;
     public String user = null, timestamp = null;
+    public ChangeAction action = ChangeAction.none;
+
+
     protected Region boundingBox;
     protected boolean complete = false;
 
@@ -62,6 +69,7 @@ public abstract class OSMEntity {
             osm_id = idOverride;
         }
         complete = entityToCopy.complete;
+        action = entityToCopy.action;
         boundingBox = entityToCopy.boundingBox;
         if(entityToCopy.tags != null) {
             tags = new HashMap<>(entityToCopy.tags);
@@ -74,6 +82,7 @@ public abstract class OSMEntity {
             System.out.println("BAD UPGRADE " + osm_id + "/" + completeEntity.osm_id);
         }
         complete = completeEntity.complete;
+        action = completeEntity.action;
         boundingBox = completeEntity.boundingBox;
         if(completeEntity.tags != null) {
             tags = new HashMap<>(completeEntity.tags);
@@ -133,6 +142,7 @@ public abstract class OSMEntity {
             throw new InvalidArgumentException(msg);
         }
         tags.put(name, value.trim());
+        markAsModified();
     }
 
     /**
@@ -153,6 +163,7 @@ public abstract class OSMEntity {
         } else {
             removeTag(name);
         }
+        markAsModified();
     }
     public boolean removeTag(final String name) {
         if(!complete) { //can't set a tag on an incomplete entity
@@ -161,7 +172,12 @@ public abstract class OSMEntity {
         if(tags == null) {
             return false;
         }
-        return tags.remove(name) != null;
+        final String removedTag = tags.remove(name);
+        if(removedTag != null) {
+            markAsModified();
+            return true;
+        }
+        return false;
     }
     /**
      *
@@ -203,8 +219,19 @@ public abstract class OSMEntity {
                 }
                 break;
         }
+        markAsModified();
 
         return conflictingTags != null && conflictingTags.size() > 0 ? conflictingTags : null;
+    }
+    public void markAsModified() {
+        if(action == ChangeAction.none && version > 0) {
+            version++;
+            //timestamp = new Date().toString();
+        }
+        action = ChangeAction.modify;
+    }
+    public void markAsDeleted() {
+        action = ChangeAction.delete;
     }
 
     /**

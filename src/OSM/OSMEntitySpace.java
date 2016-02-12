@@ -21,7 +21,7 @@ import java.util.*;
  */
 public class OSMEntitySpace {
     private final static String
-            XML_DOCUMENT_OPEN = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<osm version=\"0.6\" upload=\"false\" generator=\"KCMetroImporter\">\n",
+            XML_DOCUMENT_OPEN = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<osm version=\"0.6\" upload=\"%s\" generator=\"KCMetroImporter\">\n",
             XML_BOUNDING_BOX = " <bounds minlat=\"%.07f\" minlon=\"%.07f\" maxlat=\"%.07f\" maxlon=\"%.07f\"/>\n",
             XML_DOCUMENT_CLOSE = "</osm>\n";
 
@@ -48,6 +48,7 @@ public class OSMEntitySpace {
     }
 
     public final HashMap<Long, OSMEntity> allEntities;
+    public final HashMap<Long, OSMEntity> deletedEntities;
     public final HashMap<Long, OSMNode> allNodes;
     public final HashMap<Long, OSMWay> allWays;
     public final HashMap<Long, OSMRelation> allRelations;
@@ -55,6 +56,11 @@ public class OSMEntitySpace {
     public final HashMap<Long, OSMEntity> debugEntities = new HashMap<>(8);
 
     private ArrayList<Long> debugEntityIds = new ArrayList<>();
+
+    public void setCanUpload(boolean canUpload) {
+        this.canUpload = canUpload;
+    }
+    private boolean canUpload = false;
 
     private static void setIdSequence(long sequence) {
         osmIdSequence = sequence;
@@ -70,6 +76,7 @@ public class OSMEntitySpace {
         allNodes = new HashMap<>(capacity);
         allWays = new HashMap<>(capacity);
         allRelations = new HashMap<>(capacity);
+        deletedEntities = new HashMap<>(capacity / 10);
 
         name = String.valueOf(Math.round(1000 * Math.random()));
     }
@@ -82,6 +89,7 @@ public class OSMEntitySpace {
         allNodes = new HashMap<>(capacity);
         allWays = new HashMap<>(capacity);
         allRelations = new HashMap<>(capacity);
+        deletedEntities = new HashMap<>(capacity / 10);
         mergeWithSpace(spaceToDuplicate, OSMEntity.TagMergeStrategy.keepTags, null);
     }
     private void initDebug() {
@@ -103,6 +111,7 @@ public class OSMEntitySpace {
         final OSMNode newNode = new OSMNode(--osmIdSequence);
         newNode.setCoordinate(latitude, longitude);
         newNode.setComplete(true);
+        newNode.markAsModified();
 
         if(withTags != null) {
             for(Map.Entry<String, String> tag : withTags.entrySet()) {
@@ -158,6 +167,8 @@ public class OSMEntitySpace {
     public OSMWay createWay(final Map<String, String> withTags, final List<OSMNode> withNodes) {
         final OSMWay newWay = new OSMWay(--osmIdSequence);
         newWay.setComplete(true);
+        newWay.markAsModified();
+
         if(withTags != null) {
             for(Map.Entry<String, String> tag : withTags.entrySet()) {
                 newWay.setTag(tag.getKey(), tag.getValue());
@@ -217,6 +228,8 @@ public class OSMEntitySpace {
     public OSMRelation createRelation(final Map<String, String> withTags, final List<OSMRelation.OSMRelationMember> withMembers) {
         final OSMRelation newRelation = new OSMRelation(--osmIdSequence);
         newRelation.setComplete(true);
+        newRelation.markAsModified();
+
         if(withTags != null) {
             for(Map.Entry<String, String> tag : withTags.entrySet()) {
                 newRelation.setTag(tag.getKey(), tag.getValue());
@@ -394,15 +407,27 @@ public class OSMEntitySpace {
      * @return TRUE if deleted, FALSE if not
      */
     private boolean deleteEntity(final OSMEntity entityToDelete) {
+        //get a handle on the local copy of the entity
+        OSMEntity localEntityToDelete = allEntities.get(entityToDelete.osm_id);
+
+        //if the local entity to delete doesn't exist in this space, we need to add it before beginning the deletion process
+        if(localEntityToDelete == null) {
+            //don't bother marking for deletion if not on the OSM server
+            if(entityToDelete.version <= 0) {
+                return false;
+            }
+            localEntityToDelete = addEntity(entityToDelete, OSMEntity.TagMergeStrategy.keepTags, null);
+        }
+
         //entity subclass-specific operations
-        if(entityToDelete instanceof OSMNode) {
-            final OSMNode theNode = (OSMNode) entityToDelete;
+        if(localEntityToDelete instanceof OSMNode) {
+            final OSMNode theNode = (OSMNode) localEntityToDelete;
             //check way membership, removing the entity if possible
             for(final OSMWay way : theNode.containingWays.values()) {
                 way.removeNode(theNode);
             }
-        } else if(entityToDelete instanceof OSMWay) {
-            final OSMWay theWay = (OSMWay) entityToDelete;
+        } else if(localEntityToDelete instanceof OSMWay) {
+            final OSMWay theWay = (OSMWay) localEntityToDelete;
             //delete any nodes that are untagged, and aren't a member of any other ways or relations
             final List<OSMNode> containedNodes = new ArrayList<>(theWay.getNodes());
             for(final OSMNode containedNode : containedNodes) {
@@ -412,27 +437,31 @@ public class OSMEntitySpace {
                     deleteEntity(containedNode);
                 }
             }
-        } else if(entityToDelete instanceof OSMRelation) {
-            final OSMRelation theRelation = (OSMRelation) entityToDelete;
+        } else if(localEntityToDelete instanceof OSMRelation) {
+            final OSMRelation theRelation = (OSMRelation) localEntityToDelete;
             theRelation.clearMembers(); //delete all memberships in the relation
         }
 
-        //remove the instances of entityToDelete in any relations
-        final Map<Long, OSMRelation> containingRelations = new HashMap<>(entityToDelete.containingRelations);
+        //remove the instances of localEntityToDelete in any relations
+        final Map<Long, OSMRelation> containingRelations = new HashMap<>(localEntityToDelete.containingRelations);
         for(final OSMRelation relation : containingRelations.values()) {
-            relation.removeMember(entityToDelete);
+            relation.removeMember(localEntityToDelete);
         }
 
         //and remove all references from the main data arrays
-        if(entityToDelete instanceof OSMNode) {
-            allNodes.remove(entityToDelete.osm_id);
-        } else if(entityToDelete instanceof OSMWay) {
-            allWays.remove(entityToDelete.osm_id);
-        } else if(entityToDelete instanceof OSMRelation) {
-            allRelations.remove(entityToDelete.osm_id);
+        if(localEntityToDelete instanceof OSMNode) {
+            allNodes.remove(localEntityToDelete.osm_id);
+        } else if(localEntityToDelete instanceof OSMWay) {
+            allWays.remove(localEntityToDelete.osm_id);
+        } else if(localEntityToDelete instanceof OSMRelation) {
+            allRelations.remove(localEntityToDelete.osm_id);
         }
-        final OSMEntity deletedEntity = allEntities.remove(entityToDelete.osm_id);
-        return deletedEntity != null;
+        allEntities.remove(localEntityToDelete.osm_id);
+
+        //and mark the entity as deleted
+        localEntityToDelete.markAsDeleted();
+        deletedEntities.put(localEntityToDelete.osm_id, localEntityToDelete);
+        return true;
     }
     /**
      * Merge the given entities
@@ -444,7 +473,7 @@ public class OSMEntitySpace {
         //get a handle on our main reference to theEntity - must be a member of this space
         final OSMEntity theEntity = allEntities.get(theEntityId), withEntity = allEntities.get(withEntityId);
         if(theEntity == null || withEntity == null) {
-            System.out.println("Entities not in space!");
+            System.out.println("Entities not in space: " + theEntityId + ":" + (theEntity != null ? "OK" : "MISSING") + "/" + withEntityId + ":" + (withEntity != null ? "OK" : "MISSING"));
             return null;
         }
 
@@ -511,6 +540,7 @@ public class OSMEntitySpace {
         if(entityReplaced) {
             addEntity(targetEntity, OSMEntity.TagMergeStrategy.keepTags, null);
         }
+        targetEntity.markAsModified();
         return targetEntity;
     }
     /**
@@ -801,7 +831,7 @@ public class OSMEntitySpace {
         final Region fileBoundingBox = getBoundingBox();
 
         final FileWriter writer = new FileWriter(fileName);
-        writer.write(XML_DOCUMENT_OPEN);
+        writer.write(String.format(XML_DOCUMENT_OPEN, Boolean.toString(canUpload)));
         if(fileBoundingBox != null) {
             writer.write(String.format(XML_BOUNDING_BOX, fileBoundingBox.origin.latitude, fileBoundingBox.origin.longitude, fileBoundingBox.extent.latitude, fileBoundingBox.extent.longitude));
         }
@@ -821,6 +851,9 @@ public class OSMEntitySpace {
                 writer.write(relation.toOSMXML());
             }
         }
+        for(final OSMEntity entity: deletedEntities.values()) {
+            writer.write(entity.toOSMXML());
+        }
         writer.write(XML_DOCUMENT_CLOSE);
 
         writer.close();
@@ -835,13 +868,14 @@ public class OSMEntitySpace {
     public void mergeWithSpace(final OSMEntitySpace otherSpace, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
         System.out.println("MERGE " + name + " WITH " + otherSpace.name);
 
-        //final HashMap<Long, OSMEntity> addedEntities = new HashMap<>(otherSpace.allEntities.size()), originalEntities = new HashMap<>(otherSpace.allEntities.size());
+        //merge in the entities
         for(final OSMEntity otherSpaceEntity : otherSpace.allEntities.values()) {
-            final OSMEntity localEntity = addEntity(otherSpaceEntity, mergeStrategy, conflictingEntities);
-            /*if(localEntity != otherSpaceEntity) {
-                originalEntities.put(otherSpaceEntity.osm_id, otherSpaceEntity);
-                addedEntities.put(localEntity.osm_id, localEntity);
-            }*/
+            addEntity(otherSpaceEntity, mergeStrategy, conflictingEntities);
+        }
+
+        //and delete any entities that were marked as deleted in the other space
+        for(final OSMEntity otherSpaceEntity : otherSpace.deletedEntities.values()) {
+            deleteEntity(otherSpaceEntity); //TODO: need to warn/handle case when the local copy of our entity was modified prior to this merge
         }
 
         if(debugEnabled) {

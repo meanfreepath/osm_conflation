@@ -13,9 +13,9 @@ import java.util.List;
 public class OSMRelation extends OSMEntity {
     private final static String
             BASE_XML_TAG_FORMAT_EMPTY = " <relation id=\"%d\" visible=\"%s\"/>\n",
-            BASE_XML_TAG_FORMAT_EMPTY_METADATA = " <relation id=\"%d\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\"/>\n",
+            BASE_XML_TAG_FORMAT_EMPTY_METADATA = " <relation id=\"%d\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\" action=\"%s\"/>\n",
             BASE_XML_TAG_FORMAT_OPEN = " <relation id=\"%s\" visible=\"%s\">\n",
-            BASE_XML_TAG_FORMAT_OPEN_METADATA = " <relation id=\"%s\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\">\n",
+            BASE_XML_TAG_FORMAT_OPEN_METADATA = " <relation id=\"%s\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\" action=\"%s\">\n",
             BASE_XML_TAG_FORMAT_CLOSE = " </relation>\n",
             BASE_XML_TAG_FORMAT_MEMBER = "  <member type=\"%s\" ref=\"%d\" role=\"%s\"/>\n";
     private final static OSMType type = OSMType.relation;
@@ -65,6 +65,7 @@ public class OSMRelation extends OSMEntity {
                 }
             }
         }
+        markAsModified();
     }
     protected void memberWasMadeComplete(final OSMEntity memberEntity) {
         completedMemberCount++;
@@ -115,7 +116,7 @@ public class OSMRelation extends OSMEntity {
         if(tagCount + memberCount > 0) {
             final String openTag;
             if(version > 0) {
-                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN_METADATA, osm_id, String.valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user));
+                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN_METADATA, osm_id, String.valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user), action != ChangeAction.none ? action.name() : "");
             } else {
                 openTag = String.format(BASE_XML_TAG_FORMAT_OPEN, osm_id, String.valueOf(visible));
             }
@@ -138,13 +139,17 @@ public class OSMRelation extends OSMEntity {
             return xml.toString();
         } else {
             if(version > 0) {
-                return String.format(BASE_XML_TAG_FORMAT_EMPTY_METADATA, osm_id, String .valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user));
+                return String.format(BASE_XML_TAG_FORMAT_EMPTY_METADATA, osm_id, String .valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user), action != ChangeAction.none ? action.name() : "");
             } else {
                 return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id, String .valueOf(visible));
             }
         }
     }
     public void clearMembers() {
+        if(members.size() > 0) {
+            markAsModified();
+        }
+
         for(final OSMRelationMember member : members) {
             member.member.didRemoveFromRelation(this);
         }
@@ -205,6 +210,7 @@ public class OSMRelation extends OSMEntity {
 
         if(relationMemberToRemove != null) {
             if(members.remove(relationMemberToRemove)) {
+                markAsModified();
                 if(relationMemberToRemove.member.isComplete()) {
                     completedMemberCount--;
                 }
@@ -252,6 +258,7 @@ public class OSMRelation extends OSMEntity {
             completedMemberCount++;
         }
         member.didAddToRelation(this);
+        markAsModified();
         return true;
     }
     /**
@@ -276,6 +283,7 @@ public class OSMRelation extends OSMEntity {
             newMember.member.didAddToRelation(this);
 
             boundingBox = null; //invalidate the bounding box
+            markAsModified();
         }
     }
     public List<OSMRelationMember> getMembers() {
@@ -310,11 +318,11 @@ public class OSMRelation extends OSMEntity {
                 boolean restrictionIsValid = viaEntities.size() == 1 && fromWays.size() == 1 && toWays.size() == 1;
                 //and the "from" and "to" members must be ways, and the "via" member must be a node or way
                 if(!restrictionIsValid) {
-                    return restrictionIsValid;
+                    return false;
                 }
                 restrictionIsValid = fromWays.get(0).member instanceof OSMWay && toWays.get(0).member instanceof OSMWay && (viaEntities.get(0).member instanceof OSMNode || viaEntities.get(0).member instanceof OSMWay);
                 if(!restrictionIsValid) {
-                    return restrictionIsValid;
+                    return false;
                 }
 
                 //check the intersection of the members
