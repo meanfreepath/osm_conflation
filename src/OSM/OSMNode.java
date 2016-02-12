@@ -33,10 +33,11 @@ public class OSMNode extends OSMEntity {
         }
     }
     @Override
-    protected void upgradeToCompleteEntity(final OSMEntity completeEntity, final OSMEntitySpace entitySpace) {
-        super.upgradeToCompleteEntity(completeEntity, entitySpace);
+    protected void upgradeToCompleteEntity(final OSMEntity completeEntity) {
+        super.upgradeToCompleteEntity(completeEntity);
         setCoordinate(((OSMNode) completeEntity).coordinate);
 
+        //notify the containing ways that this node is now complete
         for(final OSMWay way : containingWays.values()) {
             way.nodeWasMadeComplete(this);
         }

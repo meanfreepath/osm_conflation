@@ -23,7 +23,7 @@ public class OSMWay extends OSMEntity {
 
     private final List<OSMNode> nodes = new ArrayList<>(INITIAL_CAPACITY_NODE);
     private OSMNode firstNode = null, lastNode = null;
-    private boolean allNodesComplete = true;
+    private int completedNodeCount = 0;
 
     public OSMWay(final long id) {
         super(id);
@@ -32,26 +32,9 @@ public class OSMWay extends OSMEntity {
     /**
      * Copy constructor
      * @param wayToCopy
-     * @param nodeCopyStrategy
      */
-    public OSMWay(final OSMWay wayToCopy, final Long idOverride, final MemberCopyStrategy nodeCopyStrategy) {
+    public OSMWay(final OSMWay wayToCopy, final Long idOverride) {
         super(wayToCopy, idOverride);
-
-        copyNodes(wayToCopy.nodes, nodeCopyStrategy);
-    }
-    @Override
-    public void upgradeToCompleteEntity(final OSMEntity completeEntity, final OSMEntitySpace entitySpace) {
-        super.upgradeToCompleteEntity(completeEntity, entitySpace);
-
-        //make sure all the nodes on the incoming completed way are in this way's entitySpace
-        final OSMWay completeWay = (OSMWay) completeEntity;
-        final List<OSMNode> entitySpaceNodes = new ArrayList<>(completeWay.nodes.size());
-        for(final OSMNode node : completeWay.nodes) {
-            entitySpaceNodes.add((OSMNode) entitySpace.addEntity(node, TagMergeStrategy.keepTags, null));
-        }
-
-        //and copy them over
-        copyNodes(entitySpaceNodes, MemberCopyStrategy.shallow);
     }
     @Override
     protected void downgradeToIncompleteEntity() {
@@ -60,30 +43,23 @@ public class OSMWay extends OSMEntity {
         for(final OSMNode node : nodesToRemove) {
             removeNode(node);
         }
+        completedNodeCount = 0;
     }
 
     /**
      * Adds the given nodes to our way
      * @param nodesToCopy
-     * @param nodeCopyStrategy
      */
-    private void copyNodes(final List<OSMNode> nodesToCopy, final MemberCopyStrategy nodeCopyStrategy) {
+    protected void copyNodes(final List<OSMNode> nodesToCopy) {
         //add the nodes if complete
         if(complete) {
-            switch (nodeCopyStrategy) {
-                case shallow:
-                    nodes.addAll(nodesToCopy);
-                    for (final OSMNode addedNode : nodes) {
-                        addedNode.didAddToWay(this);
-                        if(allNodesComplete && !addedNode.isComplete()) {
-                            allNodesComplete = false;
-                        }
-                    }
-                    break;
-                case none:
-                    break;
+            nodes.addAll(nodesToCopy);
+            for (final OSMNode addedNode : nodes) {
+                addedNode.didAddToWay(this);
+                if(addedNode.isComplete()) {
+                    completedNodeCount++;
+                }
             }
-
             updateFirstAndLastNodes();
         }
     }
@@ -101,11 +77,11 @@ public class OSMWay extends OSMEntity {
      */
     public void insertNode(final OSMNode node, final int index) {
         nodes.add(index, node);
+        if(node.isComplete()) {
+            completedNodeCount++;
+        }
         node.didAddToWay(this);
         updateFirstAndLastNodes();
-        if(!node.isComplete()) {
-            allNodesComplete = false;
-        }
         boundingBox = null; //invalidate the bounding box
     }
     /**
@@ -114,11 +90,11 @@ public class OSMWay extends OSMEntity {
      */
     public void appendNode(final OSMNode node) {
         nodes.add(node);
+        if(node.isComplete()) {
+            completedNodeCount++;
+        }
         node.didAddToWay(this);
         updateFirstAndLastNodes();
-        if(!node.isComplete()) {
-            allNodesComplete = false;
-        }
         boundingBox = null; //invalidate the bounding box
     }
     public boolean removeNode(final OSMNode node) {
@@ -135,12 +111,15 @@ public class OSMWay extends OSMEntity {
         if(nodeIndex >= 0) {
             if(newNode != null) {
                 nodes.set(nodeIndex, newNode);
-                newNode.didAddToWay(this);
-                if(!newNode.isComplete()) {
-                    allNodesComplete = false;
+                if(newNode.isComplete()) {
+                    completedNodeCount++;
                 }
+                newNode.didAddToWay(this);
             } else {
                 nodes.remove(nodeIndex);
+                if(oldNode.isComplete()) {
+                    completedNodeCount--;
+                }
             }
             oldNode.didRemoveFromWay(this);
             updateFirstAndLastNodes();
@@ -169,14 +148,7 @@ public class OSMWay extends OSMEntity {
         return lastNode;
     }
     protected void nodeWasMadeComplete(final OSMNode node) {
-        boolean allNodesComplete = true;
-        for(final OSMNode containedNode : nodes) {
-            if(!containedNode.isComplete()) {
-                allNodesComplete = false;
-                break;
-            }
-        }
-        this.allNodesComplete = allNodesComplete;
+        completedNodeCount++;
     }
     /**
      * Returns the closest node (within the tolerance distance) to the given point
@@ -205,7 +177,7 @@ public class OSMWay extends OSMEntity {
         lastNode = lastLastNode;
     }
     public boolean areAllNodesComplete() {
-        return allNodesComplete;
+        return nodes.size() == completedNodeCount;
     }
 
     @Override
@@ -292,6 +264,6 @@ public class OSMWay extends OSMEntity {
         for(final OSMNode node : nodes) {
             nodeIds.add(Long.toString(node.osm_id));
         }
-        return String.format("way@%d (id %d): %d nodes [%s] (%s)", hashCode(), osm_id, nodes.size(), String.join(",", nodeIds), complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
+        return String.format("way@%d (id %d): %d/%d nodes [%s] (%s)", hashCode(), osm_id, completedNodeCount, nodes.size(), String.join(",", nodeIds), complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
     }
 }

@@ -69,7 +69,7 @@ public abstract class OSMEntity {
 
         copyMetadata(entityToCopy, this);
     }
-    protected void upgradeToCompleteEntity(final OSMEntity completeEntity, final OSMEntitySpace entitySpace) {
+    protected void upgradeToCompleteEntity(final OSMEntity completeEntity) {
         if(complete || osm_id != completeEntity.osm_id) {
             System.out.println("BAD UPGRADE " + osm_id + "/" + completeEntity.osm_id);
         }
@@ -81,12 +81,10 @@ public abstract class OSMEntity {
 
         copyMetadata(completeEntity, this);
 
-        /*also check the containing relation references of the incoming entity
-        for(final OSMRelation relation : completeEntity.containingRelations.values()) {
-            if(!containingRelations.containsKey(relation.osm_id)) {
-                entitySpace.entityAddedContainingRelation(this, relation.osm_id);
-            }
-        }*/
+        //and notify any containing relations that this member is now complete
+        for(final OSMRelation containingRelation : containingRelations.values()) {
+            containingRelation.memberWasMadeComplete(this);
+        }
     }
     protected void downgradeToIncompleteEntity() {
         complete = false;

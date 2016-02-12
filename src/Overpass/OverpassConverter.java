@@ -5,10 +5,8 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 
 /**
  * Created by nick on 11/5/15.
@@ -81,7 +79,7 @@ public class OverpassConverter {
                         long nodeId = wayNodes.getLong(nodeIdx);
                         curNode = entitySpace.allNodes.get(nodeId);
                         if(curNode == null) { //create an incomplete (undownloaded) node if not found
-                            curNode = entitySpace.createIncompleteNode(nodeId);
+                            curNode = entitySpace.addIncompleteNode(nodeId);
                         }
                         way.appendNode(curNode);
                     }
@@ -109,19 +107,19 @@ public class OverpassConverter {
                                 case "node":
                                     memberEntity = entitySpace.allNodes.get(memberId);
                                     if(memberEntity == null) {
-                                        memberEntity = entitySpace.createIncompleteNode(memberId);
+                                        memberEntity = entitySpace.addIncompleteNode(memberId);
                                     }
                                     break;
                                 case "way":
                                     memberEntity = entitySpace.allWays.get(memberId);
                                     if(memberEntity == null) {
-                                        memberEntity = entitySpace.createIncompleteWay(memberId);
+                                        memberEntity = entitySpace.addIncompleteWay(memberId);
                                     }
                                     break;
                                 case "relation":
                                     memberEntity = entitySpace.allRelations.get(memberId);
                                     if(memberEntity == null) {
-                                        memberEntity = entitySpace.createIncompleteRelation(memberId);
+                                        memberEntity = entitySpace.addIncompleteRelation(memberId);
                                     }
                                     break;
                             }

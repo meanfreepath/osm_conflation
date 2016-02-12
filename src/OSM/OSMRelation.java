@@ -21,14 +21,18 @@ public class OSMRelation extends OSMEntity {
     private final static OSMType type = OSMType.relation;
 
     protected final ArrayList<OSMRelationMember> members = new ArrayList<>();
+    protected int completedMemberCount = 0;
 
-    public class OSMRelationMember {
+    public static class OSMRelationMember {
         public final OSMEntity member;
         public final String role;
 
         public OSMRelationMember(OSMEntity memberEntity, @NotNull String memberRole) {
             role = memberRole;
             member = memberEntity;
+        }
+        public String toString() {
+            return String.format("RelMem@%d: role \"%s\" member %s", hashCode(), role, member);
         }
     }
 
@@ -39,27 +43,9 @@ public class OSMRelation extends OSMEntity {
     /**
      * Copy constructor
      * @param relationToCopy
-     * @param memberCopyStrategy
      */
-    public OSMRelation(final OSMRelation relationToCopy, final Long idOverride, final MemberCopyStrategy memberCopyStrategy) {
+    public OSMRelation(final OSMRelation relationToCopy, final Long idOverride) {
         super(relationToCopy, idOverride);
-
-        //add the members
-        copyMembers(relationToCopy.getMembers(), memberCopyStrategy);
-    }
-    @Override
-    public void upgradeToCompleteEntity(final OSMEntity completeEntity, final OSMEntitySpace entitySpace) {
-        super.upgradeToCompleteEntity(completeEntity, entitySpace);
-
-        //make sure all the member entities on the incoming completed relation are in this relation's entitySpace
-        final OSMRelation completeRelation = (OSMRelation) completeEntity;
-        final List<OSMRelationMember> entitySpaceMembers = new ArrayList<>(completeRelation.members.size());
-        for(final OSMRelationMember member : completeRelation.members) {
-            final OSMEntity memberInSpace = entitySpace.addEntity(member.member, TagMergeStrategy.keepTags, null);
-            entitySpaceMembers.add(new OSMRelationMember(memberInSpace, member.role));
-        }
-
-        copyMembers(entitySpaceMembers, MemberCopyStrategy.shallow);
     }
     @Override
     protected void downgradeToIncompleteEntity() {
@@ -68,19 +54,23 @@ public class OSMRelation extends OSMEntity {
         for(final OSMRelationMember member : membersToRemove) {
             removeMember(member.member);
         }
+        completedMemberCount = 0;
     }
-    private void copyMembers(final List<OSMRelationMember> membersToCopy, final MemberCopyStrategy memberCopyStrategy) {
+    protected void copyMembers(final List<OSMRelationMember> membersToCopy) {
         if(complete) {
-            switch (memberCopyStrategy) {
-                case shallow:
-                    for(final OSMRelationMember member : membersToCopy) {
-                        addMember(member.member, member.role);
-                    }
-                    break;
-                case none:
-                    break;
+            for(final OSMRelationMember member : membersToCopy) {
+                addMember(member.member, member.role);
+                if(member.member.isComplete()) {
+                    completedMemberCount++;
+                }
             }
         }
+    }
+    protected void memberWasMadeComplete(final OSMEntity memberEntity) {
+        completedMemberCount++;
+    }
+    public boolean areAllMembersComplete() {
+        return completedMemberCount == members.size();
     }
 
     @Override
@@ -159,6 +149,7 @@ public class OSMRelation extends OSMEntity {
             member.member.didRemoveFromRelation(this);
         }
         members.clear();
+        completedMemberCount = 0;
     }
 
     /**
@@ -214,6 +205,9 @@ public class OSMRelation extends OSMEntity {
 
         if(relationMemberToRemove != null) {
             if(members.remove(relationMemberToRemove)) {
+                if(relationMemberToRemove.member.isComplete()) {
+                    completedMemberCount--;
+                }
                 relationMemberToRemove.member.didRemoveFromRelation(this);
                 return true;
             }
@@ -254,6 +248,9 @@ public class OSMRelation extends OSMEntity {
     }
     private boolean addMemberInternal(final OSMEntity member, final String role, final int index) {
         members.add(index, new OSMRelationMember(member, role));
+        if(member.isComplete()) {
+            completedMemberCount++;
+        }
         member.didAddToRelation(this);
         return true;
     }
@@ -268,6 +265,12 @@ public class OSMRelation extends OSMEntity {
             final OSMRelationMember oldMember = members.get(memberIndex);
             final OSMRelationMember newMember = new OSMRelationMember(newEntity, oldMember.role);
             members.set(memberIndex, newMember);
+            if(oldMember.member.isComplete()) {
+                completedMemberCount--;
+            }
+            if(newMember.member.isComplete()) {
+                completedMemberCount++;
+            }
 
             oldMember.member.didRemoveFromRelation(this);
             newMember.member.didAddToRelation(this);
@@ -436,6 +439,6 @@ public class OSMRelation extends OSMEntity {
         }
     }
     public String toString() {
-        return String.format("relation@%d (id %d): %d members (%s)", hashCode(), osm_id, members.size(), complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
+        return String.format("relation@%d (id %d): %d/%d members (%s)", hashCode(), osm_id, completedMemberCount, members.size(), complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
     }
 }
