@@ -74,7 +74,7 @@ public class PathSegment implements WaySegmentsObserver {
         //System.out.println("Segment of " + line.way.getTag("name") + " (" + line.way.osm_id + "): from " + originJunction.junctionNode.osm_id + " (traveling " + (line.matchObject.getAvgDotProduct() >= 0.0 ? "forward" : "backward") + ")");
         lineMatched = false;
 
-        final int debugWayId = 243738297;
+        final int debugWayId = 60914402;
 
         //determine the direction of this line relative to the direction of route travel
         if(line.getMatchForLine(parentPathTree.parentPathFinder.route.routeLine) == null) {
@@ -121,7 +121,7 @@ public class PathSegment implements WaySegmentsObserver {
                     alignedPathLength += segment.length;
                     alignedSegmentCount++;
                     if(line.way.osm_id == debugWayId) {
-                        System.out.println("WAY:: " + line.way.osm_id + "/SEG " + bestMatchForSegment + ": dm " + directionMultiplier + "/dp " + bestMatchForSegment.dotProduct + "/dist " + bestMatchForSegment.midPointDistance + ":::score " + pathScore);
+                        System.out.println(String.format("WAY:: %d/%s::mult %.02f, score %.01f", line.way.osm_id, bestMatchForSegment, directionMultiplier, pathScore));
                     }
                 }
 
@@ -212,7 +212,9 @@ public class PathSegment implements WaySegmentsObserver {
         } else {
             lengthFactor = 0.0;
             endJunction = new Junction(lastNode, this, Junction.JunctionProcessStatus.deadEnd);
-            System.out.println("NO END JUNCTION, travelled " + traveledSegmentCount);
+            if(line.way.osm_id == debugWayId) {
+                System.out.println("NO END JUNCTION, travelled " + traveledSegmentCount);
+            }
         }
 
         if(line.way.osm_id == debugWayId) {
