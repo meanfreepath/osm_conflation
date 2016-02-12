@@ -44,26 +44,23 @@ public class OSMRelation extends OSMEntity {
     public OSMRelation(final OSMRelation relationToCopy, final Long idOverride, final MemberCopyStrategy memberCopyStrategy) {
         super(relationToCopy, idOverride);
 
-        //add the nodes
-        switch (memberCopyStrategy) {
-            case deep: //if deep copying, individually copy the members as well
-                for(final OSMRelationMember member : relationToCopy.members) {
-                    final OSMEntity clonedMember;
-                    if(member.member instanceof OSMNode) {
-                        clonedMember = new OSMNode((OSMNode) member.member, null);
-                    } else if(member.member instanceof OSMWay) {
-                        clonedMember = new OSMWay((OSMWay) member.member, null, memberCopyStrategy);
-                    } else {
-                        clonedMember = new OSMRelation((OSMRelation) member.member, null, memberCopyStrategy);
-                    }
-                    addMember(clonedMember, member.role);
-                }
-                break;
-            case shallow:
-                members.addAll(relationToCopy.getMembers());
-                break;
-            case none:
-                break;
+        //add the members
+        copyMembers(relationToCopy.getMembers(), memberCopyStrategy);
+    }
+    @Override
+    public void upgradeToCompleteEntity(final OSMEntity completeEntity) {
+        super.upgradeToCompleteEntity(completeEntity);
+        copyMembers(((OSMRelation) completeEntity).members, MemberCopyStrategy.shallow);
+    }
+    private void copyMembers(final List<OSMRelationMember> membersToCopy, final MemberCopyStrategy memberCopyStrategy) {
+        if(complete) {
+            switch (memberCopyStrategy) {
+                case shallow:
+                    members.addAll(membersToCopy);
+                    break;
+                case none:
+                    break;
+            }
         }
     }
 
@@ -96,8 +93,12 @@ public class OSMRelation extends OSMEntity {
     }
 
     @Override
-    public String toString() {
-        int tagCount = tags != null ? tags.size() : 0, memberCount = members.size();
+    public String toOSMXML() {
+        if(debug) {
+            setTag("rcount", Short.toString(containingRelationCount));
+        }
+
+        final int tagCount = tags != null ? tags.size() : 0, memberCount = members.size();
 
         if(tagCount + memberCount > 0) {
             final String openTag;
@@ -411,5 +412,8 @@ public class OSMRelation extends OSMEntity {
                 }
                 break;
         }
+    }
+    public String toString() {
+        return String.format("relation@%d (id %d): %d members (%s)", hashCode(), osm_id, members.size(), complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
     }
 }

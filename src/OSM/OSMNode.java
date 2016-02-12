@@ -28,7 +28,18 @@ public class OSMNode extends OSMEntity {
      */
     public OSMNode(final OSMNode nodeToCopy, final Long idOverride) {
         super(nodeToCopy, idOverride);
-        setCoordinate(nodeToCopy.coordinate);
+        if(complete) {
+            setCoordinate(nodeToCopy.coordinate);
+        }
+    }
+    @Override
+    protected void upgradeToCompleteEntity(final OSMEntity completeEntity) {
+        super.upgradeToCompleteEntity(completeEntity);
+        setCoordinate(((OSMNode) completeEntity).coordinate);
+
+        for(final OSMWay way : containingWays.values()) {
+            way.nodeWasMadeComplete(this);
+        }
     }
     /**
      * Notifies this node it's been added to the given way's node list
@@ -38,10 +49,6 @@ public class OSMNode extends OSMEntity {
         if(!containingWays.containsKey(way.osm_id)) {
             containingWays.put(way.osm_id, way);
             containingWayCount++;
-
-            if(debug) {
-                setTag("wcount", Short.toString(containingWayCount));
-            }
         }
     }
     /**
@@ -52,13 +59,6 @@ public class OSMNode extends OSMEntity {
         if(containingWays.containsKey(way.osm_id)) {
             containingWays.remove(way.osm_id);
             containingWayCount--;
-            if(debug) {
-                if (containingWayCount > 0) {
-                    setTag("wcount", Short.toString(containingWayCount));
-                } else {
-                    removeTag("wcount");
-                }
-            }
         }
     }
 
@@ -89,6 +89,9 @@ public class OSMNode extends OSMEntity {
 
     @Override
     public Region getBoundingBox() {
+        if(!complete) {
+            return null;
+        }
         if(boundingBox == null) {
             boundingBox = new Region(lat, lon, 0.0, 0.0);
         }
@@ -101,7 +104,11 @@ public class OSMNode extends OSMEntity {
     }
 
     @Override
-    public String toString() {
+    public String toOSMXML() {
+        if(debug) {
+            setTag("wcount", Short.toString(containingWayCount));
+            setTag("rcount", Short.toString(containingRelationCount));
+        }
         if(tags != null) {
             final String openTag;
             if(version > 0) {
@@ -124,6 +131,7 @@ public class OSMNode extends OSMEntity {
             }
         }
     }
+
     public void setTag(String name, String value) {
         switch (name) {
             case KEY_LATITUDE:
@@ -136,5 +144,8 @@ public class OSMNode extends OSMEntity {
                 super.setTag(name, value);
                 break;
         }
+    }
+    public String toString() {
+        return String.format("node@%d (id %d): %.05f,%.05f (%s)", hashCode(), osm_id, lat, lon, complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
     }
 }

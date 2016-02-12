@@ -1,5 +1,7 @@
 package OSM;
 
+import com.sun.istack.internal.NotNull;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,6 +23,7 @@ public class OSMWay extends OSMEntity {
 
     private final List<OSMNode> nodes = new ArrayList<>(INITIAL_CAPACITY_NODE);
     private OSMNode firstNode = null, lastNode = null;
+    private boolean allNodesComplete = true;
 
     public OSMWay(final long id) {
         super(id);
@@ -34,24 +37,38 @@ public class OSMWay extends OSMEntity {
     public OSMWay(final OSMWay wayToCopy, final Long idOverride, final MemberCopyStrategy nodeCopyStrategy) {
         super(wayToCopy, idOverride);
 
-        //add the nodes
-        switch (nodeCopyStrategy) {
-            case deep: //if deep copying, individually copy the nodes as well
-                for(final OSMNode node : wayToCopy.nodes) {
-                    appendNode(new OSMNode(node, null));
-                }
-                break;
-            case shallow:
-                nodes.addAll(wayToCopy.nodes);
-                for(final OSMNode addedNode : nodes) {
-                    addedNode.didAddToWay(this);
-                }
-                break;
-            case none:
-                break;
-        }
+        copyNodes(wayToCopy.nodes, nodeCopyStrategy);
+    }
+    @Override
+    public void upgradeToCompleteEntity(final OSMEntity completeEntity) {
+        super.upgradeToCompleteEntity(completeEntity);
+        copyNodes(((OSMWay) completeEntity).nodes, MemberCopyStrategy.shallow);
+    }
 
-        updateFirstAndLastNodes();
+    /**
+     * Adds the given nodes to our way
+     * @param nodesToCopy
+     * @param nodeCopyStrategy
+     */
+    private void copyNodes(final List<OSMNode> nodesToCopy, final MemberCopyStrategy nodeCopyStrategy) {
+        //add the nodes if complete
+        if(complete) {
+            switch (nodeCopyStrategy) {
+                case shallow:
+                    nodes.addAll(nodesToCopy);
+                    for (final OSMNode addedNode : nodes) {
+                        addedNode.didAddToWay(this);
+                        if(allNodesComplete && !addedNode.isComplete()) {
+                            allNodesComplete = false;
+                        }
+                    }
+                    break;
+                case none:
+                    break;
+            }
+
+            updateFirstAndLastNodes();
+        }
     }
     private void updateFirstAndLastNodes() {
         if(nodes.size() > 0) {
@@ -69,7 +86,9 @@ public class OSMWay extends OSMEntity {
         nodes.add(index, node);
         node.didAddToWay(this);
         updateFirstAndLastNodes();
-
+        if(!node.isComplete()) {
+            allNodesComplete = false;
+        }
         boundingBox = null; //invalidate the bounding box
     }
     /**
@@ -80,6 +99,9 @@ public class OSMWay extends OSMEntity {
         nodes.add(node);
         node.didAddToWay(this);
         updateFirstAndLastNodes();
+        if(!node.isComplete()) {
+            allNodesComplete = false;
+        }
         boundingBox = null; //invalidate the bounding box
     }
     public boolean removeNode(final OSMNode node) {
@@ -91,17 +113,21 @@ public class OSMWay extends OSMEntity {
      * @param newNode
      * @return TRUE if the node was found and replaced
      */
-    public boolean replaceNode(final OSMNode oldNode, final OSMNode newNode) {
+    public boolean replaceNode(final OSMNode oldNode, @NotNull final OSMNode newNode) {
         final int nodeIndex = nodes.indexOf(oldNode);
         if(nodeIndex >= 0) {
             if(newNode != null) {
                 nodes.set(nodeIndex, newNode);
                 newNode.didAddToWay(this);
+                if(!newNode.isComplete()) {
+                    allNodesComplete = false;
+                }
             } else {
                 nodes.remove(nodeIndex);
             }
             oldNode.didRemoveFromWay(this);
             updateFirstAndLastNodes();
+
             boundingBox = null; //invalidate the bounding box
             return true;
         }
@@ -124,6 +150,16 @@ public class OSMWay extends OSMEntity {
     }
     public OSMNode getLastNode() {
         return lastNode;
+    }
+    protected void nodeWasMadeComplete(final OSMNode node) {
+        boolean allNodesComplete = true;
+        for(final OSMNode containedNode : nodes) {
+            if(!containedNode.isComplete()) {
+                allNodesComplete = false;
+                break;
+            }
+        }
+        this.allNodesComplete = allNodesComplete;
     }
     /**
      * Returns the closest node (within the tolerance distance) to the given point
@@ -151,6 +187,9 @@ public class OSMWay extends OSMEntity {
         firstNode = lastNode;
         lastNode = lastLastNode;
     }
+    public boolean areAllNodesComplete() {
+        return allNodesComplete;
+    }
 
     @Override
     public OSMType getType() {
@@ -167,10 +206,15 @@ public class OSMWay extends OSMEntity {
             return boundingBox;
         }
 
-        final Region node0BoundingBox = firstNode.getBoundingBox();
-        final Region boundingBox = new Region(node0BoundingBox.origin, node0BoundingBox.extent);
+        Region boundingBox = null;
         for(final OSMNode node: nodes) {
-            boundingBox.combinedBoxWithRegion(node.getBoundingBox());
+            if(node.isComplete()) {
+                if(boundingBox != null) {
+                    boundingBox.combinedBoxWithRegion(node.getBoundingBox());
+                } else {
+                    boundingBox = node.getBoundingBox();
+                }
+            }
         }
         return boundingBox;
     }
@@ -186,7 +230,11 @@ public class OSMWay extends OSMEntity {
     }
 
     @Override
-    public String toString() {
+    public String toOSMXML() {
+        if(debug) {
+            setTag("rcount", Short.toString(containingRelationCount));
+        }
+
         int tagCount = tags != null ? tags.size() : 0, nodeCount = nodes.size();
         if(tagCount + nodeCount > 0) {
             final String openTag;
@@ -219,11 +267,11 @@ public class OSMWay extends OSMEntity {
             }
         }
     }
-    public String debugOutput() {
+    public String toString() {
         final List<String> nodeIds = new ArrayList<>(nodes.size());
         for(final OSMNode node : nodes) {
             nodeIds.add(Long.toString(node.osm_id));
         }
-        return "Way(" + osm_id + "): [" + String.join(",", nodeIds) + "]";
+        return String.format("way@%d (id %d): %d nodes [%s] (%s)", hashCode(), osm_id, nodes.size(), String.join(",", nodeIds), complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
     }
 }

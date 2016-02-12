@@ -20,7 +20,7 @@ public abstract class OSMEntity {
         node, way, relation
     }
     public enum MemberCopyStrategy {
-        none, shallow, deep
+        none, shallow
     }
     public enum TagMergeStrategy {
         keepTags, replaceTags, copyTags, copyNonexistentTags, mergeTags
@@ -35,15 +35,16 @@ public abstract class OSMEntity {
     public boolean visible = true;
     public String user = null, timestamp = null;
     protected Region boundingBox;
+    protected boolean complete = false;
 
     protected HashMap<String,String> tags;
-    public final HashMap<Long, OSMRelation> containingRelations = new HashMap<>(4);
-    public short containingRelationCount = 0;
+    protected final HashMap<Long, OSMRelation> containingRelations = new HashMap<>(4);
+    protected short containingRelationCount = 0;
 
     public abstract OSMType getType();
     public abstract Region getBoundingBox();
     public abstract Point getCentroid();
-    public abstract String toString();
+    public abstract String toOSMXML();
 
     public OSMEntity(final long id) {
         osm_id = id;
@@ -60,16 +61,25 @@ public abstract class OSMEntity {
         } else {
             osm_id = idOverride;
         }
-        uid = entityToCopy.uid;
-        version = entityToCopy.version;
-        changeset = entityToCopy.changeset;
-        user = entityToCopy.user;
-        timestamp = entityToCopy.timestamp;
+        complete = entityToCopy.complete;
         boundingBox = entityToCopy.boundingBox;
-
         if(entityToCopy.tags != null) {
             tags = new HashMap<>(entityToCopy.tags);
         }
+
+        copyMetadata(entityToCopy, this);
+    }
+    protected void upgradeToCompleteEntity(final OSMEntity completeEntity) {
+        if(complete || osm_id != completeEntity.osm_id) {
+            System.out.println("BAD UPGRADE " + osm_id + "/" + completeEntity.osm_id);
+        }
+        complete = completeEntity.complete;
+        boundingBox = completeEntity.boundingBox;
+        if(completeEntity.tags != null) {
+            tags = new HashMap<>(completeEntity.tags);
+        }
+
+        copyMetadata(completeEntity, this);
     }
 
     /**
@@ -84,13 +94,12 @@ public abstract class OSMEntity {
             to.setTag(name, fromValue);
         }
     }
-    public static void copyMetadata(final OSMEntity from, final OSMEntity to) {
+    protected static void copyMetadata(final OSMEntity from, final OSMEntity to) {
         to.uid = from.uid;
         to.version = from.version;
         to.changeset = from.changeset;
         to.user = from.user;
         to.timestamp = from.timestamp;
-        to.boundingBox = from.boundingBox;
     }
     /**
      * Sets the given tag on this entity, only if it doesn't already exist
@@ -99,6 +108,9 @@ public abstract class OSMEntity {
      * @throws InvalidArgumentException
      */
     public void addTag(final String name, final String value) throws InvalidArgumentException {
+        if(!complete) { //can't set a tag on an incomplete entity
+            return;
+        }
         if(tags == null) {
             tags = new HashMap<>();
         }
@@ -116,6 +128,10 @@ public abstract class OSMEntity {
      * @param value
      */
     public void setTag(final String name, final String value) {
+        if(!complete) { //can't set a tag on an incomplete entity
+            System.out.println("ADDING TAG TO INCOMPLETE " + osm_id);
+            return;
+        }
         if(tags == null) {
             tags = new HashMap<>();
         }
@@ -126,6 +142,9 @@ public abstract class OSMEntity {
         }
     }
     public boolean removeTag(final String name) {
+        if(!complete) { //can't set a tag on an incomplete entity
+            return false;
+        }
         if(tags == null) {
             return false;
         }
@@ -138,6 +157,9 @@ public abstract class OSMEntity {
      * @return Any tags that conflict (if checkForConflicts is TRUE), null otherwise
      */
     public Map<String, String> copyTagsFrom(final OSMEntity otherEntity, final TagMergeStrategy mergeStrategy) {
+        if(!complete) { //can't set a tag on an incomplete entity
+            return null;
+        }
         if(tags == null) {
             tags = new HashMap<>();
         }
@@ -206,9 +228,6 @@ public abstract class OSMEntity {
             containingRelations.put(relation.osm_id, relation);
             containingRelationCount++;
         }
-        if(debug) {
-            setTag("rcount", Short.toString(containingRelationCount));
-        }
     }
     /**
      * Notifies this entity it's been removed from the given relation's member list
@@ -218,9 +237,14 @@ public abstract class OSMEntity {
         if(containingRelations.containsKey(relation.osm_id)) {
             containingRelations.remove(relation.osm_id);
             containingRelationCount--;
-            if(debug) {
-                setTag("rcount", Short.toString(containingRelationCount));
-            }
+        }
+    }
+    public boolean isComplete() {
+        return complete;
+    }
+    public void setComplete(boolean complete) {
+        if(!this.complete && complete) { //can't set a node back to incomplete
+            this.complete = true;
         }
     }
     public static String escapeForXML(final String str){

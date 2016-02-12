@@ -12,8 +12,8 @@ import java.util.Iterator;
  * Created by nick on 11/5/15.
  */
 public class OverpassConverter {
-    private final static String NODE_QUERY_FORMAT = "(node%s(%.04f,%.04f,%.04f,%.04f);>);";
-    private final static String WAY_QUERY_FORMAT = "(way%s(%.04f,%.04f,%.04f,%.04f);>);";
+    private final static String NODE_QUERY_FORMAT = "(node%s(%.04f,%.04f,%.04f,%.04f));";
+    private final static String WAY_QUERY_FORMAT = "(way%s(%.04f,%.04f,%.04f,%.04f);>;<);";
     private final static String ALL_QUERY_FORMAT = "(node%s(%.04f,%.04f,%.04f,%.04f);way%s(%.04f,%.04f,%.04f,%.04f);relation%s(%.04f,%.04f,%.04f,%.04f););(._;>;);";
     private OSMEntitySpace entitySpace;
 
@@ -53,6 +53,7 @@ public class OverpassConverter {
                 final String elementType = curElement.getString("type");
                 if(elementType.equals(OSMEntity.OSMType.node.name())) {
                     final OSMNode node = new OSMNode(curElement.getLong(keyId));
+                    node.setComplete(true);
                     node.setCoordinate(curElement.getDouble("lat"), curElement.getDouble("lon"));
 
                     if(curElement.has(keyTags)) {
@@ -64,6 +65,7 @@ public class OverpassConverter {
                     entitySpace.addEntity(node, OSMEntity.TagMergeStrategy.keepTags, null);
                 } else if(elementType.equals(OSMEntity.OSMType.way.name())) {
                     final OSMWay way = new OSMWay(curElement.getLong(keyId));
+                    way.setComplete(true);
                     if(curElement.has(keyTags)) {
                         addTags(curElement, way);
                     }
@@ -75,11 +77,15 @@ public class OverpassConverter {
                     for(int nodeIdx=0;nodeIdx<wayNodes.length();nodeIdx++) {
                         long nodeId = wayNodes.getLong(nodeIdx);
                         curNode = entitySpace.allNodes.get(nodeId);
+                        if(curNode == null) { //create an incomplete (undownloaded) node if not found
+                            curNode = entitySpace.createIncompleteNode(nodeId);
+                        }
                         way.appendNode(curNode);
                     }
                     entitySpace.addEntity(way, OSMEntity.TagMergeStrategy.keepTags, null);
                 } else if(elementType.equals(OSMEntity.OSMType.relation.name())) {
                     final OSMRelation relation = new OSMRelation(curElement.getLong(keyId));
+                    relation.setComplete(true);
                     if(curElement.has(keyTags)) {
                         addTags(curElement, relation);
                     }
@@ -100,19 +106,19 @@ public class OverpassConverter {
                                 case "node":
                                     memberEntity = entitySpace.allNodes.get(memberId);
                                     if(memberEntity == null) {
-                                        System.out.println("Node #" + memberId + " not in entity space");
+                                        memberEntity = entitySpace.createIncompleteNode(memberId);
                                     }
                                     break;
                                 case "way":
                                     memberEntity = entitySpace.allWays.get(memberId);
                                     if(memberEntity == null) {
-                                        System.out.println("Way #" + memberId + " not in entity space");
+                                        memberEntity = entitySpace.createIncompleteWay(memberId);
                                     }
                                     break;
                                 case "relation":
                                     memberEntity = entitySpace.allRelations.get(memberId);
                                     if(memberEntity == null) {
-                                        System.out.println("Relation #" + memberId + " not in entity space");
+                                        memberEntity = entitySpace.createIncompleteRelation(memberId);
                                     }
                                     break;
                             }

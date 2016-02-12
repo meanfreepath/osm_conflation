@@ -107,6 +107,12 @@ public class RouteConflator implements WaySegmentsObserver {
             converter.fetchFromOverpass(query);
             workingEntitySpace.mergeWithSpace(converter.getEntitySpace(), OSMEntity.TagMergeStrategy.keepTags, null);
         }
+        /*try {
+            workingEntitySpace.outputXml("routedownload.osm");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }*/
+
         System.out.println("Processing with " + workingEntitySpace.allWays.size() + " ways");
 
         if (debugEnabled) {
@@ -157,9 +163,12 @@ public class RouteConflator implements WaySegmentsObserver {
         //create WaySegments objects for all downloaded ways
         candidateLines = new HashMap<>(workingEntitySpace.allWays.size());
         for(final OSMWay way : workingEntitySpace.allWays.values()) {
-            final WaySegments line = new WaySegments(way, WaySegments.LineType.osmLine, wayMatchingOptions.maxSegmentLength);
-            candidateLines.put(way.osm_id, line);
-            line.addObserver(this);
+            //only include completely-downloaded ways, with all their nodes present and complete
+            if(way.isComplete() && way.areAllNodesComplete()) {
+                final WaySegments line = new WaySegments(way, WaySegments.LineType.osmLine, wayMatchingOptions.maxSegmentLength);
+                candidateLines.put(way.osm_id, line);
+                line.addObserver(this);
+            }
         }
 
         return true;
