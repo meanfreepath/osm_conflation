@@ -33,8 +33,8 @@ public class OSMNode extends OSMEntity {
         }
     }
     @Override
-    protected void upgradeToCompleteEntity(final OSMEntity completeEntity) {
-        super.upgradeToCompleteEntity(completeEntity);
+    protected void upgradeToCompleteEntity(final OSMEntity completeEntity, final OSMEntitySpace entitySpace) {
+        super.upgradeToCompleteEntity(completeEntity, entitySpace);
         setCoordinate(((OSMNode) completeEntity).coordinate);
 
         for(final OSMWay way : containingWays.values()) {
@@ -108,6 +108,9 @@ public class OSMNode extends OSMEntity {
         if(debug) {
             setTag("wcount", Short.toString(containingWayCount));
             setTag("rcount", Short.toString(containingRelationCount));
+            if(osm_id < 0) {
+                setTag("origid", Long.toString(osm_id));
+            }
         }
         if(tags != null) {
             final String openTag;

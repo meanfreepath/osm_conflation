@@ -38,8 +38,8 @@ public abstract class OSMEntity {
     protected boolean complete = false;
 
     protected HashMap<String,String> tags;
-    protected final HashMap<Long, OSMRelation> containingRelations = new HashMap<>(4);
-    protected short containingRelationCount = 0;
+    public final HashMap<Long, OSMRelation> containingRelations = new HashMap<>(4);
+    public short containingRelationCount = 0;
 
     public abstract OSMType getType();
     public abstract Region getBoundingBox();
@@ -69,7 +69,7 @@ public abstract class OSMEntity {
 
         copyMetadata(entityToCopy, this);
     }
-    protected void upgradeToCompleteEntity(final OSMEntity completeEntity) {
+    protected void upgradeToCompleteEntity(final OSMEntity completeEntity, final OSMEntitySpace entitySpace) {
         if(complete || osm_id != completeEntity.osm_id) {
             System.out.println("BAD UPGRADE " + osm_id + "/" + completeEntity.osm_id);
         }
@@ -80,6 +80,21 @@ public abstract class OSMEntity {
         }
 
         copyMetadata(completeEntity, this);
+
+        /*also check the containing relation references of the incoming entity
+        for(final OSMRelation relation : completeEntity.containingRelations.values()) {
+            if(!containingRelations.containsKey(relation.osm_id)) {
+                entitySpace.entityAddedContainingRelation(this, relation.osm_id);
+            }
+        }*/
+    }
+    protected void downgradeToIncompleteEntity() {
+        complete = false;
+        boundingBox = null;
+        tags = null;
+
+        uid = version = changeset = -1;
+        user = timestamp = null;
     }
 
     /**
@@ -224,16 +239,22 @@ public abstract class OSMEntity {
      * @param relation
      */
     protected void didAddToRelation(final OSMRelation relation) {
-        if(!containingRelations.containsKey(relation.osm_id)) {
-            containingRelations.put(relation.osm_id, relation);
-            containingRelationCount++;
-        }
+        addContainingRelation(relation);
     }
     /**
      * Notifies this entity it's been removed from the given relation's member list
      * @param relation
      */
     protected void didRemoveFromRelation(final OSMRelation relation) {
+        removeContainingRelation(relation);
+    }
+    protected void addContainingRelation(final OSMRelation relation) {
+        if(!containingRelations.containsKey(relation.osm_id)) {
+            containingRelations.put(relation.osm_id, relation);
+            containingRelationCount++;
+        }
+    }
+    protected void removeContainingRelation(final OSMRelation relation) {
         if(containingRelations.containsKey(relation.osm_id)) {
             containingRelations.remove(relation.osm_id);
             containingRelationCount--;

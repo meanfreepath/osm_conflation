@@ -40,9 +40,26 @@ public class OSMWay extends OSMEntity {
         copyNodes(wayToCopy.nodes, nodeCopyStrategy);
     }
     @Override
-    public void upgradeToCompleteEntity(final OSMEntity completeEntity) {
-        super.upgradeToCompleteEntity(completeEntity);
-        copyNodes(((OSMWay) completeEntity).nodes, MemberCopyStrategy.shallow);
+    public void upgradeToCompleteEntity(final OSMEntity completeEntity, final OSMEntitySpace entitySpace) {
+        super.upgradeToCompleteEntity(completeEntity, entitySpace);
+
+        //make sure all the nodes on the incoming completed way are in this way's entitySpace
+        final OSMWay completeWay = (OSMWay) completeEntity;
+        final List<OSMNode> entitySpaceNodes = new ArrayList<>(completeWay.nodes.size());
+        for(final OSMNode node : completeWay.nodes) {
+            entitySpaceNodes.add((OSMNode) entitySpace.addEntity(node, TagMergeStrategy.keepTags, null));
+        }
+
+        //and copy them over
+        copyNodes(entitySpaceNodes, MemberCopyStrategy.shallow);
+    }
+    @Override
+    protected void downgradeToIncompleteEntity() {
+        super.downgradeToIncompleteEntity();
+        final List<OSMNode> nodesToRemove = new ArrayList<>(nodes);
+        for(final OSMNode node : nodesToRemove) {
+            removeNode(node);
+        }
     }
 
     /**
@@ -233,6 +250,9 @@ public class OSMWay extends OSMEntity {
     public String toOSMXML() {
         if(debug) {
             setTag("rcount", Short.toString(containingRelationCount));
+            if(osm_id < 0) {
+                setTag("origid", Long.toString(osm_id));
+            }
         }
 
         int tagCount = tags != null ? tags.size() : 0, nodeCount = nodes.size();
