@@ -19,6 +19,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
     public final List<Path> calculatedPaths;
     public final HashMap<Long, WaySegments> candidateLines;
     private int successfulPaths = 0, failedPaths = 0;
+    protected final Map<String, List<String>> requiredWayTags;
 
     public enum RouteLogType {
         info, notice, warning, error
@@ -38,9 +39,10 @@ public class RoutePathFinder implements WaySegmentsObserver {
     }
     public final List<RouteLog> logs = new ArrayList<>(128);
 
-    public RoutePathFinder(final Route route, final HashMap<Long, WaySegments> candidateLines) {
+    public RoutePathFinder(final Route route, final HashMap<Long, WaySegments> candidateLines, final Map<String, List<String>> requiredWayTags) {
         this.route = route;
         this.candidateLines = candidateLines;
+        this.requiredWayTags = requiredWayTags;
         allPathTrees = new ArrayList<>(route.stops.size() + 1);
         calculatedPaths = new ArrayList<>(allPathTrees.size());
 

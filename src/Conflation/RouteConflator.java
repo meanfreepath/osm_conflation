@@ -2,6 +2,7 @@ package Conflation;
 
 import OSM.*;
 import Overpass.OverpassConverter;
+import PathFinding.Path;
 import PathFinding.RoutePathFinder;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
@@ -38,6 +39,7 @@ public class RouteConflator implements WaySegmentsObserver {
     private OSMEntitySpace workingEntitySpace = null;
     public final static LineComparisonOptions wayMatchingOptions = new LineComparisonOptions();
     private HashMap<Long, WaySegments> candidateLines = null;
+    public final Map<String, List<String>> allowedRouteTags, allowedPlatformTags;
 
     public RouteConflator(final OSMRelation routeMaster) throws InvalidArgumentException {
         importRouteMaster = routeMaster;
@@ -46,6 +48,9 @@ public class RouteConflator implements WaySegmentsObserver {
             final String errMsg[] = {"Invalid route type provided"};
             throw new InvalidArgumentException(errMsg);
         }
+
+        allowedRouteTags = wayTagsForRouteType(routeType);
+        allowedPlatformTags = platformTagsForRouteType(routeType);
 
         final List<OSMRelation.OSMRelationMember> subRoutes = routeMaster.getMembers();
         importRoutes = new ArrayList<>(subRoutes.size());
@@ -73,6 +78,79 @@ public class RouteConflator implements WaySegmentsObserver {
                 return false;
         }
     }
+
+    /**
+     * Define the search tags for the ways for the given route type
+     * @param relationType
+     * @return
+     */
+    public static Map<String, List<String>> wayTagsForRouteType(final String relationType) {
+        String[] keys;
+        String[][] tags;
+        switch (relationType) {
+            case OSMEntity.TAG_BUS:
+                keys = new String[]{"highway"};
+                tags = new String[keys.length][];
+                tags[0] = new String[]{"motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link", "residential", "unclassified", "service", "living_street"};
+                break;
+            case OSMEntity.TAG_LIGHT_RAIL:
+                keys = new String[]{"railway"};
+                tags = new String[keys.length][];
+                tags[0] = new String[]{"rail", "light_rail", "subway", "tram"};
+                break;
+            case OSMEntity.TAG_SUBWAY:
+                keys = new String[]{"railway"};
+                tags = new String[keys.length][];
+                tags[0] = new String[]{"rail", "light_rail", "subway"};
+                break;
+            default:
+                return null;
+        }
+        final Map<String, List<String>> keyMap = new HashMap<>(keys.length);
+        int keyIdx = 0;
+        for(final String key : keys) {
+            final List<String> tagList = new ArrayList<>(tags[keyIdx].length);
+            Collections.addAll(tagList, tags[keyIdx]);
+            keyMap.put(key, tagList);
+            keyIdx++;
+        }
+
+        return keyMap;
+    }
+    /**
+     * Define the search tags for the platforms for the given route type
+     * @param relationType
+     * @return
+     */
+    public Map<String, List<String>>  platformTagsForRouteType(final String relationType) {
+        String[] keys;
+        String[][] tags;
+        switch (relationType) {
+            case OSMEntity.TAG_BUS:
+                keys = new String[]{"highway"};
+                tags = new String[keys.length][];
+                tags[0] = new String[]{"bus_stop", "bus_station"};
+                break;
+            case OSMEntity.TAG_LIGHT_RAIL:
+            case OSMEntity.TAG_SUBWAY:
+                keys = new String[]{"railway"};
+                tags = new String[keys.length][];
+                tags[0] = new String[]{"platform"};
+                break;
+            default:
+                return null;
+        }
+        final Map<String, List<String>> keyMap = new HashMap<>(keys.length);
+        int keyIdx = 0;
+        for(final String key : keys) {
+            final List<String> tagList = new ArrayList<>(tags[keyIdx].length);
+            Collections.addAll(tagList, tags[keyIdx]);
+            keyMap.put(key, tagList);
+            keyIdx++;
+        }
+
+        return keyMap;
+    }
     public boolean downloadRegionsForImportDataset(final OSMEntitySpace intoEntitySpace) throws InvalidArgumentException {
         if(importRoutes.size() == 0) {
             System.out.println("No routes for Master " + importRouteMaster.getTag("name"));
@@ -80,6 +158,7 @@ public class RouteConflator implements WaySegmentsObserver {
         }
 
         workingEntitySpace = intoEntitySpace;
+        workingEntitySpace.name = "WORK";
 
         //get a handle on the route path geometries for the subroutes
         final List<OSMWay> routePaths = new ArrayList<>(importRoutes.size());
@@ -89,23 +168,27 @@ public class RouteConflator implements WaySegmentsObserver {
             }
         }
 
-
-                /*final OverpassConverter converter = new OverpassConverter();
-                final String query = converter.queryForBoundingBox("[\"highway\"~\"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|service|living_street\"]", combinedBoundingBox, 0.0004, OSMEntity.OSMType.way);
-                converter.fetchFromOverpass(query);
-                final OSMEntitySpace osmServerEntitySpace = converter.getEntitySpace();
-                osmServerEntitySpace.outputXml("origdl.osm");//*/
-
         //and get the download regions for them
         final List<Region> downloadRegions = generateCombinedDownloadRegions(routePaths, wayMatchingOptions.boundingBoxSize);
 
         //fetch all possible useful ways that intersect the route's combined bounding box
-        //TODO base query on route type
+        final String queryFormat = "[\"%s\"~\"%s\"]";
+        int downloadIdx = 0;
         for(final Region downloadRegion : downloadRegions) {
             final OverpassConverter converter = new OverpassConverter();
-            final String query = converter.queryForBoundingBox("[\"highway\"~\"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|service|living_street\"]", downloadRegion, 0.0, OSMEntity.OSMType.way);
-            converter.fetchFromOverpass(query);
-            workingEntitySpace.mergeWithSpace(converter.getEntitySpace(), OSMEntity.TagMergeStrategy.keepTags, null);
+
+            //TODO: works fine for now, but if a route requires multiple search *keys*, will create excessive queries
+            for(final Map.Entry<String,List<String>> searchKeys : allowedRouteTags.entrySet()) {
+                final String query = converter.queryForBoundingBox(String.format(queryFormat, searchKeys.getKey(), String.join("|", searchKeys.getValue())), downloadRegion, 0.0, OSMEntity.OSMType.way);
+                converter.fetchFromOverpass(query);
+                converter.getEntitySpace().name = "download_" + importRouteMaster.getTag(OSMEntity.KEY_REF) + "_" + downloadIdx++;
+                try {
+                    converter.getEntitySpace().outputXml("./cache/" + converter.getEntitySpace().name + ".osm");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                workingEntitySpace.mergeWithSpace(converter.getEntitySpace(), OSMEntity.TagMergeStrategy.keepTags, null);
+            }
         }
         /*try {
             workingEntitySpace.outputXml("routedownload.osm");
@@ -164,7 +247,11 @@ public class RouteConflator implements WaySegmentsObserver {
         candidateLines = new HashMap<>(workingEntitySpace.allWays.size());
         for(final OSMWay way : workingEntitySpace.allWays.values()) {
             //only include completely-downloaded ways, with all their nodes present and complete
-            if(way.isComplete() && way.areAllNodesComplete()) {
+            if(!way.areAllNodesComplete()) {
+                workingEntitySpace.purgeEntity(way);
+                continue;
+            }
+            if(way.isComplete()) {
                 final WaySegments line = new WaySegments(way, WaySegments.LineType.osmLine, wayMatchingOptions.maxSegmentLength);
                 candidateLines.put(way.osm_id, line);
                 line.addObserver(this);
@@ -337,7 +424,7 @@ public class RouteConflator implements WaySegmentsObserver {
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
                 continue;
             }
-            final RoutePathFinder routePathFinder = new RoutePathFinder(route, candidateLines);
+            final RoutePathFinder routePathFinder = new RoutePathFinder(route, candidateLines, allowedRouteTags);
             routePathFinderFinders.add(routePathFinder);
             routePathFinder.findPaths(workingEntitySpace);
             if(routePathFinder.getFailedPaths() > 0) {
