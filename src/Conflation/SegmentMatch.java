@@ -93,4 +93,8 @@ public class SegmentMatch {
         }
         return false;
     }
+    @Override
+    public String toString() {
+        return String.format("SegMatch %s/%s::: O/M: %.03f/%.03f, DP %.03f", mainSegment, matchingSegment, orthogonalDistance, midPointDistance, dotProduct);
+    }
 }

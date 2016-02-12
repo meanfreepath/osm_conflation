@@ -157,6 +157,6 @@ public class LineSegment {
         return new Point(originPoint.latitude + vectorY * t, originPoint.longitude + vectorX * t);
     }
     public String toString() {
-        return "wayseg " + parentSegments.way.osm_id + " #" + nodeIndex + "/" + segmentIndex + " ([" + DEBUG_OUTPUT_FORMATTER.format(originPoint.latitude) + "," + DEBUG_OUTPUT_FORMATTER.format(originPoint.longitude) + "], [" + DEBUG_OUTPUT_FORMATTER.format(destinationPoint.latitude) + "," + DEBUG_OUTPUT_FORMATTER.format(destinationPoint.longitude) + "]) NODES " + (originNode != null ? originNode.osm_id : "NULL") + "/" +  (destinationNode != null ? destinationNode.osm_id : "NULL");
+        return String.format("LineSeg %d #%d/%d [%.04f, %.04f], nd[%d/%d]", parentSegments.way.osm_id, nodeIndex, segmentIndex, midPoint.latitude, midPoint.longitude, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
 }
