@@ -286,7 +286,7 @@ public class PathSegment implements WaySegmentsObserver {
         return containsPathDestinationNode;
     }
     public String toString() {
-        return "PathSegment " + line.way.getTag(OSMEntity.KEY_NAME) + " (" + line.way.osm_id + ": " + originJunction.junctionNode.osm_id + "->" + (endJunction != null ? endJunction.junctionNode.osm_id : "MatchEnd") + "), travel: " + (travelDirection != null ? travelDirection.name() : "unknown");
+        return String.format("PathSegment@%d: line \"%s\" (%d:%d->%d), travel: %s", hashCode(), line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originJunction.junctionNode.osm_id, endJunction.junctionNode.osm_id, travelDirection != null ? travelDirection.name() : "unknown");
     }
     public WaySegments getLine() {
         return line;
