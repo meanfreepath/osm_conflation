@@ -348,29 +348,43 @@ public class OSMRelation extends OSMEntity {
      * @param originalWay
      * @param allSplitWays
      */
-    public void handleMemberWaySplit(final OSMWay originalWay, final OSMWay[] allSplitWays) {
+    public void handleMemberWaySplit(final OSMWay originalWay, final OSMWay[] allSplitWays, final boolean wasValidBeforeSplit) {
         //get the relation's type, using the default handling if not set
         final String relationType = hasTag(OSMEntity.KEY_TYPE) ? getTag(OSMEntity.KEY_TYPE) : "";
         assert relationType != null;
         switch (relationType) {
             case "restriction": //turn restriction: use the way that contains the "via" node
                 //if the restriction is valid, check if the new way should be added to it or not
-                  /*  if(isValid()) {
-                        final OSMEntity viaEntity = getMembers("via").get(0).member;
-                        if(viaEntity instanceof OSMNode && newWay.getNodes().contains(viaEntity)) { //"via" member is a node, and the new originalWay contains it, replace the old originalWay with the new originalWay in the relation
-                            replaceMember(originalWay, newWay);
-                        } else if(viaEntity instanceof OSMWay) { //"via" member is a originalWay
-                            final OSMWay viaWay = (OSMWay) viaEntity;
-
-                            //if the new originalWay intersects the "via" originalWay, replace the old originalWay with it in the relation
-                            if(newWay.getNodes().contains(viaWay.getFirstNode()) || newWay.getNodes().contains(viaWay.getLastNode())) {
-                                replaceMember(originalWay, newWay);
+                if(wasValidBeforeSplit) {
+                    final OSMEntity viaEntity = getMembers("via").get(0).member;
+                    //"via" member is a node
+                    if(viaEntity instanceof OSMNode && !originalWay.getNodes().contains(viaEntity)) {
+                        //check which splitWay contains the via node, and update the relation membership as needed
+                        for(final OSMWay splitWay : allSplitWays) {
+                            if(splitWay != originalWay && splitWay.getNodes().contains(viaEntity)) {
+                                replaceMember(originalWay, splitWay);
+                                break;
                             }
                         }
-                    } else { //if the restriction is invalid, just add the new originalWay to it and log a warning
-                        final int index = indexOfMember(originalWay);
-                        addMember(newWay, members.get(index).role, index);
-                    }*/
+                    } else if(viaEntity instanceof OSMWay) { //"via" member is a originalWay
+                        final OSMWay viaWay = (OSMWay) viaEntity;
+
+                        //check which splitWay intersects the "via" way, replace the old originalWay with it in the relation
+                        for(final OSMWay splitWay : allSplitWays) {
+                            if(splitWay != originalWay && splitWay.getNodes().contains(splitWay.getFirstNode()) || splitWay.getNodes().contains(splitWay.getLastNode())) {
+                                replaceMember(originalWay, splitWay);
+                                break;
+                            }
+                        }
+                    }
+                } else { //if the restriction is invalid, just add the new originalWay to it and log a warning
+                    final OSMRelationMember member = getMemberForEntity(originalWay);
+                    for(final OSMWay splitWay : allSplitWays) {
+                        if (splitWay != originalWay) {
+                            addMember(splitWay, member.role);
+                        }
+                    }
+                }
             case "turnlanes:turns":
                 break;
             default: //all other types: just add the new ways to the relation, in the correct order if possible

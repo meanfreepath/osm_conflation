@@ -599,7 +599,8 @@ public class OSMEntitySpace {
         if(actualSplitNodes.size() == 0) {
             return new OSMWay[]{originalWay};
         }
-        actualSplitNodes.sort(nodeIndexComparator); //sort the split nodes so their order matches the order of originalWay's nodes
+        //sort the split nodes so their order matches the order of originalWay's nodes
+        actualSplitNodes.sort(nodeIndexComparator);
         final int splitWayCount = actualSplitNodes.size() + 1;
 
         //generate the arrays of nodes that will belong to the newly-split ways
@@ -637,6 +638,12 @@ public class OSMEntitySpace {
         }
         assert oldWayNewNodes != null;
 
+        //Check if the originalWay's containing relations are valid PRIOR to the split
+        final ArrayList<Boolean> containingRelationValidity = new ArrayList<>(originalWay.containingRelations.size());
+        for(final OSMRelation containingRelation : originalWay.containingRelations.values()) {
+            containingRelationValidity.add(containingRelation.isValid());
+        }
+
         //and create the new split way(s), removing the new ways' non-intersecting nodes from originalWay
         final OSMWay[] allSplitWays = new OSMWay[splitWayCount];
         int splitWayIndex = 0;
@@ -663,8 +670,10 @@ public class OSMEntitySpace {
         }
 
         //now we need to handle membership of any relations, to ensure they're updated with the correct ways
-        for(final OSMRelation containingRelation : originalWay.containingRelations.values()) {
-            containingRelation.handleMemberWaySplit(originalWay, allSplitWays);
+        int idx = 0;
+        final ArrayList<OSMRelation> originalWayContainingRelations = new ArrayList<>(originalWay.containingRelations.values());
+        for(final OSMRelation containingRelation : originalWayContainingRelations) {
+            containingRelation.handleMemberWaySplit(originalWay, allSplitWays, containingRelationValidity.get(idx++));
         }
 
         return allSplitWays;
