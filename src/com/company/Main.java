@@ -2,6 +2,7 @@ package com.company;
 
 import Conflation.Route;
 import Conflation.RouteConflator;
+import Conflation.StopArea;
 import Conflation.StopConflator;
 import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
@@ -13,7 +14,7 @@ import java.io.IOException;
 import java.util.*;
 
 public class Main {
-    private final static boolean debugEnabled = true;
+    private final static boolean debugEnabled = false;
     public static void main(String[] args) {
         if(args.length == 0) {
             System.err.println("Missing file name argument!");
@@ -32,6 +33,9 @@ public class Main {
 
         //propagate the debug value as needed
         RouteConflator.debugEnabled = debugEnabled;
+        StopConflator.debugEnabled = debugEnabled;
+        StopArea.debugEnabled = debugEnabled;
+        OSMEntity.debugEnabled = debugEnabled;
 
         final String importFileName = args[0];
 
@@ -74,42 +78,16 @@ public class Main {
                 //and match the subroutes' routePath to the downloaded OSM ways.  Also matches the stops in the route to their nearest matching way
                 routeConflator.conflateRoutePaths(stopConflator);
 
-                /*for(final Route route : routeConflator.getExportRoutes()) {
-
-
-                    //now find the optimal path from the first stop to the last stop, using the provided ways
-                    final long timeStartPathfinding = new Date().getTime();
-                    final PathTree pathList = new PathTree(relation);
-                    pathList.findPaths(stopMatcher.stopWayMatches, comparison.candidateLines);
-                    System.out.println("Found paths in " + (new Date().getTime() - timeStartPathfinding) + "ms");
-
-                    //TODO: split ways that only partially overlap the main way
-
-
-                    //finally, add the matched ways to the relation's members
-                    //relation.removeMember(routePath);
-                    if(pathList.bestPath != null) {
-                        for (final PathSegment pathSegment : pathList.bestPath.pathSegments) {
-                            relation.addMember(pathSegment.line.way, OSMEntity.MEMBERSHIP_DEFAULT);
-                        }
-                    } else { //debug: if no matched path, output the best candidates instead
-                        for (final WaySegments line : comparison.candidateLines.values()) {
-                            if(line.matchObject.matchingSegments.size() > 2 && line.matchObject.getAvgDotProduct() >= 0.9) {
-                                relation.addMember(line.way, OSMEntity.MEMBERSHIP_DEFAULT);
-                            }
-                        }
-                    }
-
-                    if (debugEnabled) {
-                       // debugOutputSegments(workingEntitySpace, routeConflator);
-                    }
-                    workingEntitySpace.outputXml("newresult" + route.routePath.osm_id + ".osm");
-                }*/
-
                 //finally, add the completed relations to their own separate file for review and upload
                 final OSMEntitySpace relationSpace = new OSMEntitySpace(65536);
                 for(final Route route: routeConflator.getExportRoutes()) {
                     relationSpace.addEntity(route.routeRelation, OSMEntity.TagMergeStrategy.keepTags, null);
+                }
+                //also include any entities that were changed during the process
+                for(final OSMEntity changedEntity : workingEntitySpace.allEntities.values()) {
+                    if(changedEntity instanceof OSMRelation || changedEntity.getAction() == OSMEntity.ChangeAction.modify) {
+                        relationSpace.addEntity(changedEntity, OSMEntity.TagMergeStrategy.keepTags, null);
+                    }
                 }
                 relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null);
                 relationSpace.outputXml("relation.osm");

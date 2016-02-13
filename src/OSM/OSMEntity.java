@@ -30,7 +30,7 @@ public abstract class OSMEntity {
         none, modify, delete
     }
 
-    public final static boolean debug = true;
+    public static boolean debugEnabled = true;
 
     public final long osm_id;
 
@@ -38,7 +38,7 @@ public abstract class OSMEntity {
     public int uid = -1, version = -1, changeset = -1;
     public boolean visible = true;
     public String user = null, timestamp = null;
-    public ChangeAction action = ChangeAction.none;
+    protected ChangeAction action = ChangeAction.none;
 
 
     protected Region boundingBox;
@@ -233,7 +233,9 @@ public abstract class OSMEntity {
     public void markAsDeleted() {
         action = ChangeAction.delete;
     }
-
+    public ChangeAction getAction() {
+        return action;
+    }
     /**
      * Get the value of the current tag
      * @param key

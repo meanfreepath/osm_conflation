@@ -639,8 +639,7 @@ public class OSMEntitySpace {
 
         //and create the new split way(s), removing the new ways' non-intersecting nodes from originalWay
         final OSMWay[] allSplitWays = new OSMWay[splitWayCount];
-        final List<OSMWay> newWays = new ArrayList<>(actualSplitNodes.size() + 1);
-        int splitWayIndex = 0, originalWayNewIndex = 0;
+        int splitWayIndex = 0;
         for(final List<OSMNode> wayNodes : splitWayNodes) {
             final OSMWay curWay;
             if(wayNodes == oldWayNewNodes) { //originalWay: just edit its node list
@@ -656,12 +655,11 @@ public class OSMEntitySpace {
                 for(final OSMNode nodeToRemove : nodesToRemove) {
                     originalWay.removeNode(nodeToRemove);
                 }
-                originalWayNewIndex = splitWayIndex;
             } else { //a new way: create an OSMWay (which is added to this space) with originalWay's tags, and add the split nodes
                 curWay = createWay(originalWay.getTags(), wayNodes);
-                newWays.add(curWay);
             }
             allSplitWays[splitWayIndex++] = curWay;
+            curWay.markAsModified();
         }
 
         //now we need to handle membership of any relations, to ensure they're updated with the correct ways
@@ -866,7 +864,9 @@ public class OSMEntitySpace {
      * @param conflictingEntities any conflicting entities will be added to this list
      */
     public void mergeWithSpace(final OSMEntitySpace otherSpace, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
-        System.out.println("MERGE " + name + " WITH " + otherSpace.name);
+        if(debugEnabled) {
+            System.out.println("MERGE " + name + " WITH " + otherSpace.name);
+        }
 
         //merge in the entities
         for(final OSMEntity otherSpaceEntity : otherSpace.allEntities.values()) {
@@ -906,5 +906,10 @@ public class OSMEntitySpace {
                 System.out.println(entity.osm_id + " REL OUT OF SYNC");
             }
         }*/
+    }
+    public void markAllEntitiesWithAction(final OSMEntity.ChangeAction action) {
+        for(final OSMEntity entity : allEntities.values()) {
+            entity.action = action;
+        }
     }
 }

@@ -21,7 +21,7 @@ public class StopArea implements WaySegmentsObserver {
     };
 
     public final static double maxDistanceFromPlatformToWay = 25.0, stopNodeTolerance = 3.0;
-    public final static boolean debugEnabled = false;
+    public static boolean debugEnabled = false;
     public OSMEntity platform; //can be a node or way
     private OSMNode stopPosition = null;
     public final Region nearbyWaySearchRegion;

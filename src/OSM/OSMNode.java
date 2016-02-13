@@ -112,7 +112,7 @@ public class OSMNode extends OSMEntity {
 
     @Override
     public String toOSMXML() {
-        if(debug) {
+        if(debugEnabled) {
             setTag("wcount", Short.toString(containingWayCount));
             setTag("rcount", Short.toString(containingRelationCount));
             if(osm_id < 0) {

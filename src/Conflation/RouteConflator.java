@@ -212,6 +212,7 @@ public class RouteConflator implements WaySegmentsObserver {
                 System.out.println(r.toString());
             }
         }
+        workingEntitySpace.markAllEntitiesWithAction(OSMEntity.ChangeAction.none);
 
         //now that the data is downloaded, create the necessary OSM relations in the new working entity space
         exportRouteMaster = workingEntitySpace.createRelation(importRouteMaster.getTags(), null);
@@ -365,7 +366,7 @@ public class RouteConflator implements WaySegmentsObserver {
         return regions;
     }
     public void conflateRoutePaths(final StopConflator stopConflator) {
-        final int debugRouteId = -1212;
+        final int debugRouteId = -1170;
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {

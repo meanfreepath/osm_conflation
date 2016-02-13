@@ -65,7 +65,6 @@ public class OSMRelation extends OSMEntity {
                 }
             }
         }
-        markAsModified();
     }
     protected void memberWasMadeComplete(final OSMEntity memberEntity) {
         completedMemberCount++;
@@ -104,7 +103,7 @@ public class OSMRelation extends OSMEntity {
 
     @Override
     public String toOSMXML() {
-        if(debug) {
+        if(debugEnabled) {
             setTag("rcount", Short.toString(containingRelationCount));
             if(osm_id < 0) {
                 setTag("origid", Long.toString(osm_id));

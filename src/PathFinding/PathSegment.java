@@ -304,7 +304,7 @@ public class PathSegment implements WaySegmentsObserver {
         line.removeObserver(this);
     }
     private void setLine(final WaySegments newLine) {
-        System.out.println("Reassigned " + id + "(" + line.way.getTag("name") + ") from " + line.way.osm_id + " to " + newLine.way.osm_id);
+        //System.out.println("Reassigned " + id + "(" + line.way.getTag("name") + ") from " + line.way.osm_id + " to " + newLine.way.osm_id);
         line.removeObserver(this);
         newLine.addObserver(this);
 
