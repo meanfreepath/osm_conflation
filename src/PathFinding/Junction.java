@@ -28,7 +28,7 @@ public class Junction {
 
     public final OSMNode junctionNode;
     public final List<PathSegmentStatus> junctionPathSegments;
-    public final PathSegmentStatus originatingPathSegment;
+    protected PathSegmentStatus originatingPathSegment;
     public final JunctionProcessStatus processStatus;
     private final static Comparator<PathSegmentStatus> pathSegmentComparator = new Comparator<PathSegmentStatus>() {
         @Override
@@ -55,7 +55,7 @@ public class Junction {
         junctionPathSegments.add(segmentStatus);
         return segmentStatus;
     }
-    public void replacePathSegment(final PathSegment originalPathSegment, final PathSegment newPathSegment) {
+    public PathSegmentStatus replacePathSegment(final PathSegment originalPathSegment, final PathSegment newPathSegment) {
         PathSegmentStatus originalSegmentStatus = null;
         for(final PathSegmentStatus segmentStatus : junctionPathSegments) {
             if(segmentStatus.segment == originalPathSegment) {
@@ -63,7 +63,18 @@ public class Junction {
                 break;
             }
         }
+
         assert originalSegmentStatus != null;
-        junctionPathSegments.set(junctionPathSegments.indexOf(originalSegmentStatus), new PathSegmentStatus(newPathSegment, originalSegmentStatus.processStatus));
+        final PathSegmentStatus newSegmentStatus = new PathSegmentStatus(newPathSegment, originalSegmentStatus.processStatus);
+        junctionPathSegments.set(junctionPathSegments.indexOf(originalSegmentStatus), newSegmentStatus);
+
+        //update the originating segment too, if the originalPathSegment was the originating segment
+        if(originalSegmentStatus == originatingPathSegment) {
+            originatingPathSegment = newSegmentStatus;
+        }
+        return newSegmentStatus;
+    }
+    public String toString() {
+        return String.format("Junction@%d: node %d (%d): status %s", hashCode(), junctionNode.hashCode(), junctionNode.osm_id, processStatus.toString());
     }
 }
