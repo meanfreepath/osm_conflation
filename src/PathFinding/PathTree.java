@@ -126,7 +126,7 @@ public class PathTree implements WaySegmentsObserver {
             if(wayPathSegment.containsPathDestinationNode()) {
                 parentPath.logEvent(RoutePathFinder.RouteLogType.info, "FOUND destination on " + wayPathSegment.getLine().way.getTag(OSMEntity.KEY_NAME)  + "(" + wayPathSegment.getLine().way.osm_id + "), node " + toNode.getTag(OSMEntity.KEY_NAME), this);
                 currentPath.markAsSuccessful(wayPathSegment);
-                junction.addPathSegment(wayPathSegment, Junction.PathSegmentProcessStatus.yes);
+                junction.addPathSegment(wayPathSegment, Junction.PathSegmentProcessStatus.containsDestination);
                 return false;
             }
 

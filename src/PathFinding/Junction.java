@@ -12,7 +12,7 @@ import java.util.List;
  */
 public class Junction {
     public enum PathSegmentProcessStatus {
-        none, yes, belowScoreThreshold, isOriginatingWay, nonMatchingLine
+        none, yes, belowScoreThreshold, isOriginatingWay, nonMatchingLine, containsDestination
     }
     public enum JunctionProcessStatus {
         continuePath, deadEnd
