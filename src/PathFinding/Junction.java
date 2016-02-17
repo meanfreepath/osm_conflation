@@ -24,6 +24,10 @@ public class Junction {
             this.segment = segment;
             this.processStatus = processStatus != null ? processStatus : PathSegmentProcessStatus.none;
         }
+        @Override
+        public String toString() {
+            return String.format("%s: %s", processStatus.toString(), segment);
+        }
     }
 
     public final OSMNode junctionNode;
@@ -49,6 +53,15 @@ public class Junction {
     }
     public void sortPathSegmentsByScore() {
         junctionPathSegments.sort(pathSegmentComparator);
+    }
+    public PathSegmentStatus containsPathSegment(final PathSegment pathSegment) {
+        for(final PathSegmentStatus curStatus : junctionPathSegments) {
+            if(curStatus.segment == pathSegment) {
+                System.out.println("Re-add " + this.junctionNode.osm_id + ": " + pathSegment);
+                return curStatus;
+            }
+        }
+        return null;
     }
     public PathSegmentStatus addPathSegment(final PathSegment pathSegment, final Junction.PathSegmentProcessStatus processStatus) {
         final PathSegmentStatus segmentStatus = new PathSegmentStatus(pathSegment, processStatus);
