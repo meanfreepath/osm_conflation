@@ -409,7 +409,7 @@ public class OSMRelation extends OSMEntity {
                 }
 
                 //if unable to determine the order by checking the previous member, try checking the next member
-                if(addForward == null && index < members.size()) {
+                if(addForward == null && index < members.size() - 1) {
                     final OSMRelation.OSMRelationMember nextMember = members.get(index + 1);
                     if(nextMember.member instanceof OSMWay) {
                         final OSMWay nexMember = (OSMWay) nextMember.member;
