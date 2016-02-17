@@ -24,7 +24,7 @@ public class PathTree implements WaySegmentsObserver {
             return o1.getTotalScore() > o2.getTotalScore() ? -1 : 1;
         }
     };
-    private final static double scoreThresholdToProcessPathSegment = 3.0, MAX_DETOUR_LENGTH = 50.0;
+    private final static double scoreThresholdToProcessPathSegment = 3.0, MAX_DETOUR_LENGTH = 0.0;
 
     public final String id;
     public final StopArea fromStop, toStop;
@@ -62,14 +62,15 @@ public class PathTree implements WaySegmentsObserver {
     public static String idForParameters(final OSMNode fromNode, final OSMNode toNode) {
         return String.format("PT:%d:%d", fromNode.osm_id, toNode.osm_id);
     }
-    private void iteratePath(final Junction startingJunction, final RoutePathFinder routePathFinder, final Path curPath, int debugDepth) throws PathIterationException {
+    private void iteratePath(final Junction startingJunction, final RoutePathFinder routePathFinder, final Path curPath, final int debugDepth) throws PathIterationException {
         //bail if the junction indicates there's no need to continue processing
-        if(!processJunction(startingJunction, routePathFinder, curPath)) {
+        if(!processJunction(startingJunction, routePathFinder, curPath, debugDepth)) {
             return;
         }
 
-        String debugPadding = "";
+        String debugPadding = null;
         if(debugEnabled) {
+            debugPadding = "";
             for(int d=0;d<debugDepth;d++) {
                 debugPadding += "  ";
             }
@@ -112,9 +113,17 @@ public class PathTree implements WaySegmentsObserver {
         candidatePaths.add(newPath);
         return newPath;
     }
-    private boolean processJunction(final Junction junction, final RoutePathFinder parentPath, final Path currentPath) {
+    private boolean processJunction(final Junction junction, final RoutePathFinder parentPath, final Path currentPath, final int debugDepth) {
+        String debugPadding = null;
+        if(debugEnabled) {
+            debugPadding = "";
+            for(int d=0;d<debugDepth;d++) {
+                debugPadding += "  ";
+            }
+        }
+
         if(junction.processStatus == Junction.JunctionProcessStatus.deadEnd) {
-            System.out.println("ZOMG SHOULDNT PROCESS");
+            System.out.println(debugPadding + "L" + debugDepth + ": junction #" + junction.junctionNode.osm_id + " DEAD END");
             return false;
         }
 
@@ -122,6 +131,7 @@ public class PathTree implements WaySegmentsObserver {
             //look up the respective WaySegments object for the way
             final WaySegments curLine = parentPath.candidateLines.get(junctionWay.osm_id);
             if(curLine == null) {
+                System.out.println(debugPadding + "L" + debugDepth + ": Unable to find way #" + junctionWay.osm_id + " in candidate Lines");
                 parentPath.logEvent(RoutePathFinder.RouteLogType.error, "Unable to find way #" + junctionWay.osm_id + " in candidate Lines", this);
                 continue;
             }
@@ -131,6 +141,7 @@ public class PathTree implements WaySegmentsObserver {
 
             //if wayPathSegment contains toNode, we've found a successful path.  Mark it and bail
             if(wayPathSegment.containsPathDestinationNode()) {
+                System.out.println(debugPadding + "L" + debugDepth + ": FOUND destination on " + wayPathSegment.getLine().way.getTag(OSMEntity.KEY_NAME)  + "(" + wayPathSegment.getLine().way.osm_id + "), node " + toNode.getTag(OSMEntity.KEY_NAME));
                 parentPath.logEvent(RoutePathFinder.RouteLogType.info, "FOUND destination on " + wayPathSegment.getLine().way.getTag(OSMEntity.KEY_NAME)  + "(" + wayPathSegment.getLine().way.osm_id + "), node " + toNode.getTag(OSMEntity.KEY_NAME), this);
                 currentPath.markAsSuccessful(wayPathSegment);
                 if(junction.containsPathSegment(wayPathSegment) == null) {
@@ -167,6 +178,7 @@ public class PathTree implements WaySegmentsObserver {
         //starting with the first line, determine the initial direction of travel
         final Junction startingJunction = new Junction(fromNode, null, Junction.JunctionProcessStatus.continuePath);
         final Path initialPath = new Path(this, null); //this path is always empty, since there are 3+ possible paths from each junction
+        candidatePaths.add(initialPath);
         try {
             iteratePath(startingJunction, parentPath, initialPath, 0);
         } catch (PathIterationException ignored) {}
@@ -186,14 +198,6 @@ public class PathTree implements WaySegmentsObserver {
         for(final Path path :successfulPaths) {
             System.out.println(path + ": " + path.getTotalScore());
         }
-
-
-        //get the closest segment on the routeLine to fromNode
-//        fromLine.getMatchForLine(parentPath.route.routeLine).getAvgDotProduct();
-
-
-        //we then determine the best path based on score (TODO maybe try shortcuts etc here)
-        //bestPath =
     }
     public Path splitWaysAtIntersections(final OSMEntitySpace entitySpace, final Path previousPath, final RoutePathFinder parentPathFinder) throws InvalidArgumentException {
         if(bestPath == null || bestPath.outcome != Path.PathOutcome.waypointReached) {
