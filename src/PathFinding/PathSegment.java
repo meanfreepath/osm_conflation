@@ -144,9 +144,7 @@ public class PathSegment implements WaySegmentsObserver {
 
                 //check if we've found the final destination node for this PathSegment's PathTree, or we're at a junction, and if so, bail
                 if(segment.destinationNode != null) {
-                    if(segment.destinationNode == parentPathTree.toNode) {
-                        return new Junction(segment.destinationNode, this, Junction.JunctionProcessStatus.continuePath);
-                    } else if(segment.destinationNode.containingWayCount > 1) {
+                    if(segment.destinationNode == parentPathTree.toNode || segment.destinationNode.containingWayCount > 1) {
                         return new Junction(segment.destinationNode, this, Junction.JunctionProcessStatus.continuePath);
                     }
                 }
