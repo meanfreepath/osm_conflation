@@ -33,7 +33,7 @@ public class Junction {
     private final static Comparator<PathSegmentStatus> pathSegmentComparator = new Comparator<PathSegmentStatus>() {
         @Override
         public int compare(final PathSegmentStatus o1, final PathSegmentStatus o2) {
-            return o1.segment.getScore() > o2.segment.getScore() ? -1 : 1;
+            return o1.segment.getTotalScore() > o2.segment.getTotalScore() ? -1 : 1;
         }
     };
 

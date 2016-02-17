@@ -1,7 +1,6 @@
 package PathFinding;
 
 import Conflation.LineSegment;
-import Conflation.WaySegments;
 import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
@@ -15,23 +14,26 @@ import java.util.ListIterator;
  * Created by nick on 1/27/16.
  */
 public class Path {
-    private final static int INITIAL_PATH_SEGMENT_CAPACITY = 64;
+    private final static int INITIAL_PATH_SEGMENT_CAPACITY = 64, INITIAL_DETOUR_PATH_SEGMENT_CAPACITY = 8;
     public static boolean debugEnabled = false;
     public enum PathOutcome {
-        waypointReached, deadEnded, unknown
+        waypointReached, deadEnded, detourLimitReached, unknown
     }
 
     private final List<PathSegment> pathSegments;
+    private final List<PathSegment> detourPathSegments;
     public final PathTree parentPathTree;
     public PathSegment firstPathSegment = null, lastPathSegment = null;
     public PathOutcome outcome = PathOutcome.unknown;
 
-    public int segmentCount = 0;
+    protected int detourSegmentCount = 0;
+    protected double detourSegmentLength = 0.0;
     public double scoreSegments = 0.0, scoreStops = 0.0, scoreAdjust = 0.0, scoreTotal = 0.0;
 
     public Path(final PathTree parentPathTree, final PathSegment initialSegment) {
         this.parentPathTree = parentPathTree;
         pathSegments = new ArrayList<>(INITIAL_PATH_SEGMENT_CAPACITY);
+        detourPathSegments = new ArrayList<>(INITIAL_DETOUR_PATH_SEGMENT_CAPACITY);
         firstPathSegment = lastPathSegment = initialSegment;
         if(initialSegment != null) {
             addPathSegment(initialSegment);
@@ -47,6 +49,10 @@ public class Path {
         firstPathSegment = pathToClone.firstPathSegment;
         lastPathSegment = pathToClone.lastPathSegment;
 
+        detourPathSegments = new ArrayList<>(pathToClone.detourPathSegments);
+        detourSegmentCount = pathToClone.detourSegmentCount;
+        detourSegmentLength = pathToClone.detourSegmentLength;
+
         if(segmentToAdd != null) {
             addPathSegment(segmentToAdd);
         }
@@ -58,6 +64,13 @@ public class Path {
         }
         lastPathSegment = segment;
         segment.addContainingPath(this);
+
+        //track detour segments
+        if(segment.detourPathScore > 0.0) {
+            detourPathSegments.add(segment);
+            detourSegmentCount += segment.detourSegmentCount;
+            detourSegmentLength += segment.detourSegmentLength;
+        }
     }
 
     /**
@@ -73,14 +86,16 @@ public class Path {
         final ListIterator<PathSegment> iterator = splitPathSegments.listIterator(splitPathSegments.size());
         while (iterator.hasPrevious()) {
             final PathSegment splitPathSegment = iterator.previous();
-            pathSegments.add(originalSegmentIndex, splitPathSegment);
-            splitPathSegment.addContainingPath(this);
+            addPathSegment(splitPathSegment);
         }
 
-        if(firstPathSegment == null) {
+
+        if(pathSegments.size() > 0) {
             firstPathSegment = pathSegments.get(0);
+            lastPathSegment = pathSegments.get(pathSegments.size() - 1);
+        } else {
+            firstPathSegment = lastPathSegment = null;
         }
-        lastPathSegment = pathSegments.get(pathSegments.size() - 1);
     }
     public List<PathSegment> getPathSegments() {
         return pathSegments;
@@ -90,11 +105,12 @@ public class Path {
         outcome = PathOutcome.waypointReached;
     }
     public double getTotalScore() {
-        double totalScore = 0.0;
+        double pathScore = 0.0, waypointScore = 0.0;
         for(final PathSegment segment : pathSegments) {
-            totalScore += segment.getScore();
+            pathScore += segment.getPathScore();
+            waypointScore += segment.getWaypointScore();
         }
-        return totalScore;
+        return waypointScore + pathScore / pathSegments.size();
     }
     public List<OSMWay> getPathWays() {
         List<OSMWay> ways = new ArrayList<>(pathSegments.size());
