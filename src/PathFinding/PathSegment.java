@@ -461,12 +461,10 @@ public class PathSegment implements WaySegmentsObserver {
             }
 
             //and add the newly-split PathSegments to their respective paths
-            for(final Path path : containingPaths) {
+            final List<Path> containingPathsToNotify = new ArrayList<>(containingPaths);
+            for(final Path path : containingPathsToNotify) {
                 path.replaceSplitPathSegment(this, splitPathSegments);
             }
-
-            //and replace any references to this PathSegment
-            containingPaths.clear();
 
             //and stop subscribing to any updates etc
             retire();

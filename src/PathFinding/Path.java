@@ -59,11 +59,11 @@ public class Path {
     }
     public void addPathSegment(final PathSegment segment) {
         pathSegments.add(segment);
+        segment.addContainingPath(this);
         if(firstPathSegment == null) {
             firstPathSegment = pathSegments.get(0);
         }
         lastPathSegment = segment;
-        segment.addContainingPath(this);
 
         //track detour segments
         if(segment.detourPathScore > 0.0) {
@@ -81,6 +81,7 @@ public class Path {
     public void replaceSplitPathSegment(final PathSegment originalSegment, final List<PathSegment> splitPathSegments) {
         final int originalSegmentIndex = pathSegments.indexOf(originalSegment);
         pathSegments.remove(originalSegmentIndex);
+        originalSegment.removeContainingPath(this);
 
         //add the PathSegments in reverse order, so the segment replacing the original segment is always last (just for consistency's sake)
         final ListIterator<PathSegment> iterator = splitPathSegments.listIterator(splitPathSegments.size());
