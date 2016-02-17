@@ -43,7 +43,7 @@ public class PathSegment implements WaySegmentsObserver {
      */
     private boolean lineMatched = false;
 
-    final static String debugId = "PS364419113:53087445->-1257";
+    final static String debugId = "PS6409705:-1258->53160148";
 
     public static String idForParameters(final OSMWay way, final OSMNode fromNode, final OSMNode toNode) {
         return String.format("PS%d:%d->%d", way.osm_id, fromNode.osm_id, toNode.osm_id);
@@ -290,7 +290,7 @@ public class PathSegment implements WaySegmentsObserver {
         return waypointScore + alignedLengthFactor * alignedPathScore + detourLengthFactor * detourPathScore;
     }
     public String toString() {
-        return String.format("PathSegment@%d: line \"%s\" (%d:%d->%s), travel: %s", hashCode(), line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originJunction.junctionNode.osm_id, endJunction != null ? Long.toString(endJunction.junctionNode.osm_id) : "N/D", travelDirection != null ? travelDirection.name() : "unknown");
+        return String.format("PathSegment@%d: line \"%s\" (%d:%d->%s), travel: %s", hashCode(), line, line.way.osm_id, originJunction.junctionNode.osm_id, endJunction != null ? Long.toString(endJunction.junctionNode.osm_id) : "N/D", travelDirection != null ? travelDirection.name() : "unknown");
     }
     public WaySegments getLine() {
         return line;
@@ -357,9 +357,19 @@ public class PathSegment implements WaySegmentsObserver {
             if (wayContainsOriginNode && wayContainsEndNode) { //line encompasses (or is equal to) entire PathSegment
                 if(splitLine != line) {
                     setLine(splitLine);
+                    if(id.equals(debugId)) {
+                        System.out.println("SET LINE TO " + line);
+                    }
+                } else {
+                    if(id.equals(debugId)) {
+                        System.out.println("KEPT LINE " + line);
+                    }
                 }
                 return; //bail, since we've found the line that fully contains this PathSegment
             } else if(wayContainsOriginNode) { //if the splitLine contains this PathSegment's origin node, make sure splitLine starts or ends at that node
+                if(id.equals(debugId)) {
+                    System.out.println("CONTAINS ORIGIN");
+                }
                 /*check if the way intrudes partially into this PathSegment via the originJunction:
                   traveling forward: way ends somewhere in the middle of this PathSegment (i.e. not on the originJunction)
                   traveling backward: way starts somewhere in the middle of this PathSegment (i.e. not on the originJunction)
@@ -370,6 +380,9 @@ public class PathSegment implements WaySegmentsObserver {
                     overlappingLines.add(new SplitInfo(splitLine, originJunction.junctionNode, splitLine.way.getFirstNode()));
                 }
             } else if(wayContainsEndNode) { //if the splitLine contains this PathSegment's end node, make sure splitLine starts or ends at that node
+                if(id.equals(debugId)) {
+                    System.out.println("CONTAINS END");
+                }
                 /*check if the way intrudes partially into this PathSegment via the endJunction:
                   traveling forward: way starts somewhere in the middle of this PathSegment (i.e. not on the endJunction)
                   traveling backward: way ends somewhere in the middle of this PathSegment (i.e. not on the endJunction)
@@ -379,11 +392,25 @@ public class PathSegment implements WaySegmentsObserver {
                 } else if(travelDirection == TravelDirection.backward && splitLine.way.getLastNode() != endJunction.junctionNode) {
                     overlappingLines.add(new SplitInfo(splitLine, splitLine.way.getLastNode(), endJunction.junctionNode));
                 }
-            } else { //if the splitLine is fully contained within this PathSegment
-                if(travelDirection == TravelDirection.forward) {
-                    overlappingLines.add(new SplitInfo(splitLine, splitLine.way.getFirstNode(), splitLine.way.getLastNode()));
-                } else if(travelDirection == TravelDirection.backward){
-                    overlappingLines.add(new SplitInfo(splitLine, splitLine.way.getLastNode(), splitLine.way.getFirstNode()));
+            } else { //the splitLine doesn't contain the originJunction or endJunction
+                //at this stage, splitLine is either fully contained within this PathSegment, or doesn't intersect it at all
+                boolean isFullyContained = false;
+                for(final LineSegment containedSegment : containedSegments) { //check if splitLine contains any node contained within this PathSegment
+                    if(splitLine.way.getNodes().contains(containedSegment.originNode) || splitLine.way.getNodes().contains(containedSegment.destinationNode)) {
+                        isFullyContained = true;
+                        break;
+                    }
+                }
+
+                //if the splitLine is fully contained within this PathSegment, this PathSegment needs to be split
+                if(isFullyContained) {
+                    if (travelDirection == TravelDirection.forward) {
+                        overlappingLines.add(new SplitInfo(splitLine, splitLine.way.getFirstNode(), splitLine.way.getLastNode()));
+                    } else if (travelDirection == TravelDirection.backward) {
+                        overlappingLines.add(new SplitInfo(splitLine, splitLine.way.getLastNode(), splitLine.way.getFirstNode()));
+                    }
+                } else { //otherwise, this PathSegment lies outside the splitLine, and can stop watching it
+                    splitLine.removeObserver(this);
                 }
             }
         }
@@ -406,10 +433,6 @@ public class PathSegment implements WaySegmentsObserver {
         }
         if(travelDirection == TravelDirection.backward) {
             Collections.reverse(segNodes);
-        }
-
-        if(id.equals(debugId)) {
-            System.out.println("DEBUG");
         }
 
         //if we've reached this stage, one or more of the split lines doesn't full contain this PathSegment: we need to split it
