@@ -43,7 +43,7 @@ public class PathSegment implements WaySegmentsObserver {
      */
     private boolean lineMatched = false;
 
-    final String debugId = "6432632:53143819";
+    final static String debugId = "PS364419113:53087445->-1257";
 
     public static String idForParameters(final OSMWay way, final OSMNode fromNode, final OSMNode toNode) {
         return String.format("PS%d:%d->%d", way.osm_id, fromNode.osm_id, toNode.osm_id);
@@ -65,6 +65,8 @@ public class PathSegment implements WaySegmentsObserver {
             newPathSegment.determineScore();
             allPathSegments.put(newPathSegment.id, newPathSegment);
             existingPathSegment = newPathSegment;
+        } else {
+            newPathSegment.retire(); //properly discard the newPathSegment, since it's not going to be used
         }
         return existingPathSegment;
     }
@@ -80,7 +82,7 @@ public class PathSegment implements WaySegmentsObserver {
     }
     private PathSegment(final WaySegments line, final Junction fromJunction, final Junction toJunction, final PathSegment originalPathSegment) {
         this.line = line;
-        this.line.addObserver(this);
+        this.line.addObserver(this); //track all changes to the underlying line, i.e. for splits
         originJunction = fromJunction;
         endJunction = toJunction;
         containedSegments = new ArrayList<>(line.segments.size());
@@ -93,7 +95,7 @@ public class PathSegment implements WaySegmentsObserver {
     }
     private PathSegment(final WaySegments line, final Junction fromJunction, final PathTree parentPathTree) {
         this.line = line;
-        this.line.addObserver(this);
+        this.line.addObserver(this); //track all changes to the underlying line, i.e. for splits
         originJunction = fromJunction;
         this.parentPathTree = parentPathTree;
         containedSegments = new ArrayList<>(line.segments.size());
@@ -105,6 +107,9 @@ public class PathSegment implements WaySegmentsObserver {
 
         //generate a unique ID for this PathSegment
         id = idForParameters(line.way, originJunction.junctionNode, endJunction.junctionNode);
+    }
+    public void retire() {
+        line.removeObserver(this);
     }
     private Junction determineEndJunction() {
         //determine the direction of this line relative to the direction of route travel
@@ -285,7 +290,7 @@ public class PathSegment implements WaySegmentsObserver {
         return waypointScore + alignedLengthFactor * alignedPathScore + detourLengthFactor * detourPathScore;
     }
     public String toString() {
-        return String.format("PathSegment@%d: line \"%s\" (%d:%d->%d), travel: %s", hashCode(), line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originJunction.junctionNode.osm_id, endJunction.junctionNode.osm_id, travelDirection != null ? travelDirection.name() : "unknown");
+        return String.format("PathSegment@%d: line \"%s\" (%d:%d->%s), travel: %s", hashCode(), line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originJunction.junctionNode.osm_id, endJunction != null ? Long.toString(endJunction.junctionNode.osm_id) : "N/D", travelDirection != null ? travelDirection.name() : "unknown");
     }
     public WaySegments getLine() {
         return line;
@@ -298,9 +303,6 @@ public class PathSegment implements WaySegmentsObserver {
     }
     public void removeContainingPath(final Path path) {
         containingPaths.remove(path);
-    }
-    public void retire() {
-        line.removeObserver(this);
     }
     private void setLine(final WaySegments newLine) {
         //System.out.println("Reassigned " + id + "(" + line.way.getTag("name") + ") from " + line.way.osm_id + " to " + newLine.way.osm_id);
