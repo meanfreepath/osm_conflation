@@ -242,17 +242,14 @@ public class StopConflator {
                     //System.out.println("GTFS id match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(gtfsIdTag) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
                 } else if(existingStopPlatform.hasTag(OSMEntity.KEY_REF)) { //try matching by ref if no importer id
                     final String existingRefTag = existingStopPlatform.getTag(OSMEntity.KEY_REF);
-                    //TODO also match based on import dataset
                     assert existingRefTag != null;
                     if(existingRefTag.trim().equals(importRefTag)) { //string match
-                        System.out.println("Ref string match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
                         mergedStopEntity = workingEntitySpace.mergeEntities(existingStopPlatform.osm_id, stop.platform.osm_id);
                         stop.platform = mergedStopEntity;
                     } else if(importRefTagNumeric != Double.MAX_VALUE) { //try doing a basic numeric match if strings don't match (special case for already-imported King County metro data)
                         try {
                             final double existingRefTagNumeric = Double.parseDouble(existingRefTag);
                             if(existingRefTagNumeric == importRefTagNumeric) {
-                                //System.out.println("Ref numeric match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
                                 mergedStopEntity = workingEntitySpace.mergeEntities(existingStopPlatform.osm_id, stop.platform.osm_id);
                                 stop.platform = mergedStopEntity;
                             }
