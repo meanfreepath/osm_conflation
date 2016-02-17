@@ -104,7 +104,6 @@ public class WaySegments {
     public final OneWayDirection oneWayDirection;
     public final double maxSegmentLength;
     private List<WaySegmentsObserver> observers = null;
-    private List<WaySegmentsObserver> observersPendingAddition = null, observersPendingRemoval = null;
 
     public WaySegments(final OSMWay way, final LineType type, final double maxSegmentLength) {
         this.way = way;
@@ -258,25 +257,10 @@ public class WaySegments {
         way.insertNode(node, insertedSegment.nodeIndex);
 
         //and notify any observers
-        if(observersPendingAddition != null) { //add any pending observers here
-            if(observers == null) {
-                observers = new ArrayList<>(64);
-            }
-            for(final WaySegmentsObserver observer : observersPendingAddition) {
-                if(!observers.contains(observer)) {
-                    observers.add(observer);
-                }
-            }
-            observersPendingAddition = null;
-        }
         if(observers != null) {
-            for (final WaySegmentsObserver observer : observers) {
+            final List<WaySegmentsObserver> observersToNotify = new ArrayList<>(observers);
+            for (final WaySegmentsObserver observer : observersToNotify) {
                 observer.waySegmentsAddedSegment(this, insertedSegment);
-            }
-            //remove any observers that indicated they are no longer observing
-            if(observersPendingRemoval != null) {
-                observers.removeAll(observersPendingRemoval);
-                observersPendingRemoval = null;
             }
         }
 
@@ -402,48 +386,29 @@ public class WaySegments {
 
 
         //notify the observers of the split
-        if(observersPendingAddition != null) { //add any pending observers here
-            if(observers == null) {
-                observers = new ArrayList<>(64);
-            }
-            for(final WaySegmentsObserver observer : observersPendingAddition) {
-                if(!observers.contains(observer)) {
-                    observers.add(observer);
-                }
-            }
-            observersPendingAddition = null;
-        }
         if(observers != null) {
-            for (final WaySegmentsObserver observer : observers) {
+            final List<WaySegmentsObserver> observersToNotify = new ArrayList<>(observers);
+            for (final WaySegmentsObserver observer : observersToNotify) {
                 observer.waySegmentsWasSplit(this, splitWaySegments);
-            }
-            //remove any observers that indicated they are no longer observing
-            if(observersPendingRemoval != null) {
-                observers.removeAll(observersPendingRemoval);
-                observersPendingRemoval = null;
             }
         }
 
         return splitWaySegments;
     }
     public boolean addObserver(final WaySegmentsObserver observer) {
-        if(observersPendingAddition == null) {
-            observersPendingAddition = new ArrayList<>(64);
+        if(observers == null) {
+            observers = new ArrayList<>(32);
         }
-        if(!observersPendingAddition.contains(observer)) {
-            return observersPendingAddition.add(observer);
+        if(!observers.contains(observer)) {
+            return observers.add(observer);
         }
         return false;
     }
     public boolean removeObserver(final WaySegmentsObserver observer) {
-        if(!observers.contains(observer)) {
-            return false;
+        if(observers != null && observers.contains(observer)) {
+            return observers.remove(observer);
         }
-        if(observersPendingRemoval == null) {
-            observersPendingRemoval = new ArrayList<>(64);
-        }
-        observersPendingRemoval.add(observer);
-        return true;
+        return false;
     }
     public static String outputSegments(final List<LineSegment> segments) {
         final List<String> segs = new ArrayList<>(segments.size());
