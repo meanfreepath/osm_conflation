@@ -828,7 +828,7 @@ public class OSMEntitySpace {
         //produce an empty XMl file if no entities
         if(allEntities.size() == 0) {
             final FileWriter writer = new FileWriter(fileName);
-            writer.write(XML_DOCUMENT_OPEN);
+            writer.write(String.format(XML_DOCUMENT_OPEN, Boolean.toString(canUpload)));
             writer.write(XML_DOCUMENT_CLOSE);
             writer.close();
             return;
