@@ -4,7 +4,6 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -12,10 +11,12 @@ import java.util.Map;
  * Created by nick on 10/15/15.
  */
 public abstract class OSMEntity {
-    public final static String KEY_LATITUDE = "lat", KEY_LONGITUDE = "lon", KEY_OSMID = "osm_id", KEY_FROM = "from", KEY_VIA = "via", KEY_TO = "to", KEY_OPERATOR = "operator", KEY_ROUTE = "route", KEY_ROUTE_MASTER = "route_master", KEY_NAME = "name", KEY_REF = "ref", KEY_LOCAL_REF = "local_ref", KEY_DESCRIPTION = "description", KEY_WEBSITE = "website", KEY_TYPE = "type", KEY_PUBLIC_TRANSPORT = "public_transport", KEY_PUBLIC_TRANSPORT_VERSION = "public_transport:version", KEY_COLOUR = "colour", KEY_AMENITY = "amenity", KEY_WHEELCHAIR = "wheelchair";
+    public final static String KEY_LATITUDE = "lat", KEY_LONGITUDE = "lon", KEY_OSMID = "osm_id", KEY_FROM = "from", KEY_VIA = "via", KEY_TO = "to", KEY_OPERATOR = "operator", KEY_ROUTE = "route", KEY_ROUTE_MASTER = "route_master", KEY_NAME = "name", KEY_REF = "ref", KEY_LOCAL_REF = "local_ref", KEY_DESCRIPTION = "description", KEY_WEBSITE = "website", KEY_TYPE = "type", KEY_PUBLIC_TRANSPORT = "public_transport", KEY_PUBLIC_TRANSPORT_VERSION = "public_transport:version", KEY_COLOUR = "colour", KEY_AMENITY = "amenity", KEY_WHEELCHAIR = "wheelchair", KEY_SOURCE = "source";
     public final static String TAG_ROUTE = "route", TAG_ROUTE_MASTER = "route_master", TAG_BUS = "bus", TAG_LIGHT_RAIL = "light_rail", TAG_TRAM = "tram", TAG_SUBWAY = "subway", TAG_TRAIN = "train", TAG_FERRY = "ferry", TAG_AERIALWAY = "aerialway", TAG_YES = "yes", TAG_NO = "no", TAG_STOP_POSITION = "stop_position", TAG_PLATFORM = "platform";
     public final static String MEMBERSHIP_DEFAULT = "", MEMBERSHIP_STOP = "stop", MEMBERSHIP_PLATFORM = "platform";
-    protected final static String BASE_XML_TAG_FORMAT_TAG = "  <tag k=\"%s\" v=\"%s\"/>\n";
+    protected final static String
+            BASE_XML_TAG_FORMAT_TAG = "  <tag k=\"%s\" v=\"%s\"/>\n",
+            ACTION_ATTRIBUTE_FORMAT = " action=\"%s\"";
 
     public enum OSMType {
         node, way, relation
@@ -224,10 +225,6 @@ public abstract class OSMEntity {
         return conflictingTags != null && conflictingTags.size() > 0 ? conflictingTags : null;
     }
     public void markAsModified() {
-        if(action == ChangeAction.none && version > 0) {
-            version++;
-            //timestamp = new Date().toString();
-        }
         action = ChangeAction.modify;
     }
     public void markAsDeleted() {
@@ -323,5 +320,8 @@ public abstract class OSMEntity {
             character = iterator.next();
         }
         return result.toString();
+    }
+    protected static String actionTagAttribute(final ChangeAction action) {
+        return action != ChangeAction.none ? String.format(ACTION_ATTRIBUTE_FORMAT, action.name()) : "";
     }
 }
