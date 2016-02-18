@@ -24,7 +24,7 @@ public class PathTree implements WaySegmentsObserver {
             return o1.getTotalScore() > o2.getTotalScore() ? -1 : 1;
         }
     };
-    private final static double scoreThresholdToProcessPathSegment = 3.0, MAX_DETOUR_LENGTH = 0.0;
+    private final static double scoreThresholdToProcessPathSegment = 3.0, MAX_DETOUR_LENGTH = 50.0;
 
     public final String id;
     public final StopArea fromStop, toStop;
