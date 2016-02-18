@@ -5,6 +5,7 @@ import Conflation.RouteConflator;
 import Conflation.StopArea;
 import Conflation.StopConflator;
 import OSM.*;
+import PathFinding.PathTree;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.xml.sax.SAXException;
 
@@ -36,8 +37,12 @@ public class Main {
         StopConflator.debugEnabled = debugEnabled;
         StopArea.debugEnabled = debugEnabled;
         OSMEntity.debugEnabled = debugEnabled;
+        PathTree.debugEnabled = debugEnabled;
 
         final String importFileName = args[0];
+
+        final ArrayList<String> selectedRoutes = new ArrayList<>();
+        selectedRoutes.add("100287");
 
         try {
             importSpace.loadFromXML(importFileName);
@@ -59,6 +64,9 @@ public class Main {
 
             //loop through the route masters, processing their subroutes in one entity space
             for(final OSMRelation importRouteMaster : importRouteMasterRelations) {
+                if(!selectedRoutes.contains(importRouteMaster.getTag("gtfs:route_id"))) {
+                    continue;
+                }
                 final OSMEntitySpace workingEntitySpace = new OSMEntitySpace(32768); //the entity space that all processing will occur on
 
                 //create an object to handle the processing of the data for this route master
@@ -85,7 +93,7 @@ public class Main {
                 }
                 //also include any entities that were changed during the process
                 for(final OSMEntity changedEntity : workingEntitySpace.allEntities.values()) {
-                    if(changedEntity instanceof OSMRelation || changedEntity.getAction() == OSMEntity.ChangeAction.modify) {
+                    if(changedEntity.getAction() == OSMEntity.ChangeAction.modify) {
                         relationSpace.addEntity(changedEntity, OSMEntity.TagMergeStrategy.keepTags, null);
                     }
                 }

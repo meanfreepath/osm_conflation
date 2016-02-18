@@ -59,7 +59,7 @@ public class OSMRelation extends OSMEntity {
     protected void copyMembers(final List<OSMRelationMember> membersToCopy) {
         if(complete) {
             for(final OSMRelationMember member : membersToCopy) {
-                addMember(member.member, member.role);
+                addMemberInternal(member.member, member.role, members.size(), false);
                 if(member.member.isComplete()) {
                     completedMemberCount++;
                 }
@@ -227,7 +227,7 @@ public class OSMRelation extends OSMEntity {
      * @return
      */
     public boolean addMember(final OSMEntity member, final String role) {
-        return addMemberInternal(member, role, members.size());
+        return addMemberInternal(member, role, members.size(), true);
     }
     /**
      * Add a new member before the given existing member in the member list
@@ -238,7 +238,7 @@ public class OSMRelation extends OSMEntity {
      */
     public boolean insertBeforeMember(final OSMEntity member, final String role, final OSMEntity existingMember) {
         final int existingMemberIndex = existingMember != null ? indexOfMember(existingMember) : 0; //default to the first if no existingMember provided
-        return addMemberInternal(member, role, existingMemberIndex);
+        return addMemberInternal(member, role, existingMemberIndex, true);
     }
     /**
      * Add a new member after the given existing member in the member list
@@ -249,15 +249,17 @@ public class OSMRelation extends OSMEntity {
      */
     public boolean insertAfterMember(final OSMEntity member, final String role, final OSMEntity existingMember) {
         final int existingMemberIndex = existingMember != null ? indexOfMember(existingMember) : members.size() - 2; //default to the last if no existingMember provided
-        return addMemberInternal(member, role, existingMemberIndex + 1);
+        return addMemberInternal(member, role, existingMemberIndex + 1, true);
     }
-    private boolean addMemberInternal(final OSMEntity member, final String role, final int index) {
+    private boolean addMemberInternal(final OSMEntity member, final String role, final int index, final boolean markAsModified) {
         members.add(index, new OSMRelationMember(member, role));
         if(member.isComplete()) {
             completedMemberCount++;
         }
         member.didAddToRelation(this);
-        markAsModified();
+        if(markAsModified) {
+            markAsModified();
+        }
         return true;
     }
     /**
