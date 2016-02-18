@@ -106,20 +106,6 @@ public class RoutePathFinder implements WaySegmentsObserver {
 
             lastPath = pathTree;
         }
-
-        //split ways as needed
-        /*for(final PathTree pathTree : allPathTrees) {
-            pathTree.splitWaysAtIntersections(entitySpace);
-        }
-
-        //and add the correct ways to the route relation
-        for(final PathTree pathTree : allPathTrees) {
-            for (final PathSegment pathSegment : pathTree.bestPath.getPathSegments()) {
-                if (pathSegment.usedWay != null) {
-                    route.routeRelation.addMember(pathSegment.usedWay, OSMEntity.MEMBERSHIP_DEFAULT);
-                }
-            }
-        }*/
     }
     public void splitWaysAtIntersections(final OSMEntitySpace entitySpace) {
         //split ways as needed
