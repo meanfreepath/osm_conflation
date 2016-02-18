@@ -123,7 +123,7 @@ public class Route {
                 matchingSegmentWay.appendNode(matchOriginNode);
                 matchingSegmentWay.appendNode(matchLastNode);
                 matchingSegmentWay.setTag("way_id", Long.toString(matchingSegment.parentSegments.way.osm_id));
-                matchingSegmentWay.setTag(OSMEntity.KEY_REF, Integer.toString(matchingSegment.segmentIndex));
+                matchingSegmentWay.setTag(OSMEntity.KEY_REF, matchingSegment.nodeIndex + "/" + matchingSegment.segmentIndex);
                 OSMEntity.copyTag(matchingSegment.parentSegments.way, matchingSegmentWay, "highway");
                 OSMEntity.copyTag(matchingSegment.parentSegments.way, matchingSegmentWay, "railway");
                 OSMEntity.copyTag(matchingSegment.parentSegments.way, matchingSegmentWay, OSMEntity.KEY_NAME);
