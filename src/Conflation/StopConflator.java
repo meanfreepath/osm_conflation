@@ -147,10 +147,10 @@ public class StopConflator {
             }
 
             //then add a node on the nearest point and add to the relation and the way
+            OSMPresetFactory.makeStopPosition(nearestNodeOnWay);
             nearestNodeOnWay.setTag(OSMEntity.KEY_NAME, stopArea.platform.getTag(OSMEntity.KEY_NAME));
             nearestNodeOnWay.setTag(OSMEntity.KEY_REF, stopArea.platform.getTag(OSMEntity.KEY_REF));
             nearestNodeOnWay.setTag("gtfs:stop_id", stopArea.platform.getTag("gtfs:stop_id"));
-            nearestNodeOnWay.setTag(OSMEntity.KEY_PUBLIC_TRANSPORT, OSMEntity.TAG_STOP_POSITION);
             nearestNodeOnWay.setTag(routeConflator.routeType, OSMEntity.TAG_YES); //TODO need proper key mapping (e.g. for subway, light_rail, etc)
 
             //and add the stop position to the stop area
