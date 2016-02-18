@@ -22,6 +22,7 @@ public class WaySegments {
             return o1.matchingSegment.segmentIndex < o2.matchingSegment.segmentIndex ? -1 : 1;
         }
     };
+    public final static long debugWayId = 0L;//244322295L;//157766372L
 
     /**
      * Class for tracking the match status between two WaySegmentsObjects
