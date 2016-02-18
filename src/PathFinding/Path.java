@@ -15,25 +15,26 @@ import java.util.ListIterator;
  */
 public class Path {
     private final static int INITIAL_PATH_SEGMENT_CAPACITY = 64, INITIAL_DETOUR_PATH_SEGMENT_CAPACITY = 8;
+    private final static double PATH_SEGMENT_LOOP_PENALTY = 500.0;
     public static boolean debugEnabled = false;
     public enum PathOutcome {
         waypointReached, deadEnded, detourLimitReached, unknown
     }
 
-    private final List<PathSegment> pathSegments;
-    private final List<PathSegment> detourPathSegments;
+    private final List<PathSegment> pathSegments, detourPathSegments, loopedPathSegments;
     public final PathTree parentPathTree;
     public PathSegment firstPathSegment = null, lastPathSegment = null;
     public PathOutcome outcome = PathOutcome.unknown;
 
     protected int detourSegmentCount = 0;
     protected double detourSegmentLength = 0.0;
-    public double scoreSegments = 0.0, scoreStops = 0.0, scoreAdjust = 0.0, scoreTotal = 0.0;
+    //public double scoreSegments = 0.0, scoreStops = 0.0, scoreAdjust = 0.0, scoreTotal = 0.0;
 
     public Path(final PathTree parentPathTree, final PathSegment initialSegment) {
         this.parentPathTree = parentPathTree;
         pathSegments = new ArrayList<>(INITIAL_PATH_SEGMENT_CAPACITY);
         detourPathSegments = new ArrayList<>(INITIAL_DETOUR_PATH_SEGMENT_CAPACITY);
+        loopedPathSegments = new ArrayList<>(INITIAL_DETOUR_PATH_SEGMENT_CAPACITY);
         firstPathSegment = lastPathSegment = initialSegment;
         if(initialSegment != null) {
             addPathSegment(initialSegment);
@@ -52,12 +53,16 @@ public class Path {
         detourPathSegments = new ArrayList<>(pathToClone.detourPathSegments);
         detourSegmentCount = pathToClone.detourSegmentCount;
         detourSegmentLength = pathToClone.detourSegmentLength;
+        loopedPathSegments = new ArrayList<>(pathToClone.loopedPathSegments);
 
         if(segmentToAdd != null) {
             addPathSegment(segmentToAdd);
         }
     }
     public void addPathSegment(final PathSegment segment) {
+        if(pathSegments.contains(segment)) { //track segments that are contained multiple times in the path
+            loopedPathSegments.add(segment);
+        }
         pathSegments.add(segment);
         segment.addContainingPath(this);
         if(firstPathSegment == null) {
@@ -110,6 +115,10 @@ public class Path {
         for(final PathSegment segment : pathSegments) {
             pathScore += segment.getPathScore();
             waypointScore += segment.getWaypointScore();
+        }
+        //deduct a penalty for looped PathSegments (we want the most direct route)
+        for(final PathSegment loopedSegment : loopedPathSegments) {
+            pathScore -= PATH_SEGMENT_LOOP_PENALTY;
         }
         return waypointScore + pathScore / pathSegments.size();
     }
@@ -255,7 +264,7 @@ public class Path {
             }
         }
     }
-    public String scoreSummary() {
+    /*public String scoreSummary() {
         final DecimalFormat format = new DecimalFormat("0.00");
         final StringBuilder output = new StringBuilder(pathSegments.size() * 128);
         for(final PathSegment segment : pathSegments) {
@@ -268,7 +277,7 @@ public class Path {
             output.append(format.format(segment.getScoreStops()));
             output.append("/");
             output.append(format.format(segment.getScoreAdjust()));
-            output.append("\n");*/
+            output.append("\n");
         }
         output.append("Total score: ");
         output.append(format.format(scoreSegments));
@@ -281,7 +290,7 @@ public class Path {
         output.append("\n");
 
         return output.toString();
-    }
+    }*/
     public void debugOutputPathSegments(final OSMEntitySpace entitySpace, final int pathIndex) {
         int segmentIndex = 0;
         final OSMNode pathBeginNode = (OSMNode) entitySpace.addEntity(parentPathTree.fromNode, OSMEntity.TagMergeStrategy.keepTags, null);
