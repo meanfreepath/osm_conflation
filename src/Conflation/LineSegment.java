@@ -112,17 +112,26 @@ public class LineSegment {
         }
 
         //and loop through them, picking the one with the best score as the best match
-        double minScore = Double.MAX_VALUE, matchScore;
-        SegmentMatch bestMatch = null;
-        for(final SegmentMatch match : matchesForLine) {
-            //choose the best match based on the product of their dot product and distance score
-            matchScore = (match.orthogonalDistance * match.orthogonalDistance + match.midPointDistance * match.midPointDistance) / Math.max(0.000001, Math.abs(match.dotProduct));
-            if(bestMatch == null || matchScore < minScore) {
-                bestMatch = match;
-                minScore = matchScore;
-            }
+        SegmentMatch bestMatch = chooseBestMatchForMatchType(matchesForLine, SegmentMatch.matchMaskAll);
+        if(bestMatch == null) {
+            //bestMatch = chooseBestMatchForMatchType(matchesForLine, SegmentMatch.matchTypeBoundingBox);
         }
         bestMatchForLine.put(routeLine.way.osm_id, bestMatch);
+    }
+    private SegmentMatch chooseBestMatchForMatchType(final List<SegmentMatch> matches, final short matchMask) {
+        double minScore = Double.MAX_VALUE, matchScore, nextBestMinScore = Double.MAX_VALUE, nextBestMatchScore;
+        SegmentMatch bestMatch = null;
+        for(final SegmentMatch match : matches) {
+            //choose the best match based on the product of their dot product and distance score
+            if((match.type & matchMask) == matchMask) {
+                matchScore = (match.orthogonalDistance * match.orthogonalDistance + match.midPointDistance * match.midPointDistance) / Math.max(0.000001, Math.abs(match.dotProduct));
+                if (bestMatch == null || matchScore < minScore) {
+                    bestMatch = match;
+                    minScore = matchScore;
+                }
+            }
+        }
+        return bestMatch;
     }
     public void copyMatches(final LineSegment fromSegment) {
         //TODO: may be more accurate to rematch rather than copy
