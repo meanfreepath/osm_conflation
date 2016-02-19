@@ -79,12 +79,28 @@ public class StopArea implements WaySegmentsObserver {
                 nameScore += scoreFactorForMatchType(nameMatch.matchType);
             }
 
+            //check the oneway direction of the line, and whether it goes with or against
+            final boolean wayIsOneWay = line.oneWayDirection != WaySegments.OneWayDirection.none;
+            final boolean debugIds = line.way.osm_id == 158265862L || line.way.osm_id == 158265857L;
+
             //and the proximity matches
+            double dpFactor, odFactor, oneWayFactor;
             for(final SegmentProximityMatch segmentMatch : proximityMatches) {
-                final double dpFactor, odFactor;
                 final SegmentMatch bestMatchForRouteLine = segmentMatch.candidateSegment.bestMatchForLine.get(segmentMatch.routeLine.way.osm_id);
+
                 if(bestMatchForRouteLine != null) {
-                    dpFactor = Math.abs(bestMatchForRouteLine.dotProduct);
+                    //adjust score for matches that go with direction of oneway travel, for better matching on dual carriageways
+                    if(line.oneWayDirection == WaySegments.OneWayDirection.forward) {
+                        oneWayFactor = bestMatchForRouteLine.dotProduct > 0.0 ? 2.0 : -2.0;
+                    } else if(line.oneWayDirection == WaySegments.OneWayDirection.backward) {
+                        oneWayFactor = bestMatchForRouteLine.dotProduct < 0.0 ? 2.0 : -2.0;
+                    } else {
+                        oneWayFactor = 1.0;
+                    }
+                    if(debugIds) {
+                        System.out.println("ONEWAY " + line.way.osm_id + ": " + bestMatchForRouteLine.dotProduct + " factor " + oneWayFactor);
+                    }
+                    dpFactor = oneWayFactor * Math.abs(bestMatchForRouteLine.dotProduct);
                     odFactor = bestMatchForRouteLine.orthogonalDistance;
                 } else {
                     dpFactor = 0.01;
