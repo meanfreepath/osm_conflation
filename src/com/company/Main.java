@@ -42,7 +42,8 @@ public class Main {
         final String importFileName = args[0];
 
         final ArrayList<String> selectedRoutes = new ArrayList<>();
-        selectedRoutes.add("100287");
+        //selectedRoutes.add("100224");
+        selectedRoutes.add("102615");
 
         try {
             importSpace.loadFromXML(importFileName);
@@ -67,7 +68,16 @@ public class Main {
                 if(!selectedRoutes.contains(importRouteMaster.getTag("gtfs:route_id"))) {
                     continue;
                 }
-                final OSMEntitySpace workingEntitySpace = new OSMEntitySpace(32768); //the entity space that all processing will occur on
+
+                //output an OSM XML file with only the current route data
+                if(debugEnabled) {
+                    OSMEntitySpace originalRouteSpace = new OSMEntitySpace(2048);
+                    originalRouteSpace.addEntity(importRouteMaster, OSMEntity.TagMergeStrategy.keepTags, null);
+                    originalRouteSpace.outputXml("gtfsroute_" + importRouteMaster.getTag("gtfs:route_id") + ".osm");
+                    originalRouteSpace = null;
+                }
+
+                final OSMEntitySpace workingEntitySpace = new OSMEntitySpace(65536); //the entity space that all processing will occur on
 
                 //create an object to handle the processing of the data for this route master
                 final RouteConflator routeConflator = new RouteConflator(importRouteMaster);
