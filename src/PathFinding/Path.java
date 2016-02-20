@@ -18,7 +18,7 @@ public class Path {
     private final static double PATH_SEGMENT_LOOP_PENALTY = 500.0;
     public static boolean debugEnabled = false;
     public enum PathOutcome {
-        waypointReached, deadEnded, detourLimitReached, unknown
+        waypointReached, deadEnded, lengthLimitReached, detourLimitReached, unknown
     }
 
     private final List<PathSegment> pathSegments, detourPathSegments, loopedPathSegments;
@@ -27,7 +27,7 @@ public class Path {
     public PathOutcome outcome = PathOutcome.unknown;
 
     protected int detourSegmentCount = 0;
-    protected double detourSegmentLength = 0.0;
+    protected double totalSegmentLength = 0.0, detourSegmentLength = 0.0;
     //public double scoreSegments = 0.0, scoreStops = 0.0, scoreAdjust = 0.0, scoreTotal = 0.0;
 
     public Path(final PathTree parentPathTree, final PathSegment initialSegment) {
@@ -40,17 +40,18 @@ public class Path {
             addPathSegment(initialSegment);
         }
     }
-    public Path(final Path pathToClone, final Junction branchJunction, final PathSegment segmentToAdd) {
+    public Path(final Path pathToClone, final PathSegment segmentToAdd) {
         parentPathTree = pathToClone.parentPathTree;
         pathSegments = new ArrayList<>(pathToClone.pathSegments.size() + INITIAL_PATH_SEGMENT_CAPACITY);
         detourPathSegments = new ArrayList<>(pathToClone.detourPathSegments.size() + INITIAL_DETOUR_PATH_SEGMENT_CAPACITY);
         loopedPathSegments = new ArrayList<>(pathToClone.loopedPathSegments.size() + INITIAL_DETOUR_PATH_SEGMENT_CAPACITY);
         detourSegmentCount = 0;
-        detourSegmentLength = 0.0;
+        detourSegmentLength = totalSegmentLength = 0.0;
 
         //add all the pathToClone's PathSegments, up to the given junction
         for(final PathSegment pathSegment : pathToClone.pathSegments) {
             pathSegments.add(pathSegment);
+            totalSegmentLength += pathSegment.traveledSegmentLength;
             pathSegment.addContainingPath(this);
 
             //also track any detour and looped PathSegments
@@ -63,8 +64,8 @@ public class Path {
                 loopedPathSegments.add(pathSegment);
             }
 
-            //bail once we've reached the branching junction point
-            if(pathSegment.endJunction == branchJunction) {
+            //don't process any PathSegment past the new PathSegment's origin junction - i.e. where the Path is branched
+            if(pathSegment.endJunction == segmentToAdd.originJunction) {
                 break;
             }
         }
@@ -77,6 +78,7 @@ public class Path {
             loopedPathSegments.add(segment);
         }
         pathSegments.add(segment);
+        totalSegmentLength += segment.traveledSegmentLength;
         segment.addContainingPath(this);
         if(firstPathSegment == null) {
             firstPathSegment = pathSegments.get(0);

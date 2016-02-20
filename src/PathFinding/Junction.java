@@ -57,7 +57,7 @@ public class Junction {
     public PathSegmentStatus containsPathSegment(final PathSegment pathSegment) {
         for(final PathSegmentStatus curStatus : junctionPathSegments) {
             if(curStatus.segment == pathSegment) {
-                System.out.println("Re-add " + this.junctionNode.osm_id + ": " + pathSegment);
+                //System.out.println("Re-add " + this.junctionNode.osm_id + ": " + pathSegment);
                 return curStatus;
             }
         }
