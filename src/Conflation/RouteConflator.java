@@ -3,6 +3,7 @@ package Conflation;
 import OSM.*;
 import Overpass.OverpassConverter;
 import PathFinding.Path;
+import PathFinding.PathTree;
 import PathFinding.RoutePathFinder;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
@@ -190,11 +191,6 @@ public class RouteConflator implements WaySegmentsObserver {
                 workingEntitySpace.mergeWithSpace(converter.getEntitySpace(), OSMEntity.TagMergeStrategy.keepTags, null);
             }
         }
-        /*try {
-            workingEntitySpace.outputXml("routedownload.osm");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }*/
 
         System.out.println("Processing with " + workingEntitySpace.allWays.size() + " ways");
 
@@ -366,7 +362,7 @@ public class RouteConflator implements WaySegmentsObserver {
         return regions;
     }
     public void conflateRoutePaths(final StopConflator stopConflator) {
-        final int debugRouteId = -1170;
+        final long debugRouteId = -240250L*0;
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
@@ -422,6 +418,7 @@ public class RouteConflator implements WaySegmentsObserver {
         //with the candidate lines determined, begin the pathfinding stage to lock down the path between the route's stops
         final List<RoutePathFinder> routePathFinderFinders = new ArrayList<>(exportRoutes.size());
         for(final Route route : exportRoutes) {
+            System.out.println("Begin PathFinding for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
                 continue;
             }
@@ -436,8 +433,23 @@ public class RouteConflator implements WaySegmentsObserver {
             //and add the stops data to the OSMRelation for the route
             route.syncStopsWithRelation();
 
+            if(debugEnabled) {
+                System.out.println("--------------------------------------------------------\nPRE-SPLIT PATHS:");
+                for (final PathTree pathTree : routePathFinder.allPathTrees) {
+                    System.out.println("PATH: " + pathTree.bestPath);
+                }
+            }
+
             //split any ways that aren't fully contained by the route path
             routePathFinder.splitWaysAtIntersections(workingEntitySpace);
+
+            //debug paths
+            if(debugEnabled) {
+                System.out.println("--------------------------------------------------------\nFINAL PATHS:");
+                for (final PathTree pathTree : routePathFinder.allPathTrees) {
+                    System.out.println("PATH: " + pathTree.bestPath);
+                }
+            }
 
             //and finally, add the ways associated with the routeFinder's best path to the OSM route relation
             routePathFinder.addWaysToRouteRelation();
