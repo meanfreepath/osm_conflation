@@ -93,8 +93,16 @@ public class PathTree implements WaySegmentsObserver {
                 throw new PathIterationException("Reached maximum paths");
             }
 
-            //process the ending junction of the current segment, but only if its line is properly matched with the route path
-            final Path newPath = createPath(curPath, segmentStatus.segment);
+            //process the ending junction of the current PathSegment, but only if its line is properly matched with the route path
+            final Path newPath;
+            if(processedPathSegments == 0) { //the best matching PathSegment is simply added to the current path
+                newPath = curPath;
+                newPath.addPathSegment(segmentStatus.segment);
+            }  else { //the next-best PathSegments are added to a clone of the current path, as branched at this junction
+                newPath = new Path(curPath, startingJunction, segmentStatus.segment);
+                candidatePaths.add(newPath);
+            }
+
             if(newPath.detourSegmentLength <= MAX_DETOUR_LENGTH) { //also enforce detour limits - don't continue the path if it exceeds them
                 iteratePath(segmentStatus.segment.endJunction, routePathFinder, newPath, debugDepth + 1);
                 processedPathSegments++;
@@ -103,15 +111,11 @@ public class PathTree implements WaySegmentsObserver {
             }
         }
 
-        if(processedPathSegments == 0) { //dead end junction: mark this path as such
+        //dead end junction: mark this path as such
+        if(processedPathSegments == 0) {
             routePathFinder.logEvent(RoutePathFinder.RouteLogType.notice, "Dead end at node #" + startingJunction.junctionNode.osm_id, this);
             curPath.outcome = Path.PathOutcome.deadEnded;
         }
-    }
-    private Path createPath(final Path parent, final PathSegment segmentToAdd) {
-        final Path newPath = new Path(parent, segmentToAdd); //create a clone of parent, with the new segment added to it
-        candidatePaths.add(newPath);
-        return newPath;
     }
     private boolean processJunction(final Junction junction, final RoutePathFinder parentPath, final Path currentPath, final int debugDepth) {
         String debugPadding = null;

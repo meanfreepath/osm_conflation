@@ -40,24 +40,37 @@ public class Path {
             addPathSegment(initialSegment);
         }
     }
-    public Path(final Path pathToClone, final PathSegment segmentToAdd) {
+    public Path(final Path pathToClone, final Junction branchJunction, final PathSegment segmentToAdd) {
         parentPathTree = pathToClone.parentPathTree;
         pathSegments = new ArrayList<>(pathToClone.pathSegments.size() + INITIAL_PATH_SEGMENT_CAPACITY);
-        pathSegments.addAll(pathToClone.pathSegments);
-        for(final PathSegment pathSegment : pathSegments) {
+        detourPathSegments = new ArrayList<>(pathToClone.detourPathSegments.size() + INITIAL_DETOUR_PATH_SEGMENT_CAPACITY);
+        loopedPathSegments = new ArrayList<>(pathToClone.loopedPathSegments.size() + INITIAL_DETOUR_PATH_SEGMENT_CAPACITY);
+        detourSegmentCount = 0;
+        detourSegmentLength = 0.0;
+
+        //add all the pathToClone's PathSegments, up to the given junction
+        for(final PathSegment pathSegment : pathToClone.pathSegments) {
+            pathSegments.add(pathSegment);
             pathSegment.addContainingPath(this);
-        }
-        firstPathSegment = pathToClone.firstPathSegment;
-        lastPathSegment = pathToClone.lastPathSegment;
 
-        detourPathSegments = new ArrayList<>(pathToClone.detourPathSegments);
-        detourSegmentCount = pathToClone.detourSegmentCount;
-        detourSegmentLength = pathToClone.detourSegmentLength;
-        loopedPathSegments = new ArrayList<>(pathToClone.loopedPathSegments);
+            //also track any detour and looped PathSegments
+            if(pathToClone.detourPathSegments.contains(pathSegment)) {
+                detourPathSegments.add(pathSegment);
+                detourSegmentCount++;
+                detourSegmentLength += pathSegment.detourSegmentLength;
+            }
+            if(pathToClone.loopedPathSegments.contains(pathSegment)) {
+                loopedPathSegments.add(pathSegment);
+            }
 
-        if(segmentToAdd != null) {
-            addPathSegment(segmentToAdd);
+            //bail once we've reached the branching junction point
+            if(pathSegment.endJunction == branchJunction) {
+                break;
+            }
         }
+
+        //and finally, add the new PathSegment to the list
+        addPathSegment(segmentToAdd);
     }
     public void addPathSegment(final PathSegment segment) {
         if(pathSegments.contains(segment)) { //track segments that are contained multiple times in the path
