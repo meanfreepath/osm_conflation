@@ -43,7 +43,10 @@ public class Main {
 
         final ArrayList<String> selectedRoutes = new ArrayList<>();
         //selectedRoutes.add("100224");
-        selectedRoutes.add("102615");
+        //selectedRoutes.add("100062"); //errors splitting
+        //selectedRoutes.add("102581");
+        selectedRoutes.add("102615"); // E-Line
+        //selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
 
         try {
             importSpace.loadFromXML(importFileName);
