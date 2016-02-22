@@ -362,7 +362,7 @@ public class RouteConflator implements WaySegmentsObserver {
         return regions;
     }
     public void conflateRoutePaths(final StopConflator stopConflator) {
-        final long debugRouteId = -240250L*0;
+        final long debugRouteId = -240298L*0L;
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
@@ -434,7 +434,7 @@ public class RouteConflator implements WaySegmentsObserver {
             route.syncStopsWithRelation();
 
             if(debugEnabled) {
-                System.out.println("--------------------------------------------------------\nPRE-SPLIT PATHS:");
+                System.out.println("--------------------------------------------------------\nPRE-SPLIT Paths for " + routePathFinder.route.routeRelation.osm_id + ":");
                 for (final PathTree pathTree : routePathFinder.allPathTrees) {
                     System.out.println("PATH: " + pathTree.bestPath);
                 }
@@ -445,7 +445,7 @@ public class RouteConflator implements WaySegmentsObserver {
 
             //debug paths
             if(debugEnabled) {
-                System.out.println("--------------------------------------------------------\nFINAL PATHS:");
+                System.out.println("--------------------------------------------------------\nFinal Paths for " + routePathFinder.route.routeRelation.osm_id + ":");
                 for (final PathTree pathTree : routePathFinder.allPathTrees) {
                     System.out.println("PATH: " + pathTree.bestPath);
                 }
