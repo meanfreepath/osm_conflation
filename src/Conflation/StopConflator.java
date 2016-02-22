@@ -199,6 +199,7 @@ public class StopConflator {
 
         //add the downloaded OSM stops to the working entity space
         final OSMEntitySpace existingStopsSpace = converter.getEntitySpace();
+        existingStopsSpace.markAllEntitiesWithAction(OSMEntity.ChangeAction.none);
 
         if(debugEnabled) {
             try {
@@ -235,40 +236,36 @@ public class StopConflator {
 
                 //if the GTFS id or ref match, merge the existing stop with the import stop's data
                 final Point existingStopLocation = new Point(existingStopPlatform.getCentroid().latitude, existingStopPlatform.getCentroid().longitude);
-                OSMEntity mergedStopEntity = null;
+                boolean idMatchFound = false;
                 if(importGtfsId.equals(existingGtfsId)) {
-                    mergedStopEntity = workingEntitySpace.mergeEntities(existingStopPlatform.osm_id, stop.platform.osm_id);
-                    stop.platform = mergedStopEntity;
+                    idMatchFound = true;
                     //System.out.println("GTFS id match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(gtfsIdTag) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
                 } else if(existingStopPlatform.hasTag(OSMEntity.KEY_REF)) { //try matching by ref if no importer id
                     final String existingRefTag = existingStopPlatform.getTag(OSMEntity.KEY_REF);
                     assert existingRefTag != null;
                     if(existingRefTag.trim().equals(importRefTag)) { //string match
-                        mergedStopEntity = workingEntitySpace.mergeEntities(existingStopPlatform.osm_id, stop.platform.osm_id);
-                        stop.platform = mergedStopEntity;
+                        idMatchFound = true;
                     } else if(importRefTagNumeric != Double.MAX_VALUE) { //try doing a basic numeric match if strings don't match (special case for already-imported King County metro data)
                         try {
                             final double existingRefTagNumeric = Double.parseDouble(existingRefTag);
-                            if(existingRefTagNumeric == importRefTagNumeric) {
-                                mergedStopEntity = workingEntitySpace.mergeEntities(existingStopPlatform.osm_id, stop.platform.osm_id);
-                                stop.platform = mergedStopEntity;
-                            }
+                            idMatchFound = existingRefTagNumeric == importRefTagNumeric;
                         } catch(NumberFormatException ignored) {}
                     }
                 }
 
-                if(mergedStopEntity == null) { //if no matching stops found, check that the import data doesn't conflict with existing stops
+                if(!idMatchFound) { //if no matching stops found, check that the import data doesn't conflict with existing stops
                     final double stopDistance = Point.distance(stop.platform.getCentroid(), existingStopPlatform.getCentroid());
                     if(stopDistance < conflictDistance) {
                         //System.out.println("Within distance of " + stop.platform.osm_id + "/" + stop.platform.getTag("name") + "! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME) + ", dist " + stopDistance);
                         stop.platform.setTag("gtfs:conflict", "yes");
                     }
                 } else {
-                    //keep the existing platform's location if it's a node, since these are usually better-positioned than the GTFS data's
-                    if(mergedStopEntity instanceof OSMNode) {
-                        ((OSMNode) mergedStopEntity).setCoordinate(existingStopLocation);
-                    }
-                    mergedStopEntity.removeTag("gtfs:conflict"); //in case previously marked as a conflict
+                    //copy the tags from the GTFS stop into the existing stop (we keep the existing platform's location, since these are usually better-positioned than the GTFS data's)
+                    existingStopPlatform.copyTagsFrom(stop.platform, OSMEntity.TagMergeStrategy.copyTags);
+                    workingEntitySpace.deleteEntity(stop.platform); //delete the GTFS entity from the working space - no longer needed
+                    stop.platform = existingStopPlatform; //and point the StopArea's platform to the existing platform entity
+
+                    stop.platform.removeTag("gtfs:conflict"); //in case previously marked as a conflict
                     break; //bail since we've matched this stop
                 }
             }
