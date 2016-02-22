@@ -164,11 +164,14 @@ public abstract class OSMEntity {
             tags = new HashMap<>();
         }
         if(value != null) {
-            tags.put(name, value.trim());
+            final String oldValue = tags.get(name), newValue = value.trim();
+            if(oldValue == null || !oldValue.equals(newValue)) { //update the tag if it's different
+                tags.put(name, newValue);
+                markAsModified();
+            }
         } else {
             removeTag(name);
         }
-        markAsModified();
     }
     public boolean removeTag(final String name) {
         if(!complete) { //can't set a tag on an incomplete entity
@@ -203,15 +206,25 @@ public abstract class OSMEntity {
             case keepTags:
                 break;
             case replaceTags:
-                tags = new HashMap<>(otherEntity.tags);
+                if(tags.size() > 0) {
+                    tags.clear();
+                    if(otherEntity.tags.size() == 0) { //handle case where other entity has no tags
+                        markAsModified();
+                    }
+                }
+                for(Map.Entry<String, String> tag : otherEntity.tags.entrySet()) {
+                    setTag(tag.getKey(), tag.getValue());
+                }
                 break;
             case copyTags:
-                tags.putAll(otherEntity.tags);
+                for(Map.Entry<String, String> tag : otherEntity.tags.entrySet()) {
+                    setTag(tag.getKey(), tag.getValue());
+                }
                 break;
             case copyNonexistentTags:
                 for(Map.Entry<String, String> tag : otherEntity.tags.entrySet()) {
                     if(!tags.containsKey(tag.getKey())) {
-                        tags.put(tag.getKey(), tag.getValue());
+                        setTag(tag.getKey(), tag.getValue());
                     }
                 }
                 break;
@@ -220,11 +233,12 @@ public abstract class OSMEntity {
                 for(Map.Entry<String, String> tag : otherEntity.tags.entrySet()) {
                     if(tags.containsKey(tag.getKey()) && !tags.get(tag.getKey()).equals(tag.getValue())) {
                         conflictingTags.put(tag.getKey(), tag.getValue());
+                    } else {
+                        setTag(tag.getKey(), tag.getValue());
                     }
                 }
                 break;
         }
-        markAsModified();
 
         return conflictingTags != null && conflictingTags.size() > 0 ? conflictingTags : null;
     }

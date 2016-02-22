@@ -80,7 +80,7 @@ public class OSMNode extends OSMEntity {
         boundingBox = null; //invalidate the bounding box
     }
     public void setCoordinate(final Point coordinate) {
-        if(this.coordinate != null) { //mark as modified if changing (vs initial assignment)
+        if(this.coordinate != null && Point.distance(this.coordinate, coordinate) > Double.MIN_VALUE) { //mark as modified if changing (vs initial assignment)
             markAsModified();
         }
         lat = coordinate.latitude;

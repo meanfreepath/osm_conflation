@@ -355,15 +355,22 @@ public class OSMEntitySpace {
      * @return
      */
     public OSMEntity addEntity(final OSMEntity entity, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
+        final OSMEntity.ChangeAction originalEntityChangeAction = entity.action;
+        final OSMEntity addedEntity;
         if(entity instanceof OSMNode) {
-            return importNode((OSMNode) entity, mergeStrategy, conflictingEntities);
+            addedEntity = importNode((OSMNode) entity, mergeStrategy, conflictingEntities);
         } else if(entity instanceof OSMWay) {
-            return importWay((OSMWay) entity, mergeStrategy, conflictingEntities);
+            addedEntity = importWay((OSMWay) entity, mergeStrategy, conflictingEntities);
         } else if(entity instanceof OSMRelation) {
-            return importRelation((OSMRelation) entity, mergeStrategy, conflictingEntities);
+            addedEntity = importRelation((OSMRelation) entity, mergeStrategy, conflictingEntities);
+        } else { //shouldn't reach here!
+            addedEntity = null;
         }
-        //shouldn't reach here!
-        return null;
+        assert addedEntity != null;
+
+        //the entity may have been marked as modified when updating tags on the new local copy: restore here
+        addedEntity.action = originalEntityChangeAction;
+        return addedEntity;
     }
     private OSMWay importExternalWayNodes(final OSMWay externalWay, final OSMWay localWay) {
         //make sure all the nodes on the incoming completed way are in this way's entitySpace
@@ -406,16 +413,12 @@ public class OSMEntitySpace {
      * @param entityToDelete
      * @return TRUE if deleted, FALSE if not
      */
-    private boolean deleteEntity(final OSMEntity entityToDelete) {
+    public boolean deleteEntity(final OSMEntity entityToDelete) {
         //get a handle on the local copy of the entity
         OSMEntity localEntityToDelete = allEntities.get(entityToDelete.osm_id);
 
         //if the local entity to delete doesn't exist in this space, we need to add it before beginning the deletion process
         if(localEntityToDelete == null) {
-            //don't bother marking for deletion if not on the OSM server
-            if(entityToDelete.version <= 0) {
-                return false;
-            }
             localEntityToDelete = addEntity(entityToDelete, OSMEntity.TagMergeStrategy.keepTags, null);
         }
 
@@ -458,9 +461,11 @@ public class OSMEntitySpace {
         }
         allEntities.remove(localEntityToDelete.osm_id);
 
-        //and mark the entity as deleted
-        localEntityToDelete.markAsDeleted();
-        deletedEntities.put(localEntityToDelete.osm_id, localEntityToDelete);
+        //and mark the entity as deleted if it's on the OSM server
+        if(entityToDelete.version > 0) {
+            localEntityToDelete.markAsDeleted();
+            deletedEntities.put(localEntityToDelete.osm_id, localEntityToDelete);
+        }
         return true;
     }
     /**
@@ -540,7 +545,6 @@ public class OSMEntitySpace {
         if(entityReplaced) {
             addEntity(targetEntity, OSMEntity.TagMergeStrategy.keepTags, null);
         }
-        targetEntity.markAsModified();
         return targetEntity;
     }
     /**
