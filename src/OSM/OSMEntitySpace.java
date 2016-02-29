@@ -838,29 +838,8 @@ public class OSMEntitySpace {
             return;
         }
 
-        //we need to sort the relations first, to ensure that relations
-        final Comparator<OSMRelation> relationComparator = new Comparator<OSMRelation>() {
-            @Override
-            public int compare(final OSMRelation o1, final OSMRelation o2) {
-                //incomplete relations go first
-                if(!o1.isComplete() && !o2.isComplete()) {
-                    return 0;
-                } else if(!o1.isComplete()) {
-                    return -1;
-                } else if(!o2.isComplete()) {
-                    return 1;
-                }
-
-                if(o1.containsMember(o2)) { //if the first relation contains the second, it needs to be behind the second relation
-                    return 1;
-                } else if(o2.containsMember(o1)) {
-                    return -1;
-                }
-                return 0;
-            }
-        };
-        final ArrayList<OSMRelation> sortedRelations = new ArrayList<>(allRelations.values());
-        Collections.sort(sortedRelations, relationComparator);
+        //create a sorted list of the relations first, to ensure that relations referring to other relations are placed after them
+        final ArrayList<OSMRelation> sortedRelations = Graph.sortRelationsTopologically(allRelations);
 
         //generate the bounding box for the file
         final Region fileBoundingBox = getBoundingBox();
