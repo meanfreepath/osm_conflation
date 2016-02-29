@@ -376,8 +376,18 @@ public class RouteConflator implements WaySegmentsObserver {
             for (final LineSegment routeLineSegment : route.routeLine.segments) {
                 final Region routeSegmentBoundingBox = routeLineSegment.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
                 for (final WaySegments candidateLine : candidateLines.values()) {
+
+                    //check the tags of the way, to ensure only valid ways are considered for routes
+                    boolean isValidWay = false;
+                    for(final Map.Entry<String, List<String>> requiredTag : allowedRouteTags.entrySet()) {
+                        if(requiredTag.getValue().contains(candidateLine.way.getTag(requiredTag.getKey()))) {
+                            isValidWay = true;
+                            break;
+                        }
+                    }
+
                     //don't match against any lines that have been marked as "ignore", such as other gtfs shape lines
-                    if (candidateLine.way.hasTag("gtfs:ignore")) {
+                    if (!isValidWay || candidateLine.way.hasTag("gtfs:ignore")) {
                         continue;
                     }
 
