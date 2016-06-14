@@ -6,7 +6,7 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 
@@ -167,18 +167,23 @@ public class StopConflator {
      * @param conflictDistance: the distance (in meters) to check for existing stops
      * @throws InvalidArgumentException
      */
-    public void conflateStops(final double conflictDistance) throws InvalidArgumentException {
-        if(routeConflator.getAllRouteStops().size() == 0) {
+    public void conflateStops(final double conflictDistance, final Collection<StopArea> allStops, final String routeType, final OSMEntitySpace workingEntitySpace) throws InvalidArgumentException {
+        if(allStops.size() == 0) {
             return;
         }
+        Region stopDownloadRegion = allStops.iterator().next().platform.getBoundingBox().clone();
+        for(final StopArea stop : allStops) {
+            stopDownloadRegion.includePoint(stop.platform.getCentroid());
+        }
+
 
         //fetch all possible useful ways that intersect the route's combined bounding box
-        final double latitudeDelta = -0.5 * conflictDistance / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * routeConflator.roughCentroid.latitude / 180.0);
-        final Region stopDownloadRegion = routeConflator.importRouteMaster.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
+        final double latitudeDelta = -0.5 * conflictDistance / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * stopDownloadRegion.getCentroid().latitude / 180.0);
+        stopDownloadRegion = stopDownloadRegion.regionInset(latitudeDelta, longitudeDelta);
         final OverpassConverter converter = new OverpassConverter();
         try {
             final String query;
-            switch (routeConflator.routeType) {
+            switch (routeType) {
                 case OSMEntity.TAG_BUS: //bus stops are always nodes
                     query = converter.queryForBoundingBox("[\"highway\"=\"bus_stop\"]", stopDownloadRegion, 0.0, OSMEntity.OSMType.node);
                     break;
@@ -210,7 +215,6 @@ public class StopConflator {
         }
 
         //and another list of stops in the existing OSM data
-        final OSMEntitySpace workingEntitySpace = routeConflator.getWorkingEntitySpace();
         final ArrayList<OSMEntity> importedExistingStops = new ArrayList<>(existingStopsSpace.allEntities.size());
         for(final OSMEntity existingStop : existingStopsSpace.allEntities.values()) {
             importedExistingStops.add(workingEntitySpace.addEntity(existingStop, OSMEntity.TagMergeStrategy.keepTags, null));
@@ -218,7 +222,7 @@ public class StopConflator {
 
         //and compare them to the existing OSM data
         final String gtfsIdTag = "gtfs:stop_id";
-        for(final StopArea stop : routeConflator.getAllRouteStops()) {
+        for(final StopArea stop : allStops) {
             final String importGtfsId = stop.platform.getTag("gtfs:stop_id");
             final String importRefTag = stop.platform.getTag(OSMEntity.KEY_REF);
             double importRefTagNumeric;

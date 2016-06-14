@@ -1,5 +1,7 @@
 package com.company;
 
+import Conflation.StopArea;
+import Conflation.StopConflator;
 import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMNode;
@@ -41,6 +43,21 @@ public class OSMTaskManagerExporter {
 
     public OSMTaskManagerExporter(final OSMEntitySpace space) {
         entitySpace = space;
+    }
+
+    public void conflateStops() {
+        final StopConflator conflator = new StopConflator(null);
+        List<StopArea> allStops = new ArrayList<>(entitySpace.allNodes.size());
+        for(final OSMNode node : entitySpace.allNodes.values()) {
+            if("bus_stop".equals(node.getTag("highway"))) {
+                allStops.add(new StopArea(node, null));
+            }
+        }
+        try {
+            conflator.conflateStops(20.0, allStops, OSMEntity.KEY_BUS, entitySpace);
+        } catch (InvalidArgumentException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -150,6 +167,15 @@ public class OSMTaskManagerExporter {
         jsonWriter.endObject();
 
         fileWriter.close();
+
+
+        final OSMEntitySpace debugEntitySpace = new OSMEntitySpace(filteredNodes.size());
+        for(final OSMNode node : filteredNodes) {
+            if(node.hasTag("gtfs:conflict")) {
+                debugEntitySpace.addEntity(node, OSMEntity.TagMergeStrategy.keepTags, null);
+            }
+        }
+        debugEntitySpace.outputXml(destinationDir + "all_stops.osm");
     }
     private void createSubBoxesInRegion(final Region region, final double boxWidth, final double boxHeight, final List<OSMNode> filteredNodes, final List<DividedBox> boxList) {
         for(double lon=region.origin.longitude;lon<region.extent.longitude;lon += boxWidth) {

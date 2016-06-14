@@ -43,15 +43,18 @@ public class Main {
 
         final ArrayList<String> selectedRoutes = new ArrayList<>();
         //selectedRoutes.add("100224");
+        //selectedRoutes.add("100173"); //Route 3: multiple issues (looping, etc)
+        selectedRoutes.add("100221");
         //selectedRoutes.add("100062"); //errors splitting
-        //selectedRoutes.add("102581");
-        selectedRoutes.add("102615"); // E-Line
+        //selectedRoutes.add("102581"); //D-Line: not preferring matching trunk_link near NB stop "15th Ave NW & NW Leary Way"
+        //selectedRoutes.add("102615"); // E-Line
         //selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
 
         try {
             importSpace.loadFromXML(importFileName);
 
-            /*OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace);
+            /*final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace);
+            exporter.conflateStops();
             exporter.outputForOSMTaskingManager("boxes", "https://www.meanfreepath.com/kcstops/");
             if(Math.random() < 2) {
                 return;
@@ -73,6 +76,7 @@ public class Main {
                 }
 
                 //output an OSM XML file with only the current route data
+                System.out.println("ROUTE HAS " + importRouteMaster.getMembers().size() + " MEMBERS");
                 if(debugEnabled) {
                     OSMEntitySpace originalRouteSpace = new OSMEntitySpace(2048);
                     originalRouteSpace.addEntity(importRouteMaster, OSMEntity.TagMergeStrategy.keepTags, null);
@@ -94,7 +98,7 @@ public class Main {
 
                 //fetch all existing stops from OSM in the route's bounding box
                 final StopConflator stopConflator = new StopConflator(routeConflator);
-                stopConflator.conflateStops(20.0);
+                stopConflator.conflateStops(20.0, routeConflator.getAllRouteStops(), routeConflator.routeType, routeConflator.getWorkingEntitySpace());
 
                 //and match the subroutes' routePath to the downloaded OSM ways.  Also matches the stops in the route to their nearest matching way
                 routeConflator.conflateRoutePaths(stopConflator);
