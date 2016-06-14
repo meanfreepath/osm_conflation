@@ -158,6 +158,9 @@ public class Region implements Cloneable {
     public Region regionInset(final double bufferLat, final double bufferLon) {
         return new Region(origin.latitude + 0.5 * bufferLat, origin.longitude + 0.5 * bufferLon, extent.latitude - origin.latitude - bufferLat, extent.longitude - origin.longitude - bufferLon);
     }
+    public Point getCentroid() {
+        return new Point(0.5 * (origin.latitude + extent.latitude), 0.5 * (origin.longitude + extent.longitude));
+    }
 
     public static Point computeCentroid(final Point[] vertices) {
         if(vertices.length < 2) {
