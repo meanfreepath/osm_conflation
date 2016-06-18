@@ -435,9 +435,12 @@ public class RouteConflator implements WaySegmentsObserver {
             final RoutePathFinder routePathFinder = new RoutePathFinder(route, candidateLines, allowedRouteTags);
             routePathFinderFinders.add(routePathFinder);
             routePathFinder.findPaths(workingEntitySpace);
+
+            //if the route wasn't fully matched, mark it
             if(routePathFinder.getFailedPaths() > 0) {
                 workingEntitySpace.addEntity(route.routePath, OSMEntity.TagMergeStrategy.keepTags, null);
                 route.routeRelation.addMember(route.routePath, "");
+                route.routeRelation.setTag(OSMEntity.KEY_NAME, "**" + route.routeRelation.getTag(OSMEntity.KEY_NAME));
             }
 
             //and add the stops data to the OSMRelation for the route

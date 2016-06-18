@@ -53,8 +53,8 @@ public class Main {
         try {
             importSpace.loadFromXML(importFileName);
 
-            /*final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace);
-            exporter.conflateStops();
+            /*(final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace);
+            exporter.conflateStops(20.0);
             exporter.outputForOSMTaskingManager("boxes", "https://www.meanfreepath.com/kcstops/");
             if(Math.random() < 2) {
                 return;

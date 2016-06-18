@@ -45,7 +45,7 @@ public class OSMTaskManagerExporter {
         entitySpace = space;
     }
 
-    public void conflateStops() {
+    public void conflateStops(final double tolerance) {
         final StopConflator conflator = new StopConflator(null);
         List<StopArea> allStops = new ArrayList<>(entitySpace.allNodes.size());
         for(final OSMNode node : entitySpace.allNodes.values()) {
@@ -54,7 +54,7 @@ public class OSMTaskManagerExporter {
             }
         }
         try {
-            conflator.conflateStops(20.0, allStops, OSMEntity.KEY_BUS, entitySpace);
+            conflator.conflateStops(tolerance, allStops, OSMEntity.KEY_BUS, entitySpace);
         } catch (InvalidArgumentException e) {
             e.printStackTrace();
         }
@@ -177,9 +177,10 @@ public class OSMTaskManagerExporter {
         }
         debugEntitySpace.outputXml(destinationDir + "all_stops.osm");
     }
-    private void createSubBoxesInRegion(final Region region, final double boxWidth, final double boxHeight, final List<OSMNode> filteredNodes, final List<DividedBox> boxList) {
-        for(double lon=region.origin.longitude;lon<region.extent.longitude;lon += boxWidth) {
-            for(double lat=region.origin.latitude;lat<region.extent.latitude;lat += boxHeight) {
+    private static void createSubBoxesInRegion(final Region region, final double boxWidth, final double boxHeight, final List<OSMNode> filteredNodes, final List<DividedBox> boxList) {
+        final double boxWidthTolerance = boxWidth * 0.01, boxHeightTolerance = boxHeight * 0.01;
+        for(double lon=region.origin.longitude;region.extent.longitude - lon > boxWidthTolerance;lon += boxWidth) {
+            for(double lat=region.origin.latitude;region.extent.latitude - lat > boxHeightTolerance;lat += boxHeight) {
                 final Region boxRegion = new Region(lat, lon, boxHeight, boxWidth);
 
                 //create a sub-box if the boxRegion contains at least one of the desired node types
