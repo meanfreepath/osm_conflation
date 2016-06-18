@@ -29,7 +29,7 @@ public class OSMTaskManagerExporter {
 
         public final int id;
         public final Region region;
-        public final List<OSMNode> containedNodes = new ArrayList<>(128);
+        public final List<OSMEntity> containedEntities = new ArrayList<>(128);
         public final String osmFileName;
 
         public DividedBox(final Region boxRegion) {
@@ -47,10 +47,10 @@ public class OSMTaskManagerExporter {
 
     public void conflateStops(final double tolerance) {
         final StopConflator conflator = new StopConflator(null);
-        List<StopArea> allStops = new ArrayList<>(entitySpace.allNodes.size());
-        for(final OSMNode node : entitySpace.allNodes.values()) {
-            if("bus_stop".equals(node.getTag("highway"))) {
-                allStops.add(new StopArea(node, null));
+        List<StopArea> allStops = new ArrayList<>(entitySpace.allEntities.size());
+        for(final OSMEntity entity : entitySpace.allNodes.values()) {
+            if("bus_stop".equals(entity.getTag("highway")) || "platform".equals(entity.getTag("public_transport"))) {
+                allStops.add(new StopArea(entity, null));
             }
         }
         try {
@@ -80,27 +80,28 @@ public class OSMTaskManagerExporter {
         final List<DividedBox> subBoxes = new ArrayList<>(horizontalBoxCount * verticalBoxCount);
 
         //filter out the non-stop nodes from the list
-        final List<OSMNode> filteredNodes = new ArrayList<>(8192);
-        for(final OSMNode node : entitySpace.allNodes.values()) {
-            if(node.hasTag("public_transport")) {
-                filteredNodes.add(node);
+        final List<OSMEntity> filteredEntities = new ArrayList<>(8192);
+        for(final OSMEntity entity: entitySpace.allEntities.values()) {
+            final String ptTag = entity.getTag("public_transport");
+            if("platform".equals(ptTag)) {
+                filteredEntities.add(entity);
             }
         }
 
         //divide the bounding box into multiple smaller boxes
         final double boxWidth = DividedBox.BOX_SIZE / Math.cos(0.5 * (boundingBox.origin.latitude + boundingBox.extent.latitude) * Math.PI / 180.0);
-        createSubBoxesInRegion(boundingBox, boxWidth, DividedBox.BOX_SIZE, filteredNodes, subBoxes);
+        createSubBoxesInRegion(boundingBox, boxWidth, DividedBox.BOX_SIZE, filteredEntities, subBoxes);
 
         //now subdivide boxes with a large number of stops into smaller boxes
         final List<DividedBox> boxesToRemove = new ArrayList<>(128);
         final List<DividedBox> boxesToAdd = new ArrayList<>(128);
         for(final DividedBox box : subBoxes) {
-            final int stopsInBox = box.containedNodes.size();
+            final int stopsInBox = box.containedEntities.size();
             if(stopsInBox > 250) { //break into 9 boxes
-                createSubBoxesInRegion(box.region, boxWidth / 3.0, DividedBox.BOX_SIZE / 3.0, filteredNodes, boxesToAdd);
+                createSubBoxesInRegion(box.region, boxWidth / 3.0, DividedBox.BOX_SIZE / 3.0, filteredEntities, boxesToAdd);
                 boxesToRemove.add(box);
             } else if(stopsInBox > 100) { //break into 4 boxes
-                createSubBoxesInRegion(box.region, boxWidth / 2.0, DividedBox.BOX_SIZE / 2.0, filteredNodes, boxesToAdd);
+                createSubBoxesInRegion(box.region, boxWidth / 2.0, DividedBox.BOX_SIZE / 2.0, filteredEntities, boxesToAdd);
                 boxesToRemove.add(box);
             }
         }
@@ -110,13 +111,13 @@ public class OSMTaskManagerExporter {
 
         //now create an OSM file for each box
         for(final DividedBox box : subBoxes) {
-            final OSMEntitySpace boxSpace = new OSMEntitySpace(box.containedNodes.size());
-            for(final OSMNode node : box.containedNodes) {
-                boxSpace.addEntity(node, OSMEntity.TagMergeStrategy.keepTags, null);
+            final OSMEntitySpace boxSpace = new OSMEntitySpace(box.containedEntities.size());
+            for(final OSMEntity entity : box.containedEntities) {
+                boxSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null);
             }
 
             try {
-                boxSpace.outputXml(destinationDir + box.osmFileName);
+                boxSpace.outputXml(destinationDir + box.osmFileName, box.region);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -169,15 +170,15 @@ public class OSMTaskManagerExporter {
         fileWriter.close();
 
 
-        final OSMEntitySpace debugEntitySpace = new OSMEntitySpace(filteredNodes.size());
-        for(final OSMNode node : filteredNodes) {
-            if(node.hasTag("gtfs:conflict")) {
-                debugEntitySpace.addEntity(node, OSMEntity.TagMergeStrategy.keepTags, null);
+        final OSMEntitySpace debugEntitySpace = new OSMEntitySpace(filteredEntities.size());
+        for(final OSMEntity entity : filteredEntities) {
+            if(entity.hasTag("gtfs:conflict")) {
+                debugEntitySpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null);
             }
         }
         debugEntitySpace.outputXml(destinationDir + "all_stops.osm");
     }
-    private static void createSubBoxesInRegion(final Region region, final double boxWidth, final double boxHeight, final List<OSMNode> filteredNodes, final List<DividedBox> boxList) {
+    private static void createSubBoxesInRegion(final Region region, final double boxWidth, final double boxHeight, final List<OSMEntity> filteredEntities, final List<DividedBox> boxList) {
         final double boxWidthTolerance = boxWidth * 0.01, boxHeightTolerance = boxHeight * 0.01;
         for(double lon=region.origin.longitude;region.extent.longitude - lon > boxWidthTolerance;lon += boxWidth) {
             for(double lat=region.origin.latitude;region.extent.latitude - lat > boxHeightTolerance;lat += boxHeight) {
@@ -185,12 +186,12 @@ public class OSMTaskManagerExporter {
 
                 //create a sub-box if the boxRegion contains at least one of the desired node types
                 final DividedBox box = new DividedBox(boxRegion);
-                for(final OSMNode node : filteredNodes) {
-                    if(boxRegion.containsPoint(node.getCentroid())) {
-                        box.containedNodes.add(node);
+                for(final OSMEntity entity : filteredEntities) {
+                    if(boxRegion.containsPoint(entity.getCentroid())) {
+                        box.containedEntities.add(entity);
                     }
                 }
-                if(box.containedNodes.size() > 0) {
+                if(box.containedEntities.size() > 0) {
                     boxList.add(box);
                 }
             }

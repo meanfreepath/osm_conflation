@@ -185,7 +185,13 @@ public class StopConflator {
             final String query;
             switch (routeType) {
                 case OSMEntity.TAG_BUS: //bus stops are always nodes
-                    query = converter.queryForBoundingBox("[\"highway\"=\"bus_stop\"]", stopDownloadRegion, 0.0, OSMEntity.OSMType.node);
+                    final String[] queryComponents = {
+                            String.format("node[\"highway\"=\"bus_stop\"](%.04f,%.04f,%.04f,%.04f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
+                            String.format("node[\"public_transport\"=\"platform\"](%.04f,%.04f,%.04f,%.04f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
+                            String.format("way[\"highway\"=\"bus_stop\"](%.04f,%.04f,%.04f,%.04f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
+                            String.format("way[\"public_transport\"=\"platform\"](%.04f,%.04f,%.04f,%.04f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude)
+                    };
+                    query = "(" + String.join(";", queryComponents) + ");(._;>;);";
                     break;
                 case OSMEntity.TAG_LIGHT_RAIL:
                 case OSMEntity.TAG_TRAIN:
@@ -243,7 +249,7 @@ public class StopConflator {
                 boolean idMatchFound = false;
                 if(importGtfsId.equals(existingGtfsId)) {
                     idMatchFound = true;
-                    //System.out.println("GTFS id match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(gtfsIdTag) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
+                   // System.out.println("GTFS id match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(gtfsIdTag) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
                 } else if(existingStopPlatform.hasTag(OSMEntity.KEY_REF)) { //try matching by ref if no importer id
                     final String existingRefTag = existingStopPlatform.getTag(OSMEntity.KEY_REF);
                     assert existingRefTag != null;
