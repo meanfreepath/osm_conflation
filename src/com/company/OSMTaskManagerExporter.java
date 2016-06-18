@@ -79,11 +79,10 @@ public class OSMTaskManagerExporter {
         final int verticalBoxCount = (int) Math.ceil((boundingBox.origin.latitude - boundingBox.origin.latitude) / DividedBox.BOX_SIZE);
         final List<DividedBox> subBoxes = new ArrayList<>(horizontalBoxCount * verticalBoxCount);
 
-        //filter out the non-stop nodes from the list
+        //include all GTFS stops, and any existing stops that conflict with them
         final List<OSMEntity> filteredEntities = new ArrayList<>(8192);
         for(final OSMEntity entity: entitySpace.allEntities.values()) {
-            final String ptTag = entity.getTag("public_transport");
-            if("platform".equals(ptTag)) {
+            if(entity.hasTag("gtfs:conflict") || entity.hasTag("gtfs:stop_id")) {
                 filteredEntities.add(entity);
             }
         }
@@ -117,6 +116,7 @@ public class OSMTaskManagerExporter {
             }
 
             try {
+                boxSpace.setCanUpload(true);
                 boxSpace.outputXml(destinationDir + box.osmFileName, box.region);
             } catch (IOException e) {
                 e.printStackTrace();
@@ -187,7 +187,7 @@ public class OSMTaskManagerExporter {
                 //create a sub-box if the boxRegion contains at least one of the desired node types
                 final DividedBox box = new DividedBox(boxRegion);
                 for(final OSMEntity entity : filteredEntities) {
-                    if(boxRegion.containsPoint(entity.getCentroid())) {
+                    if(Region.intersects(boxRegion, entity.getBoundingBox())) {
                         box.containedEntities.add(entity);
                     }
                 }
