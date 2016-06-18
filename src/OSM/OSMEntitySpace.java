@@ -823,12 +823,15 @@ public class OSMEntitySpace {
         }
         return fileBoundingBox;
     }
+    public void outputXml(final String fileName) throws IOException {
+        outputXml(fileName, null);
+    }
     /**
      * Outputs the current entity space to an OSM XML file
      * @param fileName
      * @throws IOException
      */
-    public void outputXml(String fileName) throws IOException {
+    public void outputXml(final String fileName, Region fileBoundingBox) throws IOException {
         //produce an empty XMl file if no entities
         if(allEntities.size() == 0) {
             final FileWriter writer = new FileWriter(fileName);
@@ -841,8 +844,10 @@ public class OSMEntitySpace {
         //create a sorted list of the relations first, to ensure that relations referring to other relations are placed after them
         final ArrayList<OSMRelation> sortedRelations = Graph.sortRelationsTopologically(allRelations);
 
-        //generate the bounding box for the file
-        final Region fileBoundingBox = getBoundingBox();
+        //generate the bounding box for the file, if not provided
+        if(fileBoundingBox == null) {
+            fileBoundingBox = getBoundingBox();
+        }
 
         final FileWriter writer = new FileWriter(fileName);
         writer.write(String.format(XML_DOCUMENT_OPEN, Boolean.toString(canUpload)));
