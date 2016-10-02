@@ -75,7 +75,7 @@ public abstract class OSMEntity {
         }
         complete = entityToCopy.complete;
         action = entityToCopy.action;
-        boundingBox = entityToCopy.boundingBox;
+        boundingBox = entityToCopy.boundingBox != null ? new Region(entityToCopy.boundingBox) : null;
         if(entityToCopy.tags != null) {
             tags = new HashMap<>(entityToCopy.tags);
         }
@@ -88,7 +88,7 @@ public abstract class OSMEntity {
         }
         complete = completeEntity.complete;
         action = completeEntity.action;
-        boundingBox = completeEntity.boundingBox;
+        boundingBox = completeEntity.boundingBox != null ? new Region(completeEntity.boundingBox) : null;
         if(completeEntity.tags != null) {
             tags = new HashMap<>(completeEntity.tags);
         }

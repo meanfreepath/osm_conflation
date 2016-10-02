@@ -187,6 +187,22 @@ public class OSMWay extends OSMEntity {
         return nodes.size() == completedNodeCount;
     }
 
+    /**
+     * Returns a rough total length of the way, in meters.
+     * @return
+     */
+    public double length() {
+        OSMNode lastNode = null;
+        double length = 0.0;
+        for(final OSMNode curNode : nodes) {
+            if(lastNode != null) {
+                length += Point.distance(lastNode.getCentroid(), curNode.getCentroid());
+            }
+            lastNode = curNode;
+        }
+        return length;
+    }
+
     @Override
     public OSMType getType() {
         return type;
@@ -208,7 +224,7 @@ public class OSMWay extends OSMEntity {
                 if(boundingBox != null) {
                     boundingBox.combinedBoxWithRegion(node.getBoundingBox());
                 } else {
-                    boundingBox = node.getBoundingBox();
+                    boundingBox = new Region(node.getBoundingBox());
                 }
             }
         }

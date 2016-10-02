@@ -97,6 +97,14 @@ public class Region implements Cloneable {
             includePoint(includedPoints[p]);
         }
     }
+    /**
+     * Copy constructor
+     * @param regionToCopy the region to copy
+     */
+    public Region(final Region regionToCopy) {
+        origin = new Point(regionToCopy.origin.latitude, regionToCopy.origin.longitude);
+        extent = new Point(regionToCopy.extent.latitude, regionToCopy.extent.longitude);
+    }
 
     /**
      * Expand this region to include the given point
@@ -210,6 +218,6 @@ public class Region implements Cloneable {
     }
     @Override
     public String toString() {
-        return String.format("Region({%.03f,%.03f}{%.03f,%.03f})", origin.latitude, origin.longitude, extent.latitude, extent.longitude);
+        return String.format("Region({%.06f,%.06f}{%.06f,%.06f})", origin.latitude, origin.longitude, extent.latitude, extent.longitude);
     }
 }
