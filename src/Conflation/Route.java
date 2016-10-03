@@ -98,6 +98,7 @@ public class Route {
             segmentWay.setTag(OSMEntity.KEY_DESCRIPTION, String.format("[%.04f, %.04f], nd[%d/%d]: %d matches", mainSegment.midPoint.latitude, mainSegment.midPoint.longitude, mainSegment.originNode != null ? mainSegment.originNode.osm_id : 0, mainSegment.destinationNode != null ? mainSegment.destinationNode.osm_id : 0, mainSegment.bestMatchForLine.size()));
             OSMEntity.copyTag(routeLine.way, segmentWay, "highway");
             OSMEntity.copyTag(routeLine.way, segmentWay, "railway");
+            segmentWay.setTag("oneway", OSMEntity.TAG_YES);
             //OSMEntity.copyTag(mai, segmentWay, OSMEntity.KEY_NAME);
             originNode = lastNode;
         }
@@ -111,6 +112,9 @@ public class Route {
         for(final LineSegment lineSegment : routeLine.segments) {
             final RouteLineSegment routeLineSegment = (RouteLineSegment) lineSegment;
             for(final SegmentMatch osmLineMatch : routeLineSegment.bestMatchForLine.values()) {
+                if(osmLineMatch.type != SegmentMatch.matchMaskAll) {
+                    continue;
+                }
 
                 //look up the origin node in the segment space, and use it if already present
                 pointMatchKeyOrigin = String.format(nodeMatchFormat, osmLineMatch.matchingSegment.originPoint.latitude, osmLineMatch.matchingSegment.originPoint.longitude);

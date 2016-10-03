@@ -1,5 +1,6 @@
 package Conflation;
 
+import OSM.OSMEntity;
 import OSM.Point;
 import OSM.Region;
 
@@ -8,7 +9,8 @@ import OSM.Region;
  */
 public class SegmentMatch {
     private final static double DOT_PRODUCT_FOR_PARALLEL_LINE = 0.999; //segments with a dot product > than this are considered "parallel" for some calculations
-    public final static short matchTypeBoundingBox = 1, matchTypeDistance = 2, matchTypeDotProduct = 4, matchMaskAll = 7;
+    public final static short matchTypeBoundingBox = 1, matchTypeDistance = 2, matchTypeDotProduct = 4, matchTypeTravelDirection = 8;
+    public final static short matchMaskAll = matchTypeBoundingBox | matchTypeDistance | matchTypeDotProduct | matchTypeTravelDirection;
 
     public final double orthogonalDistance, midPointDistance, dotProduct;
     public final RouteLineSegment mainSegment;
@@ -28,6 +30,11 @@ public class SegmentMatch {
         }
         if(orthogonalDistance <= options.maxSegmentOrthogonalDistance && midPointDistance <= options.maxSegmentMidPointDistance) {
             matchType |= matchTypeDistance;
+        }
+        //check oneway directions
+        final WaySegments.OneWayDirection oneWayDirection = matchingSegment.getParent().oneWayDirection;
+        if(oneWayDirection == WaySegments.OneWayDirection.none || oneWayDirection == WaySegments.OneWayDirection.forward && dotProduct > 0.0 || oneWayDirection == WaySegments.OneWayDirection.backward && dotProduct < 0.0) {
+            matchType |= matchTypeTravelDirection;
         }
         type = matchType;
     }
