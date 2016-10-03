@@ -1,9 +1,6 @@
 package PathFinding;
 
-import Conflation.LineSegment;
-import Conflation.SegmentMatch;
-import Conflation.WaySegments;
-import Conflation.WaySegmentsObserver;
+import Conflation.*;
 import OSM.OSMEntity;
 import OSM.OSMNode;
 import OSM.OSMWay;
@@ -24,7 +21,7 @@ public class PathSegment implements WaySegmentsObserver {
     private static HashMap<String, PathSegment> allPathSegments = new HashMap<>(1024);
 
     public final Junction originJunction, endJunction;
-    private WaySegments line;
+    private OSMWaySegments line;
     private String id;
     private TravelDirection travelDirection = null;
     protected double traveledSegmentLength, alignedSegmentLength, detourSegmentLength; //the length of segments this path aligns with
@@ -58,7 +55,7 @@ public class PathSegment implements WaySegmentsObserver {
     protected static void clearPathSegmentCache() {
         allPathSegments.clear();
     }
-    protected static PathSegment createNewPathSegment(final WaySegments line, final Junction fromJunction, final PathTree parentPathTree) {
+    protected static PathSegment createNewPathSegment(final OSMWaySegments line, final Junction fromJunction, final PathTree parentPathTree) {
         final PathSegment newPathSegment = new PathSegment(line, fromJunction, parentPathTree);
         PathSegment existingPathSegment = allPathSegments.get(newPathSegment.id);
         if(existingPathSegment == null) {
@@ -70,7 +67,7 @@ public class PathSegment implements WaySegmentsObserver {
         }
         return existingPathSegment;
     }
-    private static PathSegment createSplitPathSegment(final WaySegments line, final Junction fromJunction, final Junction toJunction, final PathSegment originalPathSegment) {
+    private static PathSegment createSplitPathSegment(final OSMWaySegments line, final Junction fromJunction, final Junction toJunction, final PathSegment originalPathSegment) {
         final String id = idForParameters(line.way, fromJunction.junctionNode, toJunction.junctionNode);
         PathSegment existingPathSegment = allPathSegments.get(id);
         if(existingPathSegment == null) {
@@ -80,7 +77,7 @@ public class PathSegment implements WaySegmentsObserver {
         }
         return existingPathSegment;
     }
-    private PathSegment(final WaySegments line, final Junction fromJunction, final Junction toJunction, final PathSegment originalPathSegment) {
+    private PathSegment(final OSMWaySegments line, final Junction fromJunction, final Junction toJunction, final PathSegment originalPathSegment) {
         this.line = line;
         this.line.addObserver(this); //track all changes to the underlying line, i.e. for splits
         originJunction = fromJunction;
@@ -93,7 +90,7 @@ public class PathSegment implements WaySegmentsObserver {
         parentPathTree = originalPathSegment.parentPathTree;
         travelDirection = originalPathSegment.travelDirection;
     }
-    private PathSegment(final WaySegments line, final Junction fromJunction, final PathTree parentPathTree) {
+    private PathSegment(final OSMWaySegments line, final Junction fromJunction, final PathTree parentPathTree) {
         this.line = line;
         this.line.addObserver(this); //track all changes to the underlying line, i.e. for splits
         originJunction = fromJunction;
@@ -113,7 +110,7 @@ public class PathSegment implements WaySegmentsObserver {
     }
     private Junction determineEndJunction() {
         //determine the direction of this line relative to the direction of route travel
-        final WaySegments.LineMatch lineMatch = line.getMatchForLine(parentPathTree.parentPathFinder.route.routeLine);
+        final LineMatch lineMatch = null;//TODO 222 line.getMatchForLine(parentPathTree.parentPathFinder.route.routeLine);
         if(lineMatch == null) {
             parentPathTree.parentPathFinder.logEvent(RoutePathFinder.RouteLogType.error, "No match for line " + line.way.getTag(OSMEntity.KEY_NAME) + "(" + line.way.osm_id + ")", this);
             return new Junction(originJunction.junctionNode, this, Junction.JunctionProcessStatus.deadEnd);
@@ -248,7 +245,7 @@ public class PathSegment implements WaySegmentsObserver {
         traveledSegmentCount++;
 
         //System.out.println("segment " + line.way.getTag("name") + ":" + (segment.destinationNode != null? segment.destinationNode.osm_id : "N/A") + "/" + (segment.originNode != null? segment.originNode.osm_id : "N/A"));
-        final SegmentMatch bestMatchForSegment = segment.bestMatchForLine.get(routeLineId);
+        final SegmentMatch bestMatchForSegment = null;//TODO 222 segment.bestMatchForLine.get(routeLineId);
         if(bestMatchForSegment != null) {
             alignedPathScore += directionMultiplier * SCORE_FOR_ALIGNMENT * Math.abs(bestMatchForSegment.dotProduct) / bestMatchForSegment.midPointDistance;
             if(line.way.osm_id == debugWayId) {
@@ -304,7 +301,7 @@ public class PathSegment implements WaySegmentsObserver {
     public void removeContainingPath(final Path path) {
         containingPaths.remove(path);
     }
-    private void setLine(final WaySegments newLine) {
+    private void setLine(final OSMWaySegments newLine) {
         //System.out.println("Reassigned " + id + "(" + line.way.getTag("name") + ") from " + line.way.osm_id + " to " + newLine.way.osm_id);
         line.removeObserver(this);
         newLine.addObserver(this);
@@ -319,9 +316,9 @@ public class PathSegment implements WaySegmentsObserver {
         id = idForParameters(line.way, originJunction.junctionNode, endJunction.junctionNode);
     }
     private class SplitInfo {
-        public final WaySegments line;
+        public final OSMWaySegments line;
         public final OSMNode fromNode, toNode;
-        public SplitInfo(final WaySegments line, final OSMNode fromNode, final OSMNode toNode) {
+        public SplitInfo(final OSMWaySegments line, final OSMNode fromNode, final OSMNode toNode) {
             this.line = line;
             this.fromNode = fromNode;
             this.toNode = toNode;
@@ -329,6 +326,7 @@ public class PathSegment implements WaySegmentsObserver {
     }
     @Override
     public void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
+        final OSMWaySegments[] splitWaySegmentsCast = (OSMWaySegments[]) splitWaySegments;
 
         if(id.equals(debugId)) {
             List<WaySegments> splitSegs = new ArrayList<>(splitWaySegments.length);
@@ -348,7 +346,7 @@ public class PathSegment implements WaySegmentsObserver {
             System.out.println("CHECK PathSegment SPLIT FOR " + this + ": " + splitWaySegments.length + " splitLines");
         }
         final List<SplitInfo> overlappingLines = new ArrayList<>(splitWaySegments.length - 1); //populated if this PathSegment is being split in the middle
-        for(final WaySegments splitLine : splitWaySegments) {
+        for(final OSMWaySegments splitLine : splitWaySegmentsCast) {
             final List<OSMNode> splitWayNodesOnPathSegment = splitLine.way.getNodes();
 
             //System.out.println("CHECK " + splitLine + ": " + splitLine.way);
@@ -419,7 +417,7 @@ public class PathSegment implements WaySegmentsObserver {
         //OSMNode splitNode = originJunction.junctionNode, lastNode = endJunction.junctionNode;
         List<OSMNode> segNodes = new ArrayList<>(containedSegments.size());
         List<List<OSMNode>> lineNodes = new ArrayList<>(splitWaySegments.length);
-        for(final WaySegments splitSeg : splitWaySegments) {
+        for(final OSMWaySegments splitSeg : splitWaySegmentsCast) {
             List<OSMNode> sNodes = new ArrayList<>(splitSeg.way.getNodes());
             lineNodes.add(sNodes);
         }

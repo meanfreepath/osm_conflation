@@ -17,7 +17,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
     public final Route route;
     public final List<PathTree> allPathTrees;
     public final List<Path> calculatedPaths;
-    public final HashMap<Long, WaySegments> candidateLines;
+    public final HashMap<Long, OSMWaySegments> candidateLines;
     private int successfulPaths = 0, failedPaths = 0;
     protected final Map<String, List<String>> requiredWayTags;
 
@@ -39,7 +39,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
     }
     public final List<RouteLog> logs = new ArrayList<>(128);
 
-    public RoutePathFinder(final Route route, final HashMap<Long, WaySegments> candidateLines, final Map<String, List<String>> requiredWayTags) {
+    public RoutePathFinder(final Route route, final HashMap<Long, OSMWaySegments> candidateLines, final Map<String, List<String>> requiredWayTags) {
         this.route = route;
         this.candidateLines = candidateLines;
         this.requiredWayTags = requiredWayTags;
@@ -193,7 +193,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
     public void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
         for(final WaySegments ws : splitWaySegments) {
             if(ws != originalWaySegments) {
-                candidateLines.put(ws.way.osm_id, ws);
+                candidateLines.put(ws.way.osm_id, (OSMWaySegments) ws);
             }
         }
     }

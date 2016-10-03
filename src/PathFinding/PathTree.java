@@ -1,13 +1,12 @@
 package PathFinding;
 
-import Conflation.LineSegment;
-import Conflation.StopArea;
-import Conflation.WaySegmentsObserver;
+import Conflation.*;
 import OSM.*;
-import Conflation.WaySegments;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Represents the possible paths between 2 nodes
@@ -141,7 +140,7 @@ public class PathTree implements WaySegmentsObserver {
 
         for(final OSMWay junctionWay : junction.junctionNode.containingWays.values()) {
             //look up the respective WaySegments object for the way
-            final WaySegments curLine = parentPath.candidateLines.get(junctionWay.osm_id);
+            final OSMWaySegments curLine = parentPath.candidateLines.get(junctionWay.osm_id);
             if(curLine == null) {
                 System.out.format("%sL%d: Unable to find way #%d in candidate Lines\n", debugPadding, debugDepth,  junctionWay.osm_id);
                 parentPath.logEvent(RoutePathFinder.RouteLogType.error, "Unable to find way #" + junctionWay.osm_id + " in candidate Lines", this);

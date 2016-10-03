@@ -5,45 +5,44 @@ import OSM.Point;
 import OSM.Region;
 
 import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.zip.CRC32;
 
 /**
  * Created by nick on 11/9/15.
  */
-public class LineSegment {
+public abstract class LineSegment {
     private final static DecimalFormat DEBUG_OUTPUT_FORMATTER = new DecimalFormat("#.####");
     public final Point originPoint, midPoint, destinationPoint;
     public final OSMNode originNode, destinationNode;
-    public WaySegments parentSegments;
+
+    public abstract WaySegments getParent();
+    public abstract void setParent(WaySegments newParent);
+    public abstract void updateMatches();
+    private final static CRC32 idGenerator = new CRC32();
 
     /**
      * The index of the originNode in the parent Way (if originNode is null, should be the index of the most recent node in the way)
      */
+    public final long id;
     public int nodeIndex;
     public int segmentIndex;
-    public final List<WaySegments> candidateWaySegments;
-    public final Map<Long, List<SegmentMatch>> matchingSegments;
-    public final Map<Long, SegmentMatch> bestMatchForLine;
     public final double vectorX, vectorY, orthogonalVectorX, orthogonalVectorY, midPointX, midPointY;
     public final double vectorMagnitude;
     public final double length;
     public final Region searchAreaForMatchingOtherSegments;
 
-    public LineSegment(final WaySegments parentSegments, final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
-        this.parentSegments = parentSegments;
+    private static long generateIdForPoints(final Point origin, final Point destination) {
+        idGenerator.update((origin.toString() + ":" + destination.toString()).getBytes());
+        return idGenerator.getValue();
+    }
+    public LineSegment(final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
         originPoint = origin;
         destinationPoint = destination;
         this.originNode = originNode;
         this.destinationNode = destinationNode;
         this.nodeIndex = nodeIndex;
         this.segmentIndex = segmentIndex;
-
-        candidateWaySegments = new ArrayList<>(16);
-        matchingSegments = new HashMap<>(8);
-        bestMatchForLine = new HashMap<>(8);
+        this.id = generateIdForPoints(originPoint, destinationPoint);
 
         vectorX = destination.longitude - origin.longitude;
         vectorY = destination.latitude - origin.latitude;
@@ -63,17 +62,13 @@ public class LineSegment {
         searchAreaForMatchingOtherSegments = getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
     }
     public LineSegment(final LineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
-        this.parentSegments = segmentToCopy.parentSegments;
         this.originPoint = segmentToCopy.originPoint;
         this.destinationPoint = destination;
         this.originNode = segmentToCopy.originNode;
         this.destinationNode = destinationNode;
         this.nodeIndex = segmentToCopy.nodeIndex;
         this.segmentIndex = segmentToCopy.segmentIndex;
-
-        candidateWaySegments = new ArrayList<>(segmentToCopy.candidateWaySegments);
-        matchingSegments = new HashMap<>(segmentToCopy.matchingSegments);
-        bestMatchForLine = new HashMap<>(segmentToCopy.bestMatchForLine);
+        this.id = generateIdForPoints(originPoint, destinationPoint);
 
         vectorX = destination.longitude - originPoint.longitude;
         vectorY = destination.latitude - originPoint.latitude;
@@ -96,44 +91,8 @@ public class LineSegment {
         return new Region(Math.min(originPoint.latitude, destinationPoint.latitude), Math.min(originPoint.longitude, destinationPoint.longitude), Math.abs(vectorY), Math.abs(vectorX));
     }
 
-    public void addMatch(final SegmentMatch match) {
-        List<SegmentMatch> matchesForLine = matchingSegments.get(match.mainSegment.parentSegments.way.osm_id);
-        if(matchesForLine == null) {
-            matchesForLine = new ArrayList<>(8);
-            matchingSegments.put(match.mainSegment.parentSegments.way.osm_id, matchesForLine);
-        }
-        matchesForLine.add(match);
-    }
-    public void chooseBestMatch(final WaySegments routeLine) {
-        //look up the matching segments we have for the given route line
-        final List<SegmentMatch> matchesForLine = matchingSegments.get(routeLine.way.osm_id);
-        if(matchesForLine == null) {
-            return;
-        }
 
-        //and loop through them, picking the one with the best score as the best match
-        SegmentMatch bestMatch = chooseBestMatchForMatchType(matchesForLine, SegmentMatch.matchMaskAll);
-        if(bestMatch == null) {
-            //bestMatch = chooseBestMatchForMatchType(matchesForLine, SegmentMatch.matchTypeBoundingBox);
-        }
-        bestMatchForLine.put(routeLine.way.osm_id, bestMatch);
-    }
-    private SegmentMatch chooseBestMatchForMatchType(final List<SegmentMatch> matches, final short matchMask) {
-        double minScore = Double.MAX_VALUE, matchScore, nextBestMinScore = Double.MAX_VALUE, nextBestMatchScore;
-        SegmentMatch bestMatch = null;
-        for(final SegmentMatch match : matches) {
-            //choose the best match based on the product of their dot product and distance score
-            if((match.type & matchMask) == matchMask) {
-                matchScore = (match.orthogonalDistance * match.orthogonalDistance + match.midPointDistance * match.midPointDistance) / Math.max(0.000001, Math.abs(match.dotProduct));
-                if (bestMatch == null || matchScore < minScore) {
-                    bestMatch = match;
-                    minScore = matchScore;
-                }
-            }
-        }
-        return bestMatch;
-    }
-    public void copyMatches(final LineSegment fromSegment) {
+    /*public void copyMatches(final LineSegment fromSegment) {
         //TODO: may be more accurate to rematch rather than copy
         matchingSegments.clear();
         bestMatchForLine.clear();
@@ -143,7 +102,7 @@ public class LineSegment {
             matchingSegments.put(matches.getKey(), matches.getValue());
         }
         bestMatchForLine.putAll(fromSegment.bestMatchForLine);
-    }
+    }*/
 
     /**
      * Finds the closest point on this segment to the given point
@@ -164,8 +123,5 @@ public class LineSegment {
             t = 1.0;
         }
         return new Point(originPoint.latitude + vectorY * t, originPoint.longitude + vectorX * t);
-    }
-    public String toString() {
-        return String.format("LineSeg %d #%d/%d [%.04f, %.04f], nd[%d/%d]", parentSegments.way.osm_id, nodeIndex, segmentIndex, midPoint.latitude, midPoint.longitude, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
 }

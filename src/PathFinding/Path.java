@@ -4,7 +4,6 @@ import Conflation.LineSegment;
 import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
@@ -340,7 +339,7 @@ public class Path {
                     final OSMWay pathSegmentWay = entitySpace.createWay(null, null);
                     pathSegmentWay.appendNode(matchOriginNode);
                     pathSegmentWay.appendNode(matchLastNode);
-                    pathSegmentWay.setTag("highway", lineSegment.parentSegments.way.getTag("highway"));
+                    pathSegmentWay.setTag("highway", lineSegment.getParent().way.getTag("highway"));
                     pathSegmentWay.setTag("segment", lineSegment.segmentIndex + "/" + lineSegment.nodeIndex);
                     matchOriginNode.removeTag("wcount");
                     matchLastNode.removeTag("wcount");
@@ -377,7 +376,7 @@ public class Path {
                     final OSMWay pathSegmentWay = entitySpace.createWay(null, null);
                     pathSegmentWay.appendNode(matchOriginNode);
                     pathSegmentWay.appendNode(matchLastNode);
-                    pathSegmentWay.setTag("highway", lineSegment.parentSegments.way.getTag("highway"));
+                    pathSegmentWay.setTag("highway", lineSegment.getParent().way.getTag("highway"));
                     pathSegmentWay.setTag("segment", lineSegment.segmentIndex + "/" + lineSegment.nodeIndex);
                     pathRelation.addMember(pathSegmentWay, "");
                     matchOriginNode.removeTag("wcount");

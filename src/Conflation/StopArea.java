@@ -33,11 +33,11 @@ public class StopArea implements WaySegmentsObserver {
     public class StopWayMatch {
         public class SegmentProximityMatch {
             public final LineSegment candidateSegment;
-            public final WaySegments routeLine;
+            public final RouteLineWaySegments routeLine;
             public final SegmentMatchType matchType;
             public final double distance;
 
-            public SegmentProximityMatch(final WaySegments toRouteLine, final LineSegment segment, final double distance, final SegmentMatchType matchType) {
+            public SegmentProximityMatch(final RouteLineWaySegments toRouteLine, final LineSegment segment, final double distance, final SegmentMatchType matchType) {
                 this.candidateSegment = segment;
                 this.distance = distance;
                 this.matchType = matchType;
@@ -62,7 +62,7 @@ public class StopArea implements WaySegmentsObserver {
         public StopWayMatch(final WaySegments candidateLine) {
             line = candidateLine;
         }
-        public void addStopSegmentMatch(final WaySegments toRouteLine, final LineSegment segment, final double distance, final SegmentMatchType matchType) {
+        public void addStopSegmentMatch(final RouteLineWaySegments toRouteLine, final LineSegment segment, final double distance, final SegmentMatchType matchType) {
             proximityMatches.add(new SegmentProximityMatch(toRouteLine, segment, distance, matchType));
         }
         public void addNameMatch(final WaySegments toOSMLine, final SegmentMatchType matchType) {
@@ -86,7 +86,7 @@ public class StopArea implements WaySegmentsObserver {
             //and the proximity matches
             double dpFactor, odFactor, oneWayFactor;
             for(final SegmentProximityMatch segmentMatch : proximityMatches) {
-                final SegmentMatch bestMatchForRouteLine = segmentMatch.candidateSegment.bestMatchForLine.get(segmentMatch.routeLine.way.osm_id);
+                final SegmentMatch bestMatchForRouteLine = null;//TODO 222 segmentMatch.candidateSegment.bestMatchForLine.get(segmentMatch.routeLine.way.osm_id);
 
                 if(bestMatchForRouteLine != null) {
                     //adjust score for matches that go with direction of oneway travel, for better matching on dual carriageways
@@ -144,15 +144,15 @@ public class StopArea implements WaySegmentsObserver {
 
         line.addObserver(this);
     }
-    public void addProximityMatch(final WaySegments toRouteLine, final LineSegment segment, final double distance, final SegmentMatchType matchType) {
-        StopWayMatch wayMatch = wayMatches.get(segment.parentSegments.way.osm_id);
+    public void addProximityMatch(final RouteLineWaySegments toRouteLine, final LineSegment segment, final double distance, final SegmentMatchType matchType) {
+        StopWayMatch wayMatch = wayMatches.get(segment.getParent().way.osm_id);
         if(wayMatch == null) { //init a match object for the line, if not yet present
-            wayMatch = new StopWayMatch(segment.parentSegments);
-            wayMatches.put(segment.parentSegments.way.osm_id, wayMatch);
+            wayMatch = new StopWayMatch(segment.getParent());
+            wayMatches.put(segment.getParent().way.osm_id, wayMatch);
         }
         wayMatch.addStopSegmentMatch(toRouteLine, segment, distance, matchType);
 
-        segment.parentSegments.addObserver(this);
+        segment.getParent().addObserver(this);
     }
     public void chooseBestWayMatch() {
         if(wayMatches.size() == 0) {
@@ -257,7 +257,7 @@ public class StopArea implements WaySegmentsObserver {
         //update the way matches to include the new segment
         for(final StopWayMatch wayMatch : wayMatches.values()) {
             for(final StopWayMatch.SegmentProximityMatch proximityMatch : wayMatch.proximityMatches) {
-                if(proximityMatch.candidateSegment.parentSegments == waySegments) {
+                if(proximityMatch.candidateSegment.getParent() == waySegments) {
                     addProximityMatch(proximityMatch.routeLine, newSegment, Point.distance(newSegment.midPoint, platform.getCentroid()), SegmentMatchType.proximityToOSMWay);
                     break;
                 }

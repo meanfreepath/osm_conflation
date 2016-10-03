@@ -140,9 +140,9 @@ public class StopConflator {
             final LineSegment bestSegment = stopArea.bestWayMatch.closestSegmentToStop;
             final Point nearestPointOnSegment = bestSegment.closestPointToPoint(stopArea.platform.getCentroid());
 
-            OSMNode nearestNodeOnWay = bestSegment.parentSegments.way.nearestNodeAtPoint(nearestPointOnSegment, StopArea.stopNodeTolerance);
+            OSMNode nearestNodeOnWay = bestSegment.getParent().way.nearestNodeAtPoint(nearestPointOnSegment, StopArea.stopNodeTolerance);
             if(nearestNodeOnWay == null) {
-                nearestNodeOnWay = bestSegment.parentSegments.insertNode(entitySpace.createNode(nearestPointOnSegment.latitude, nearestPointOnSegment.longitude, null), bestSegment);
+                nearestNodeOnWay = bestSegment.getParent().insertNode(entitySpace.createNode(nearestPointOnSegment.latitude, nearestPointOnSegment.longitude, null), bestSegment);
                 stopArea.chooseBestWayMatch();
             }
 

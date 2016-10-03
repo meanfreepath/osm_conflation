@@ -2,7 +2,6 @@ package Conflation;
 
 import OSM.*;
 import Overpass.OverpassConverter;
-import PathFinding.Path;
 import PathFinding.PathTree;
 import PathFinding.RoutePathFinder;
 import com.sun.javaws.exceptions.InvalidArgumentException;
@@ -39,7 +38,7 @@ public class RouteConflator implements WaySegmentsObserver {
     public static boolean debugEnabled = false;
     private OSMEntitySpace workingEntitySpace = null;
     public final static LineComparisonOptions wayMatchingOptions = new LineComparisonOptions();
-    private HashMap<Long, WaySegments> candidateLines = null;
+    protected HashMap<Long, OSMWaySegments> candidateLines = null;
     public final Map<String, List<String>> allowedRouteTags, allowedPlatformTags;
 
     public RouteConflator(final OSMRelation routeMaster) throws InvalidArgumentException {
@@ -235,12 +234,12 @@ public class RouteConflator implements WaySegmentsObserver {
                 exportRouteStops.add(existingStop);
             }
 
-            final Route exportRoute = new Route(importRoute, workingEntitySpace, exportRouteStops, wayMatchingOptions);
+            final Route exportRoute = new Route(importRoute, workingEntitySpace, exportRouteStops);
             exportRoutes.add(exportRoute);
             exportRouteMaster.addMember(exportRoute.routeRelation, OSMEntity.MEMBERSHIP_DEFAULT);
         }
 
-        //create WaySegments objects for all downloaded ways
+        //create OSMWaySegments objects for all downloaded ways
         candidateLines = new HashMap<>(workingEntitySpace.allWays.size());
         for(final OSMWay way : workingEntitySpace.allWays.values()) {
             //only include completely-downloaded ways, with all their nodes present and complete
@@ -249,7 +248,7 @@ public class RouteConflator implements WaySegmentsObserver {
                 continue;
             }
             if(way.isComplete()) {
-                final WaySegments line = new WaySegments(way, WaySegments.LineType.osmLine, wayMatchingOptions.maxSegmentLength);
+                final OSMWaySegments line = new OSMWaySegments(way, wayMatchingOptions.maxSegmentLength);
                 candidateLines.put(way.osm_id, line);
                 line.addObserver(this);
             }
@@ -362,62 +361,25 @@ public class RouteConflator implements WaySegmentsObserver {
         return regions;
     }
     public void conflateRoutePaths(final StopConflator stopConflator) {
-        final long debugRouteId = -240298L*0L;
+        final long debugRouteId = -544741L;//*0L;
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
                 continue;
             }
 
-            //get a handle on the WaySegments that intersect the route's routeLine
-            final long timeStartLineComparison = new Date().getTime();
-            final double latitudeDelta = -wayMatchingOptions.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * route.routeLine.segments.get(0).originPoint.latitude / 180.0);
-            final HashMap<Long, WaySegments> routeCandidateLines = new HashMap<>(candidateLines.size());
-            for (final LineSegment routeLineSegment : route.routeLine.segments) {
-                final Region routeSegmentBoundingBox = routeLineSegment.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
-                for (final WaySegments candidateLine : candidateLines.values()) {
-
-                    //check the tags of the way, to ensure only valid ways are considered for routes
-                    boolean isValidWay = false;
-                    for(final Map.Entry<String, List<String>> requiredTag : allowedRouteTags.entrySet()) {
-                        if(requiredTag.getValue().contains(candidateLine.way.getTag(requiredTag.getKey()))) {
-                            isValidWay = true;
-                            break;
-                        }
-                    }
-
-                    //don't match against any lines that have been marked as "ignore", such as other gtfs shape lines
-                    if (!isValidWay || candidateLine.way.hasTag("gtfs:ignore")) {
-                        continue;
-                    }
-
-                    //check for candidate lines whose bounding box intersects this segment, and add to the candidate list for this segment
-                    if (Region.intersects(routeSegmentBoundingBox, candidateLine.way.getBoundingBox().regionInset(latitudeDelta, longitudeDelta))) {
-                        if (!routeCandidateLines.containsKey(candidateLine.way.osm_id)) {
-                            routeCandidateLines.put(candidateLine.way.osm_id, candidateLine);
-                        }
-                        routeLineSegment.candidateWaySegments.add(candidateLine);
-                        candidateLine.initMatchForLine(route.routeLine);
-                        route.routeLine.initMatchForLine(candidateLine);
-                    }
-                }
+            //get a handle on the WaySegments that geographically match the route's routeLine
+            route.routeLine.findMatchingLineSegments(this);
+            try {
+                route.debugOutputSegments(workingEntitySpace, candidateLines.values());
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InvalidArgumentException e) {
+                e.printStackTrace();
             }
-
-            //now that we have a rough idea of the candidate ways for each segment, run detailed checks on their segments' distance and dot product
-            for (final LineSegment routeLineSegment : route.routeLine.segments) {
-                for (final WaySegments candidateLine : routeLineSegment.candidateWaySegments) {
-                    for (final LineSegment candidateSegment : candidateLine.segments) {
-                        SegmentMatch.checkCandidateForMatch(wayMatchingOptions, routeLineSegment, candidateSegment);
-                    }
-                }
-            }
-
-            //consolidate the segment match data for each matching line
-            for (final WaySegments line : routeCandidateLines.values()) {
-                line.summarizeMatchesForLine(route.routeLine);
-            }
-            System.out.println("Matched lines in " + (new Date().getTime() - timeStartLineComparison) + "ms");
         }
+        if(Math.random() < 2)
+        return;
 
         //update the route's stop proximity matches to include the match info on the OSM ways
         final long timeStartStopMatching = new Date().getTime();
@@ -490,7 +452,7 @@ public class RouteConflator implements WaySegmentsObserver {
     public OSMEntitySpace getWorkingEntitySpace() {
         return workingEntitySpace;
     }
-    public HashMap<Long, WaySegments> getCandidateLines() {
+    public HashMap<Long, OSMWaySegments> getCandidateLines() {
         return candidateLines;
     }
 
@@ -498,7 +460,7 @@ public class RouteConflator implements WaySegmentsObserver {
     public void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
         for(final WaySegments ws : splitWaySegments) {
             if(ws != originalWaySegments) {
-                candidateLines.put(ws.way.osm_id, ws);
+                candidateLines.put(ws.way.osm_id, (OSMWaySegments) ws);
             }
         }
     }
