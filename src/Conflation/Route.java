@@ -105,8 +105,8 @@ public class Route {
 
         //output the segments matching the main route path
         OSMNode matchOriginNode, matchLastNode;
-        HashMap<String, OSMNode> nodeSpaceMap = new HashMap<>(entitySpace.allNodes.size());
-        HashMap<String, OSMWay> waySpaceMap = new HashMap<>(entitySpace.allWays.size());
+        final HashMap<String, OSMNode> nodeSpaceMap = new HashMap<>(entitySpace.allNodes.size());
+        final HashMap<String, OSMWay> waySpaceMap = new HashMap<>(entitySpace.allWays.size());
         String pointMatchKeyOrigin, pointMatchKeyDestination;
         final String nodeMatchFormat = "%.07f:%.07f", wayMatchFormat = "%d: %d/%d";
         for(final LineSegment lineSegment : routeLine.segments) {
@@ -122,6 +122,7 @@ public class Route {
                 if(matchOriginNode == null) {
                     if (osmLineMatch.matchingSegment.originNode != null && entitySpace.allNodes.containsKey(osmLineMatch.matchingSegment.originNode.osm_id)) {
                         matchOriginNode = (OSMNode) segmentSpace.addEntity(entitySpace.allNodes.get(osmLineMatch.matchingSegment.originNode.osm_id), OSMEntity.TagMergeStrategy.keepTags, null);
+                        matchOriginNode.setTag("node_id", Long.toString(osmLineMatch.matchingSegment.originNode.osm_id));
                     } else {
                         matchOriginNode = segmentSpace.createNode(osmLineMatch.matchingSegment.originPoint.latitude, osmLineMatch.matchingSegment.originPoint.longitude, null);
                     }
@@ -134,6 +135,7 @@ public class Route {
                 if(matchLastNode == null) {
                     if (osmLineMatch.matchingSegment.destinationNode != null && entitySpace.allNodes.containsKey(osmLineMatch.matchingSegment.destinationNode.osm_id)) {
                         matchLastNode = (OSMNode) segmentSpace.addEntity(entitySpace.allNodes.get(osmLineMatch.matchingSegment.destinationNode.osm_id), OSMEntity.TagMergeStrategy.keepTags, null);
+                        matchLastNode.setTag("node_id", Long.toString(osmLineMatch.matchingSegment.destinationNode.osm_id));
                     } else {
                         matchLastNode = segmentSpace.createNode(osmLineMatch.matchingSegment.destinationPoint.latitude, osmLineMatch.matchingSegment.destinationPoint.longitude, null);
                     }
