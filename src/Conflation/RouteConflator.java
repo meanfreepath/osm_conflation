@@ -55,12 +55,93 @@ public class RouteConflator implements WaySegmentsObserver {
         final List<OSMRelation.OSMRelationMember> subRoutes = routeMaster.getMembers();
         importRoutes = new ArrayList<>(subRoutes.size());
 
+        //Now add the subroutes to the importRoutes list - these are the subroutes that will be processed for matches
+        final Map<OSMRelation, List<String>> routeStopIds = new HashMap<>(subRoutes.size());
         for(final OSMRelation.OSMRelationMember member : subRoutes) {
-            if(member.member instanceof OSMRelation) { //should always be the case
-                importRoutes.add(new Route((OSMRelation) member.member, wayMatchingOptions));
-                roughCentroid = member.member.getCentroid();
+            if (!(member.member instanceof OSMRelation)) { //should always be the case
+                continue;
             }
+            final OSMRelation subRoute = (OSMRelation) member.member;
+
+            //create an ordered list of the stops in the subroute
+            final ArrayList<String> stopIds = new ArrayList<>(subRoute.getMembers().size());
+            for (final OSMRelation.OSMRelationMember subRouteMember : subRoute.getMembers("platform")) {
+                stopIds.add(subRouteMember.member.getTag(OSMEntity.KEY_REF));
+            }
+            routeStopIds.put(subRoute, stopIds);
         }
+
+        //now create a list of the subroutes whose stops are the same (or are an ordered subset of) another subroute
+        final Map<OSMRelation, List<String>> stopIdDuplicates = new HashMap<>(routeStopIds.size());
+        int i=0, j;
+        for(final Map.Entry<OSMRelation, List<String>> stopIds : routeStopIds.entrySet()) {
+            j = 0;
+            if(stopIdDuplicates.containsKey(stopIds.getKey())) { //don't process if already marked as a subset/dupe of other
+                //System.out.println(i + ":" + j + "::" + stopIds.getKey().osm_id + " already a duplicate OUTER");
+                i++;
+                continue;
+            }
+            for(final Map.Entry<OSMRelation, List<String>> otherStopIds : routeStopIds.entrySet()) {
+                if(stopIds.getValue() == otherStopIds.getValue()) { //don't compare equals!
+                    //System.out.println(i + ":" + j++ + " IS SAME");
+                    continue;
+                }
+                if(stopIdDuplicates.containsKey(otherStopIds.getKey())) { //don't process if already marked as a subset/dupe of other
+                    //System.out.println(i + ":" + j++ + "::" + stopIds.getKey().osm_id + " already a duplicate INNER");
+                    continue;
+                }
+
+                //if the stops in both sets are equal and in order, mark one of them as a duplicate
+                if(stopIds.getValue().equals(otherStopIds.getValue())) {
+                    //System.out.println(i + ":" + j++ + "::" + stopIds.getKey().osm_id + " is EQUAL to " + otherStopIds.getKey().osm_id);
+                    stopIdDuplicates.put(otherStopIds.getKey(), otherStopIds.getValue());
+                    continue;
+                }
+
+                //check if the otherStopIds array fully contains stopIds, including stop order
+                final List<String> mostStops, leastStops;
+                if(stopIds.getValue().size() > otherStopIds.getValue().size()) {
+                    mostStops = stopIds.getValue();
+                    leastStops = otherStopIds.getValue();
+                } else {
+                    mostStops = otherStopIds.getValue();
+                    leastStops = stopIds.getValue();
+                }
+                //initial containsAll() check (unordered)
+                if(mostStops.containsAll(leastStops)) {
+                    //also do an order check, by finding the common elements with retainAll() and comparing
+                    final List<String> commonElements = new ArrayList<>(mostStops);
+                    commonElements.retainAll(leastStops);
+
+                    //if the common elements .equals() the smaller array, it's an ordered subset and can be de-duped
+                    if(commonElements.equals(leastStops)) {
+                        if(mostStops == stopIds.getValue()) {
+                            stopIdDuplicates.put(otherStopIds.getKey(), otherStopIds.getValue());
+                            //System.out.println(i + ":" + j + "::" + otherStopIds.getKey().osm_id + " is DUPLICATE OF" + stopIds.getKey().osm_id);
+                        } else if (mostStops == otherStopIds.getValue()){
+                            stopIdDuplicates.put(stopIds.getKey(), stopIds.getValue());
+                            //System.out.println(i + ":" + j + "::" + stopIds.getKey().osm_id + " is DUPLICATE OF" + otherStopIds.getKey().osm_id);
+                            break; //bail since the outer item is no longer to be used
+                        }
+                    }
+                }
+                j++;
+            }
+            i++;
+        }
+
+        //now add the de-duplicated subroutes to the list to be processed
+        for(final Map.Entry<OSMRelation, List<String>> routeStops : routeStopIds.entrySet()) {
+            if(stopIdDuplicates.containsKey(routeStops.getKey())) {
+               // System.out.println("DUPED " + routeStops.getKey().osm_id + ": " + String.join(":", routeStops.getValue()));
+                continue;
+            }
+            //System.out.println("USING " + routeStops.getKey().osm_id + ": " + String.join(":", routeStops.getValue()));
+            importRoutes.add(new Route(routeStops.getKey(), wayMatchingOptions));
+            roughCentroid = routeStops.getKey().getCentroid();
+        }
+
+        System.out.println("Used " + importRoutes.size() + " unique out of " + subRoutes.size() + " possible subroutes");
     }
     public static boolean validateRouteType(final String routeType) {
         if(routeType == null) {
