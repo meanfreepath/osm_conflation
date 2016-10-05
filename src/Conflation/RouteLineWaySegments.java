@@ -34,48 +34,67 @@ public class RouteLineWaySegments extends WaySegments {
 
     public void findMatchingLineSegments(final RouteConflator routeConflator) {
         final long timeStartLineComparison = new Date().getTime();
-        final double latitudeDelta = -RouteConflator.wayMatchingOptions.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * segments.get(0).originPoint.latitude / 180.0);
+        final double latitudeDelta = RouteConflator.Cell.getLatitudeBuffer(), longitudeDelta = RouteConflator.Cell.getLongitudeBuffer();
 
         //loop through all the segments in this RouteLine, compiling a list of OSM ways to check for detailed matches
         Date t0 = new Date();
         RouteLineSegment routeLineSegment;
-        final Collection<OSMWaySegments> routeCandidateLines = routeConflator.candidateLines.values();
+        //final Collection<OSMWaySegments> routeCandidateLines = routeConflator.candidateLines.values();
+        final Map<Long, RouteConflator.Cell> allCells = RouteConflator.Cell.allCells;
+        int totalIterations = 0;
         for (final LineSegment lineSegment : segments) {
             routeLineSegment = (RouteLineSegment) lineSegment;
             //and loop through the OSM ways that intersect the current RouteLineSegment's bounding box
             final Region routeSegmentBoundingBox = lineSegment.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
-            for (final OSMWaySegments candidateLine : routeCandidateLines ) {
 
-                //check the tags of the way, to ensure only valid ways are considered for the current route's type
-                boolean isValidWay = false;
-                for(final Map.Entry<String, List<String>> requiredTag : routeConflator.allowedRouteTags.entrySet()) {
-                    if(requiredTag.getValue().contains(candidateLine.way.getTag(requiredTag.getKey()))) {
-                        isValidWay = true;
-                        break;
+            //get the cells which the routeLineSegment overlaps with
+            final List<RouteConflator.Cell> segmentCells = new ArrayList<>(2);
+            for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells.values()) {
+                if (Region.intersects(routeSegmentBoundingBox, cell.expandedBoundingBox)) {
+                    if (!segmentCells.contains(cell)) {
+                        segmentCells.add(cell);
                     }
                 }
+            }
 
-                //don't match against any lines that have been marked as "ignore", such as other gtfs shape lines
-                if (!isValidWay || candidateLine.way.hasTag("gtfs:ignore")) {
-                    continue;
-                }
+            //and check the ways contained in those cells for overlap with the segment
+            for (final RouteConflator.Cell candidateCell : segmentCells) {
+                for(final OSMWaySegments candidateLine : candidateCell.containedEntities) {
+                //for(final OSMWaySegments candidateLine : routeConflator.candidateLines.values()) {
+                    totalIterations++;
 
-                //check for candidate lines whose bounding box intersects this segment, and add to the candidate list for this segment
-                if (Region.intersects(routeSegmentBoundingBox, candidateLine.way.getBoundingBox().regionInset(latitudeDelta, longitudeDelta))) {
-                    if(!lineMatches.containsKey(candidateLine.way.osm_id)) {
-                        lineMatches.put(candidateLine.way.osm_id, new LineMatch(this, candidateLine));
+                    //check the tags of the way, to ensure only valid ways are considered for the current route's type
+                    boolean isValidWay = false;
+                    for (final Map.Entry<String, List<String>> requiredTag : routeConflator.allowedRouteTags.entrySet()) {
+                        if (requiredTag.getValue().contains(candidateLine.way.getTag(requiredTag.getKey()))) {
+                            isValidWay = true;
+                            break;
+                        }
                     }
-                    routeLineSegment.addCandidateLine(candidateLine);
+
+                    //don't match against any lines that have been marked as "ignore", such as other gtfs shape lines
+                    if (!isValidWay || candidateLine.way.hasTag("gtfs:ignore")) {
+                        continue;
+                    }
+
+                    //check for candidate lines whose bounding box intersects this segment, and add to the candidate list for this segment
+                    if (Region.intersects(routeSegmentBoundingBox, candidateLine.way.getBoundingBox().regionInset(latitudeDelta, longitudeDelta))) {
+                        if (!lineMatches.containsKey(candidateLine.way.osm_id)) {
+                            lineMatches.put(candidateLine.way.osm_id, new LineMatch(this, candidateLine));
+                        }
+                        routeLineSegment.addCandidateLine(candidateLine);
+                    }
                 }
             }
         }
-        System.out.println(lineMatches.size() + "LineMatches in " + (new Date().getTime() - t0.getTime()) + "ms");
+        System.out.println(lineMatches.size() + "LineMatches in " + (new Date().getTime() - t0.getTime()) + "ms, " + totalIterations + " iterations");
 
         //now that we have a rough idea of the candidate ways for each segment, run detailed checks on their segments' distance and dot product
         OSMLineSegment osmLineSegment;
         SegmentMatch currentMatch;
         final Collection<LineMatch> matchedLines = lineMatches.values();
-        System.out.println(routeCandidateLines.size() + " route candidates, " + lineMatches.size() + " bb matches, " + segments.size() + "segments to match");
+        System.out.println(routeConflator.candidateLines.size() + " route candidates, " + lineMatches.size() + " bb matches, " + segments.size() + "segments to match");
+        int preciseMatches = 0, dotProductMatches = 0, distanceMatches = 0, travelDirectionMatches = 0, bboxMatches = 0;
         for (final LineSegment segment : segments) { //iterate over the RouteLine's segments
             routeLineSegment = (RouteLineSegment) segment;
             for (final OSMWaySegments candidateLine : ((RouteLineSegment) segment).getCandidateLines()) { //and the OSM ways matched on the previous step
@@ -92,6 +111,23 @@ public class RouteLineWaySegments extends WaySegments {
                         final LineMatch lineMatch = lineMatches.get(osmLineSegment.getParent().way.osm_id);
                         lineMatch.addMatch(currentMatch);
 
+                        if(currentMatch.type == SegmentMatch.matchMaskAll) {
+                            preciseMatches++;
+                        } else {
+                            if((currentMatch.type & SegmentMatch.matchTypeDotProduct) != 0) {
+                                dotProductMatches++;
+                            }
+                            if((currentMatch.type & SegmentMatch.matchTypeDistance) != 0) {
+                                distanceMatches++;
+                            }
+                            if((currentMatch.type & SegmentMatch.matchTypeTravelDirection) != 0) {
+                                travelDirectionMatches++;
+                            }
+                            if((currentMatch.type & SegmentMatch.matchTypeBoundingBox) != 0) {
+                                bboxMatches++;
+                            }
+                        }
+
                         //also track the individual segment matches, keyed by the OSM segment's id
                         /*List<SegmentMatch> existingMatches = matchingOSMSegments.get(match.matchingSegment.id);
                         if (existingMatches == null) {
@@ -103,7 +139,7 @@ public class RouteLineWaySegments extends WaySegments {
                 }
             }
         }
-        System.out.println("Segment matches in " + (new Date().getTime() - t0.getTime()) + "ms");
+        System.out.format("%d/%d/%d/%d/%d bbox/distance/dotproduct/travel/precise Matches in %dms\n", bboxMatches, distanceMatches, dotProductMatches, travelDirectionMatches, preciseMatches, new Date().getTime() - t0.getTime());
 
         //consolidate the segment match data for each matching line
         /*first, collapse the segment matchers down by their index (each segment in mainWaySegments

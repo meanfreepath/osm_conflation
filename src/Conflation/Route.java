@@ -157,6 +157,7 @@ public class Route {
                         matchingSegmentWay.setTag("way_name", "[noname]");
                     }
                     matchingSegmentWay.setTag(OSMEntity.KEY_NAME, osmLineMatch.matchingSegment.segmentIndex + "/" + osmLineMatch.matchingSegment.nodeIndex);
+                    matchingSegmentWay.setTag("hashid", Long.toString(osmLineMatch.matchingSegment.id));
                     matchingSegmentWay.setTag("matchcount", "1");
 
                     //also copy over some relevant tags
@@ -179,6 +180,22 @@ public class Route {
                 }*/
             }
         }
+
+        //output the cells generated to process the area
+        for(RouteConflator.Cell cell : RouteConflator.Cell.allCells.values()) {
+            final Region bbox = cell.boundingBox;
+            List<OSMNode> cellNodes = new ArrayList<>(5);
+            final OSMNode oNode = segmentSpace.createNode(bbox.origin.latitude, bbox.origin.longitude, null);
+            cellNodes.add(oNode);
+            cellNodes.add(segmentSpace.createNode(bbox.origin.latitude, bbox.extent.longitude, null));
+            cellNodes.add(segmentSpace.createNode(bbox.extent.latitude, bbox.extent.longitude, null));
+            cellNodes.add(segmentSpace.createNode(bbox.extent.latitude, bbox.origin.longitude, null));
+            cellNodes.add(oNode);
+            final OSMWay cellWay = segmentSpace.createWay(null, cellNodes);
+            cellWay.setTag("landuse", "construction");
+            cellWay.setTag("name", cell.toString());
+        }
+
         segmentSpace.outputXml("segments" + routeRelation.osm_id + ".osm");
     }
 }
