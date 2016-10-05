@@ -32,6 +32,7 @@ public abstract class LineSegment {
     public final Region searchAreaForMatchingOtherSegments;
 
     private static long generateIdForPoints(final Point origin, final Point destination) {
+        idGenerator.reset();
         idGenerator.update((origin.toString() + ":" + destination.toString()).getBytes());
         return idGenerator.getValue();
     }
