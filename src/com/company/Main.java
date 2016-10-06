@@ -26,11 +26,11 @@ public class Main {
 
         //define the options for the comparison routines
         final RouteConflator.LineComparisonOptions options = RouteConflator.wayMatchingOptions;
-        options.boundingBoxSize = 50.0;
+        options.boundingBoxSize = 30.0;
         options.maxSegmentLength = 10.0;
         options.setMaxSegmentAngle(30.0);
-        options.maxSegmentOrthogonalDistance = 3.0 * options.maxSegmentLength;
-        options.maxSegmentMidPointDistance = 4.0 * options.maxSegmentLength;
+        options.maxSegmentOrthogonalDistance = 15.0;
+        options.maxSegmentMidPointDistance = Math.sqrt(options.maxSegmentOrthogonalDistance * options.maxSegmentOrthogonalDistance + 4.0 * options.maxSegmentLength * options.maxSegmentLength);
 
         //propagate the debug value as needed
         RouteConflator.debugEnabled = debugEnabled;
@@ -44,10 +44,10 @@ public class Main {
         final ArrayList<String> selectedRoutes = new ArrayList<>();
         //selectedRoutes.add("100224");
         //selectedRoutes.add("100173"); //Route 3: multiple issues (looping, etc)
-        selectedRoutes.add("100221");
+        //selectedRoutes.add("100221");
         //selectedRoutes.add("100062"); //errors splitting
         //selectedRoutes.add("102581"); //D-Line: not preferring matching trunk_link near NB stop "15th Ave NW & NW Leary Way"
-        //selectedRoutes.add("102615"); // E-Line
+        selectedRoutes.add("102615"); // E-Line
         //selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
 
         try {
