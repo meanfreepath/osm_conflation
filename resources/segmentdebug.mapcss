@@ -1,0 +1,33 @@
+way[matchcount > 0] {
+	set tmcount;
+	left-casing-color: #ff8800;
+	right-casing-color: #ff8800;
+}
+way[matchcount > 2] {
+	set tmcount;
+	left-casing-color: #ffff00;
+	right-casing-color: #ffff00;
+}
+way[matchcount > 4] {
+	set tmcount;
+	left-casing-color: #00ff00;
+	right-casing-color: #00ff00;
+}
+way[matchcount > 8] {
+	set tmcount;
+	left-casing-color: #00ffff;
+	right-casing-color: #00ffff;
+}
+way[matchcount > 16] {
+	set tmcount;
+	left-casing-color: #ffffff;
+	right-casing-color: #ffffff;
+}
+
+way.tmcount {
+	major-z-index: -10;
+	left-casing-width: 4;
+	right-casing-width: 4;
+	left-casing-opacity: 0.6;
+	right-casing-opacity: 0.6;
+}
