@@ -86,7 +86,12 @@ public class ApiClient {
                 writer.write(rawResponse);
                 writer.close();
             }
+
+            //wait a little before making the next request
+            Thread.sleep(500);
         } catch (Exceptions.OverpassError | IOException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
