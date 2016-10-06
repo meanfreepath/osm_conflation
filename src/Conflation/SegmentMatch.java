@@ -17,6 +17,8 @@ public class SegmentMatch {
     public final OSMLineSegment matchingSegment;
     public final short type;
 
+    public static int totalCount = 0;
+
     public SegmentMatch(final RouteLineSegment segment1, final OSMLineSegment segment2, final double orthDistance, final double midDistance, final double dotProduct, final RouteConflator.LineComparisonOptions options) {
         mainSegment = segment1;
         matchingSegment = segment2;
@@ -37,6 +39,7 @@ public class SegmentMatch {
             matchType |= matchTypeTravelDirection;
         }
         type = matchType;
+        totalCount++;
     }
     public static SegmentMatch checkCandidateForMatch(final RouteConflator.LineComparisonOptions options, final RouteLineSegment routeLineSegment, final OSMLineSegment osmLineSegment) {
         //take the dot product

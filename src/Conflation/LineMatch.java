@@ -11,7 +11,7 @@ public class LineMatch {
     /**
      * The matches, keyed by the matchingSegment's id
      */
-    private final Map<Long, List<SegmentMatch>> matchedSegmentsByRouteLineSegmentId, matchedSegmentsByOSMLineSegmentId;
+    protected final Map<Long, List<SegmentMatch>> matchedSegmentsByRouteLineSegmentId, matchedSegmentsByOSMLineSegmentId;
     public final RouteLineWaySegments routeLine;
     public final OSMWaySegments osmLine;
     private boolean summarized = false;

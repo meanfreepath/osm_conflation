@@ -5,10 +5,7 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 /**
  * Tracks the data on a particular route
@@ -206,5 +203,39 @@ public class Route {
         }
 
         segmentSpace.outputXml("segments" + routeRelation.osm_id + ".osm");
+    }
+
+    /**
+     * Checks if the total match counts in the various match indexes are identical
+     */
+    public void debugCheckMatchIndexIntegrity() {
+        //debug: check total match counts
+        int routeLineSegmentMatchCount = 0, overallLineMatchCounts = 0, lineMatchByRouteLineCounts = 0, lineMatchByOSMLineCounts = 0;
+
+        //check by LineMatch objects
+        for(final LineMatch lineMatch : routeLine.lineMatches.values()) {
+            overallLineMatchCounts += lineMatch.matchingSegments.size();
+
+            //check if the matches based on the RouteLineSegments match up
+            for(final LineSegment segment : routeLine.segments) {
+                final List<SegmentMatch> matchesByRouteLine = lineMatch.getOSMLineMatchesForSegment((RouteLineSegment) segment, SegmentMatch.matchTypeNone);
+                lineMatchByRouteLineCounts += matchesByRouteLine.size();
+            }
+
+            //and the counts by OSMLineSegment index
+            for(final List<SegmentMatch> matchesByOSMLine : lineMatch.matchedSegmentsByOSMLineSegmentId.values()) {
+                lineMatchByOSMLineCounts += matchesByOSMLine.size();
+            }
+        }
+
+        //check the individual RouteLineSegment's match counts
+        for(final LineSegment segment : routeLine.segments) {
+            final Map<Long, List<SegmentMatch>> routeLineMatchingSegments = ((RouteLineSegment)segment).getMatchingSegments(SegmentMatch.matchTypeNone);
+            for(final List<SegmentMatch> matches : routeLineMatchingSegments.values()) {
+                routeLineSegmentMatchCount += matches.size();
+            }
+        }
+
+        System.out.format("%d global, %d RouteLineSegment, %d/%d/%d LineMatch-based SegmentMatch objects", SegmentMatch.totalCount, routeLineSegmentMatchCount, overallLineMatchCounts, lineMatchByRouteLineCounts, lineMatchByOSMLineCounts);
     }
 }
