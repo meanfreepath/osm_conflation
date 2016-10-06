@@ -16,7 +16,7 @@ import java.util.zip.CRC32;
  */
 public class RouteConflator implements WaySegmentsObserver {
     public static class LineComparisonOptions {
-        public double maxSegmentLength = 5.0, maxSegmentOrthogonalDistance = 10.0, maxSegmentMidPointDistance = 20.0, boundingBoxSize = 50.0;
+        public double maxSegmentLength = 5.0, maxSegmentOrthogonalDistance = 10.0, maxSegmentMidPointDistance = 10.0, boundingBoxSize = 30.0;
         private double minSegmentDotProduct;
         public void setMaxSegmentAngle(final double angle) {
             minSegmentDotProduct = Math.cos(angle * Math.PI / 180.0);

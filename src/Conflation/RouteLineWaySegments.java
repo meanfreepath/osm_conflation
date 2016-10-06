@@ -12,14 +12,12 @@ import java.util.*;
  * Created by nick on 9/30/16.
  */
 public class RouteLineWaySegments extends WaySegments {
-    public final HashMap<Long,LineMatch> lineMatches = new HashMap<>(8);
-    public final Map<Long, List<SegmentMatch>> matchingOSMSegments;
-    public final Map<Long, SegmentMatch> bestMatchingOSMSegments;
+    public final HashMap<Long,LineMatch> lineMatches = new HashMap<>(512);
+    public final HashMap<Long,List<LineMatch>> lineMatchesBySegmentId;
 
     public RouteLineWaySegments(final OSMWay way, final double maxSegmentLength) {
         super(way, maxSegmentLength);
-        matchingOSMSegments = new HashMap<>(segments.size());
-        bestMatchingOSMSegments = new HashMap<>(segments.size());
+        lineMatchesBySegmentId = new HashMap<>(segments.size());
     }
     protected RouteLineWaySegments(final RouteLineWaySegments originalSegments, final OSMWay splitWay, final List<LineSegment> splitSegments) {
         super(originalSegments, splitWay, splitSegments);
@@ -28,8 +26,7 @@ public class RouteLineWaySegments extends WaySegments {
             throw new RuntimeException("Copy constructor not implemented");
         }
         //TODO: need to copy over relevant matches
-        matchingOSMSegments = new HashMap<>(segments.size());
-        bestMatchingOSMSegments = new HashMap<>(segments.size());
+        lineMatchesBySegmentId = new HashMap<>(segments.size());
     }
 
     public void findMatchingLineSegments(final RouteConflator routeConflator) {
@@ -92,7 +89,6 @@ public class RouteLineWaySegments extends WaySegments {
         //now that we have a rough idea of the candidate ways for each segment, run detailed checks on their segments' distance and dot product
         OSMLineSegment osmLineSegment;
         SegmentMatch currentMatch;
-        final Collection<LineMatch> matchedLines = lineMatches.values();
         System.out.println(routeConflator.candidateLines.size() + " route candidates, " + lineMatches.size() + " bb matches, " + segments.size() + "segments to match");
         int preciseMatches = 0, dotProductMatches = 0, distanceMatches = 0, travelDirectionMatches = 0, bboxMatches = 0;
         for (final LineSegment segment : segments) { //iterate over the RouteLine's segments
@@ -113,19 +109,28 @@ public class RouteLineWaySegments extends WaySegments {
 
                         if(currentMatch.type == SegmentMatch.matchMaskAll) {
                             preciseMatches++;
-                        } else {
-                            if((currentMatch.type & SegmentMatch.matchTypeDotProduct) != 0) {
-                                dotProductMatches++;
-                            }
-                            if((currentMatch.type & SegmentMatch.matchTypeDistance) != 0) {
-                                distanceMatches++;
-                            }
-                            if((currentMatch.type & SegmentMatch.matchTypeTravelDirection) != 0) {
-                                travelDirectionMatches++;
-                            }
-                            if((currentMatch.type & SegmentMatch.matchTypeBoundingBox) != 0) {
-                                bboxMatches++;
-                            }
+                        }
+                        if((currentMatch.type & SegmentMatch.matchTypeDotProduct) != 0) {
+                            dotProductMatches++;
+                        }
+                        if((currentMatch.type & SegmentMatch.matchTypeDistance) != 0) {
+                            distanceMatches++;
+                        }
+                        if((currentMatch.type & SegmentMatch.matchTypeTravelDirection) != 0) {
+                            travelDirectionMatches++;
+                        }
+                        if((currentMatch.type & SegmentMatch.matchTypeBoundingBox) != 0) {
+                            bboxMatches++;
+                        }
+
+
+                        List<LineMatch> lineMatchesForRouteLineSegment = lineMatchesBySegmentId.get(routeLineSegment.id);
+                        if(lineMatchesForRouteLineSegment == null) {
+                            lineMatchesForRouteLineSegment = new ArrayList<>(4);
+                            lineMatchesBySegmentId.put(routeLineSegment.id, lineMatchesForRouteLineSegment);
+                        }
+                        if(!lineMatchesForRouteLineSegment.contains(lineMatch)) {
+                            lineMatchesForRouteLineSegment.add(lineMatch);
                         }
 
                         //also track the individual segment matches, keyed by the OSM segment's id
@@ -139,7 +144,7 @@ public class RouteLineWaySegments extends WaySegments {
                 }
             }
         }
-        System.out.format("%d/%d/%d/%d/%d bbox/distance/dotproduct/travel/precise Matches in %dms\n", bboxMatches, distanceMatches, dotProductMatches, travelDirectionMatches, preciseMatches, new Date().getTime() - t0.getTime());
+        System.out.format("%d/%d/%d/%d/%d bbox/dotproduct/travel/distance/precise Matches in %dms\n", bboxMatches, dotProductMatches, travelDirectionMatches, distanceMatches, preciseMatches, new Date().getTime() - t0.getTime());
 
         //consolidate the segment match data for each matching line
         /*first, collapse the segment matchers down by their index (each segment in mainWaySegments
