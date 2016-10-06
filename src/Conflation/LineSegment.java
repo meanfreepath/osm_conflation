@@ -4,6 +4,7 @@ import OSM.OSMNode;
 import OSM.Point;
 import OSM.Region;
 
+import java.nio.charset.Charset;
 import java.text.DecimalFormat;
 import java.util.zip.CRC32;
 
@@ -12,6 +13,7 @@ import java.util.zip.CRC32;
  */
 public abstract class LineSegment {
     private final static DecimalFormat DEBUG_OUTPUT_FORMATTER = new DecimalFormat("#.####");
+    private final static String ID_HASH_FORMAT = "%d:%d:%.08f,%.08f:%.08f,%.08f";
     public final Point originPoint, midPoint, destinationPoint;
     public final OSMNode originNode, destinationNode;
 
@@ -31,19 +33,19 @@ public abstract class LineSegment {
     public final double length;
     public final Region searchAreaForMatchingOtherSegments;
 
-    private static long generateIdForPoints(final Point origin, final Point destination) {
+    private static long generateIdForPoints(final long parent_id, final int segmentIndex, final Point origin, final Point destination) {
         idGenerator.reset();
-        idGenerator.update((origin.toString() + ":" + destination.toString()).getBytes());
+        idGenerator.update(String.format(ID_HASH_FORMAT, parent_id, segmentIndex, origin.latitude, origin.longitude, destination.latitude, destination.longitude).getBytes(Charset.forName("ascii")));
         return idGenerator.getValue();
     }
-    public LineSegment(final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
+    public LineSegment(final long parent_id, final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
         originPoint = origin;
         destinationPoint = destination;
         this.originNode = originNode;
         this.destinationNode = destinationNode;
         this.nodeIndex = nodeIndex;
         this.segmentIndex = segmentIndex;
-        this.id = generateIdForPoints(originPoint, destinationPoint);
+        this.id = generateIdForPoints(parent_id, segmentIndex, originPoint, destinationPoint);
 
         vectorX = destination.longitude - origin.longitude;
         vectorY = destination.latitude - origin.latitude;
@@ -69,7 +71,7 @@ public abstract class LineSegment {
         this.destinationNode = destinationNode;
         this.nodeIndex = segmentToCopy.nodeIndex;
         this.segmentIndex = segmentToCopy.segmentIndex;
-        this.id = generateIdForPoints(originPoint, destinationPoint);
+        this.id = generateIdForPoints(segmentToCopy.getParent().way.osm_id, segmentIndex, originPoint, destinationPoint);
 
         vectorX = destination.longitude - originPoint.longitude;
         vectorY = destination.latitude - originPoint.latitude;

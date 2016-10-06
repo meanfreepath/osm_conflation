@@ -3,10 +3,7 @@ package Conflation;
 import OSM.OSMNode;
 import OSM.Point;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by nick on 9/30/16.
@@ -14,10 +11,13 @@ import java.util.Map;
 public class RouteLineSegment extends LineSegment {
     public final RouteLineWaySegments parentSegments;
     private final List<OSMWaySegments> candidateWaySegments;
+    /**
+     * The OSMLineSegment matches, keyed by their way's OSM id
+     */
     private final Map<Long, List<SegmentMatch>> matchingSegments;
     public final Map<Long, SegmentMatch> bestMatchForLine;
     public RouteLineSegment(RouteLineWaySegments parentSegments, Point origin, Point destination, OSMNode originNode, OSMNode destinationNode, int segmentIndex, int nodeIndex) {
-        super(origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
+        super(parentSegments.way.osm_id, origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
         this.parentSegments = parentSegments;
 
         candidateWaySegments = new ArrayList<>(16);
@@ -91,8 +91,39 @@ public class RouteLineSegment extends LineSegment {
     public void updateMatches() {
         //TODO rerun matches
     }
-    public Map<Long, List<SegmentMatch>> getMatchingSegments() {
-        return matchingSegments;
+    public Map<Long, List<SegmentMatch>> getMatchingSegments(final short matchMask) {
+        if (matchMask == SegmentMatch.matchTypeNone) {
+            return matchingSegments;
+        }
+        final Map<Long, List<SegmentMatch>> filteredMatchingSegments = new HashMap<>(matchingSegments.size());
+        for(final Map.Entry<Long, List<SegmentMatch>> matchesForLine : matchingSegments.entrySet()) {
+            final List<SegmentMatch> filteredMatchingSegmentsForLine = new ArrayList<>(matchesForLine.getValue().size());
+            for(final SegmentMatch match : matchesForLine.getValue()) {
+                if((match.type & matchMask) == matchMask) {
+                    filteredMatchingSegmentsForLine.add(match);
+                }
+            }
+            filteredMatchingSegments.put(matchesForLine.getKey(), filteredMatchingSegmentsForLine);
+        }
+        return filteredMatchingSegments;
+    }
+    public List<SegmentMatch> getMatchingSegmentsForLine(final long wayOsmId, final short matchMask) {
+        final List<SegmentMatch> matchingSegmentsForLine = matchingSegments.get(wayOsmId);
+        if(matchingSegmentsForLine != null) {
+            if(matchMask == SegmentMatch.matchTypeNone) {
+                return matchingSegmentsForLine;
+            } else {
+                final List<SegmentMatch> filteredMatchingSegments = new ArrayList<>(matchingSegmentsForLine.size());
+                for(final SegmentMatch match: matchingSegmentsForLine) {
+                    if((match.type & matchMask) == matchMask) {
+                        filteredMatchingSegments.add(match);
+                    }
+                }
+                return filteredMatchingSegments;
+            }
+        } else {
+            return null;
+        }
     }
     public Map<Long, SegmentMatch> getBestMatchingSegments() {
         return bestMatchForLine;
