@@ -414,6 +414,7 @@ public class RouteConflator implements WaySegmentsObserver {
                 exportRouteStops.add(existingStop);
             }
 
+            //and create the object to represent the subroute in the working entity space
             final Route exportRoute = new Route(importRoute, workingEntitySpace, exportRouteStops);
             exportRoutes.add(exportRoute);
             exportRouteMaster.addMember(exportRoute.routeRelation, OSMEntity.MEMBERSHIP_DEFAULT);
@@ -560,6 +561,17 @@ public class RouteConflator implements WaySegmentsObserver {
 
             //get a handle on the WaySegments that geographically match the route's routeLine
             route.routeLine.findMatchingLineSegments(this);
+        }
+
+        //update the route's stop proximity matches to include the match info on the OSM ways
+        final long timeStartStopMatching = new Date().getTime();
+        stopConflator.matchStopsToWays();
+        stopConflator.createStopPositionsForPlatforms(workingEntitySpace);
+        System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
+
+        for(final Route route : exportRoutes) {
+            route.spliteRouteLineByStops(workingEntitySpace);
+
             try {
                 route.debugOutputSegments(workingEntitySpace, candidateLines.values());
             } catch (IOException e) {
@@ -568,14 +580,11 @@ public class RouteConflator implements WaySegmentsObserver {
                 e.printStackTrace();
             }
         }
-        if(Math.random() < 2)
-        return;
 
-        //update the route's stop proximity matches to include the match info on the OSM ways
-        final long timeStartStopMatching = new Date().getTime();
-        stopConflator.matchStopsToWays();
-        stopConflator.createStopPositionsForPlatforms(workingEntitySpace);
-        System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
+
+        //TODO: debug bail
+        if(Math.random() < 2)
+            return;
 
         //with the candidate lines determined, begin the pathfinding stage to lock down the path between the route's stops
         final List<RoutePathFinder> routePathFinderFinders = new ArrayList<>(exportRoutes.size());

@@ -28,6 +28,47 @@ public class RouteLineWaySegments extends WaySegments {
         //TODO: need to copy over relevant matches
         lineMatchesBySegmentId = new HashMap<>(segments.size());
     }
+    /**
+     * Inserts a Point onto the given segment, splitting it into two segments
+     * NOTE: does not check if point lies on onSegment!
+     * @param point The point to add
+     * @param onSegment The segment to add the node to
+     * @return If an existing node is within the tolerance distance, that node, otherwise the input node
+     */
+    public Point insertPoint(final Point point, final RouteLineSegment onSegment, final double nodeTolerance) {
+
+        //create a new segment starting from the node, and ending at onSegment's destination Point
+        final LineSegment insertedSegment = createLineSegment(point, onSegment.destinationPoint, null, onSegment.destinationNode, onSegment.segmentIndex + 1, onSegment.nodeIndex + 1);
+
+        //and replace onSegment with a version of itself that's truncated to the new node's position
+        final LineSegment newOnSegment = copyLineSegment(onSegment, point, null);
+        segments.set(segments.indexOf(onSegment), newOnSegment);
+
+        //increment the node index of all following segments
+        for(final LineSegment segment : segments) {
+            if(segment.segmentIndex > onSegment.segmentIndex) {
+                segment.segmentIndex++;
+                segment.nodeIndex++;
+            }
+        }
+
+        //add the segment and node to this line and its way
+        segments.add(insertedSegment.segmentIndex, insertedSegment);
+
+        //update any matches related to the segments (TODO maybe use observers instead?)
+        insertedSegment.updateMatches();
+        newOnSegment.updateMatches();
+
+        //and notify any observers
+        if(observers != null) {
+            final List<WaySegmentsObserver> observersToNotify = new ArrayList<>(observers);
+            for (final WaySegmentsObserver observer : observersToNotify) {
+                observer.waySegmentsAddedSegment(this, insertedSegment);
+            }
+        }
+
+        return point;
+    }
 
     public void findMatchingLineSegments(final RouteConflator routeConflator) {
         final long timeStartLineComparison = new Date().getTime();
