@@ -98,7 +98,7 @@ public class Main {
 
                 //fetch all existing stops from OSM in the route's bounding box
                 final StopConflator stopConflator = new StopConflator(routeConflator);
-                stopConflator.conflateStops(20.0, routeConflator.getAllRouteStops(), routeConflator.routeType, routeConflator.getWorkingEntitySpace());
+                stopConflator.conflateStops(routeConflator.getAllRouteStops(), routeConflator.routeType, routeConflator.getWorkingEntitySpace());
 
                 //and match the subroutes' routePath to the downloaded OSM ways.  Also matches the stops in the route to their nearest matching way
                 routeConflator.conflateRoutePaths(stopConflator);

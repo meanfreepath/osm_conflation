@@ -27,6 +27,7 @@ public class StopConflator {
     public void matchStopsToWays() {
         final int stopCount = routeConflator.getAllRouteStops().size();
         if(stopCount == 0) { //TODO add warning
+            System.out.println("No stops found for route " + routeConflator.importRouteMaster.getTag(OSMEntity.KEY_NAME));
             return;
         }
         final StreetNameMatcher matcher = new StreetNameMatcher(Locale.US);
@@ -162,23 +163,25 @@ public class StopConflator {
             }*/
         }
     }
+
     /**
      *
-     * @param conflictDistance: the distance (in meters) to check for existing stops
+     * @param allStops
+     * @param routeType
+     * @param workingEntitySpace
      * @throws InvalidArgumentException
      */
-    public void conflateStops(final double conflictDistance, final Collection<StopArea> allStops, final String routeType, final OSMEntitySpace workingEntitySpace) throws InvalidArgumentException {
+    public void conflateStops(final Collection<StopArea> allStops, final String routeType, final OSMEntitySpace workingEntitySpace) throws InvalidArgumentException {
         if(allStops.size() == 0) {
             return;
         }
+
+        //fetch all possible useful entities that intersect the route's stops' combined bounding box
         Region stopDownloadRegion = allStops.iterator().next().platform.getBoundingBox().clone();
         for(final StopArea stop : allStops) {
             stopDownloadRegion.includePoint(stop.platform.getCentroid());
         }
-
-
-        //fetch all possible useful ways that intersect the route's combined bounding box
-        final double latitudeDelta = -0.5 * conflictDistance / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * stopDownloadRegion.getCentroid().latitude / 180.0);
+        final double latitudeDelta = -StopArea.maxConflictSearchDistance / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * stopDownloadRegion.getCentroid().latitude / 180.0);
         stopDownloadRegion = stopDownloadRegion.regionInset(latitudeDelta, longitudeDelta);
         final OverpassConverter converter = new OverpassConverter();
         try {
@@ -186,10 +189,10 @@ public class StopConflator {
             switch (routeType) {
                 case OSMEntity.TAG_BUS: //bus stops are always nodes
                     final String[] queryComponents = {
-                            String.format("node[\"highway\"=\"bus_stop\"](%.04f,%.04f,%.04f,%.04f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
-                            String.format("node[\"public_transport\"=\"platform\"](%.04f,%.04f,%.04f,%.04f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
-                            String.format("way[\"highway\"=\"bus_stop\"](%.04f,%.04f,%.04f,%.04f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
-                            String.format("way[\"public_transport\"=\"platform\"](%.04f,%.04f,%.04f,%.04f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude)
+                            String.format("node[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
+                            String.format("node[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
+                            String.format("way[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
+                            String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude)
                     };
                     query = "(" + String.join(";", queryComponents) + ");(._;>;);";
                     break;
@@ -265,7 +268,7 @@ public class StopConflator {
 
                 if(!idMatchFound) { //if no matching stops found, check that the import data doesn't conflict with existing stops
                     final double stopDistance = Point.distance(stop.platform.getCentroid(), existingStopPlatform.getCentroid());
-                    if(stopDistance < conflictDistance) {
+                    if(stopDistance < StopArea.maxConflictSearchDistance) {
                         //System.out.println("Within distance of " + stop.platform.osm_id + "/" + stop.platform.getTag("name") + "! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME) + ", dist " + stopDistance);
                         stop.platform.setTag("gtfs:conflict", "yes");
                     }

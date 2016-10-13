@@ -45,7 +45,7 @@ public class OSMTaskManagerExporter {
         entitySpace = space;
     }
 
-    public void conflateStops(final double tolerance) {
+    public void conflateStops() {
         final StopConflator conflator = new StopConflator(null);
         List<StopArea> allStops = new ArrayList<>(entitySpace.allEntities.size());
         for(final OSMEntity entity : entitySpace.allNodes.values()) {
@@ -54,7 +54,7 @@ public class OSMTaskManagerExporter {
             }
         }
         try {
-            conflator.conflateStops(tolerance, allStops, OSMEntity.KEY_BUS, entitySpace);
+            conflator.conflateStops(allStops, OSMEntity.KEY_BUS, entitySpace);
         } catch (InvalidArgumentException e) {
             e.printStackTrace();
         }
