@@ -151,12 +151,23 @@ public class RouteConflator implements WaySegmentsObserver {
         allowedRouteTags = wayTagsForRouteType(routeType);
         allowedPlatformTags = platformTagsForRouteType(routeType);
 
+        //generate the list of subroutes to process
         final List<OSMRelation.OSMRelationMember> subRoutes = routeMaster.getMembers();
         importRoutes = new ArrayList<>(subRoutes.size());
+        condenseSubRoutes(subRoutes);
 
+        System.out.println("Used " + importRoutes.size() + " unique out of " + subRoutes.size() + " possible subroutes");
+    }
+
+    /**
+     * Condense the list of subroutes down, based on the stops they hit.  If a subroute's stops are an ordered subset
+     * of any other subroute, disregard the former subroute
+     * @param allSubRoutes
+     */
+    public void condenseSubRoutes(final List<OSMRelation.OSMRelationMember> allSubRoutes) {
         //Now add the subroutes to the importRoutes list - these are the subroutes that will be processed for matches
-        final Map<OSMRelation, List<String>> routeStopIds = new HashMap<>(subRoutes.size());
-        for(final OSMRelation.OSMRelationMember member : subRoutes) {
+        final Map<OSMRelation, List<String>> routeStopIds = new HashMap<>(allSubRoutes.size());
+        for(final OSMRelation.OSMRelationMember member : allSubRoutes) {
             if (!(member.member instanceof OSMRelation)) { //should always be the case
                 continue;
             }
@@ -172,7 +183,7 @@ public class RouteConflator implements WaySegmentsObserver {
 
         //now create a list of the subroutes whose stops are the same (or are an ordered subset of) another subroute
         final Map<OSMRelation, List<String>> stopIdDuplicates = new HashMap<>(routeStopIds.size());
-        int i=0, j;
+        int i = 0, j;
         for(final Map.Entry<OSMRelation, List<String>> stopIds : routeStopIds.entrySet()) {
             j = 0;
             if(stopIdDuplicates.containsKey(stopIds.getKey())) { //don't process if already marked as a subset/dupe of other
@@ -232,15 +243,13 @@ public class RouteConflator implements WaySegmentsObserver {
         //now add the de-duplicated subroutes to the list to be processed
         for(final Map.Entry<OSMRelation, List<String>> routeStops : routeStopIds.entrySet()) {
             if(stopIdDuplicates.containsKey(routeStops.getKey())) {
-               // System.out.println("DUPED " + routeStops.getKey().osm_id + ": " + String.join(":", routeStops.getValue()));
+                // System.out.println("DUPED " + routeStops.getKey().osm_id + ": " + String.join(":", routeStops.getValue()));
                 continue;
             }
             //System.out.println("USING " + routeStops.getKey().osm_id + ": " + String.join(":", routeStops.getValue()));
             importRoutes.add(new Route(routeStops.getKey(), wayMatchingOptions));
             roughCentroid = routeStops.getKey().getCentroid();
         }
-
-        System.out.println("Used " + importRoutes.size() + " unique out of " + subRoutes.size() + " possible subroutes");
     }
     public static boolean validateRouteType(final String routeType) {
         if(routeType == null) {
