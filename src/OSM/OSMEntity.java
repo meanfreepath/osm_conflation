@@ -173,6 +173,15 @@ public abstract class OSMEntity {
             removeTag(name);
         }
     }
+    /**
+     * Sets the multiple tags on this entity, replacing the previous value (if present)
+     * @param tags The key/values pairs of the tags to assign
+     */
+    public void setTags(final Map<String, String> tags) {
+        for(final Map.Entry<String, String> keyTag : tags.entrySet()) {
+            setTag(keyTag.getKey(), keyTag.getValue());
+        }
+    }
     public boolean removeTag(final String name) {
         if(!complete) { //can't set a tag on an incomplete entity
             return false;
