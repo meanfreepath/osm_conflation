@@ -97,7 +97,7 @@ public class RouteLineWaySegments extends WaySegments {
 
             //and check the ways contained in those cells for overlap with the segment
             for (final RouteConflator.Cell candidateCell : segmentCells) {
-                for(final OSMWaySegments candidateLine : candidateCell.containedEntities) {
+                for(final OSMWaySegments candidateLine : candidateCell.containedWays) {
                 //for(final OSMWaySegments candidateLine : routeConflator.candidateLines.values()) {
                     totalIterations++;
 

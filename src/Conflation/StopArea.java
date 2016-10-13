@@ -26,9 +26,9 @@ public class StopArea implements WaySegmentsObserver {
     public final static double maxConflictSearchDistance = 25.0;
     public final static double maxDistanceFromPlatformToWay = 25.0, stopNodeTolerance = 3.0;
     public static boolean debugEnabled = false;
-    public OSMEntity platform; //can be a node or way
+    private OSMEntity platform; //can be a node or way
     private OSMNode stopPosition = null;
-    public final Region nearbyWaySearchRegion;
+    private Region nearbyWaySearchRegion, nearbyStopSearchRegion;
 
     public enum SegmentMatchType {
         none, primaryStreet, crossStreet, proximityToOSMWay
@@ -126,11 +126,8 @@ public class StopArea implements WaySegmentsObserver {
     public final Map<Long, StopWayMatch> wayMatches = new HashMap<>(16);
 
     public StopArea(final OSMEntity platform, final OSMNode stopPosition) {
-        this.platform = platform;
+        this.setPlatform(platform);
         this.stopPosition = stopPosition;
-
-        final double latitudeDelta = -maxDistanceFromPlatformToWay / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * platform.getCentroid().latitude / 180.0);
-        nearbyWaySearchRegion = platform.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
     }
     public OSMNode getStopPosition() {
         return stopPosition;
@@ -193,6 +190,25 @@ public class StopArea implements WaySegmentsObserver {
             default:
                 return 0.0;
         }
+    }
+    public OSMEntity getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(OSMEntity platform) {
+        this.platform = platform;
+        final double latitudeDeltaWays = -maxDistanceFromPlatformToWay / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDeltaWays = latitudeDeltaWays / Math.cos(Math.PI * platform.getCentroid().latitude / 180.0);
+        nearbyWaySearchRegion = platform.getBoundingBox().regionInset(latitudeDeltaWays, longitudeDeltaWays);
+
+        final double latitudeDeltaStops = -maxConflictSearchDistance / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDeltaStops = latitudeDeltaStops / Math.cos(Math.PI * platform.getCentroid().latitude / 180.0);
+        nearbyStopSearchRegion = platform.getBoundingBox().regionInset(latitudeDeltaStops, longitudeDeltaStops);
+    }
+    public Region getNearbyWaySearchRegion() {
+        return nearbyWaySearchRegion;
+    }
+
+    public Region getNearbyStopSearchRegion() {
+        return nearbyStopSearchRegion;
     }
     @Override
     public void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
@@ -268,5 +284,9 @@ public class StopArea implements WaySegmentsObserver {
             }
         }
         chooseBestWayMatch();
+    }
+    @Override
+    public String toString() {
+        return String.format("StopArea P(#%d: “%s”[ref:%s]), *S(#%s: %s[ref:%s])", platform.osm_id, platform.getTag(OSMEntity.KEY_NAME), platform.getTag(OSMEntity.KEY_REF), stopPosition != null ? stopPosition.osm_id : "N/A", stopPosition != null ? stopPosition.getTag(OSMEntity.KEY_NAME) : "", stopPosition != null ? stopPosition.getTag(OSMEntity.KEY_REF) : "");
     }
 }

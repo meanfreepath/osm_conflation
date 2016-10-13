@@ -34,7 +34,6 @@ public class RouteConflator implements WaySegmentsObserver {
      * bounding box checks
      */
     public static class Cell {
-        public final static Map<Long, OSMWaySegments> allLines = new HashMap<>(128);
         public final static Map<Long, Cell> allCells = new HashMap<>(128);
         public final static double cellSize = 0.01; //must be a multiple of 10!
 
@@ -57,7 +56,10 @@ public class RouteConflator implements WaySegmentsObserver {
             ID_FORMAT = String.format("%% 0%d.%df:%% 0%d.%df", precision + 4, precision, precision + 4, precision);
         }
         public static void initCellsForBounds(final Region bounds) {
+            //wipe any existing cells (i.e. from a previous run)
             allCells.clear();
+
+            //and prepare the region
             final double longitudeFactor = Math.cos(Math.PI * bounds.getCentroid().latitude / 180.0);
             latitudeBuffer = -RouteConflator.wayMatchingOptions.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR;
             longitudeBuffer = latitudeBuffer / longitudeFactor;
@@ -107,22 +109,27 @@ public class RouteConflator implements WaySegmentsObserver {
 
         public final Long id;
         public final Region boundingBox, expandedBoundingBox;
-        public final List<OSMWaySegments> containedEntities = new ArrayList<>(1024);
+        public final List<OSMWaySegments> containedWays = new ArrayList<>(1024); //contains OSM ways only
+        public final List<StopArea> containedStops = new ArrayList<>(64); //contains stop platforms only
 
         private Cell(final Long id, final Point origin) {
             this.id = id;
             boundingBox = new Region(origin, new Point(origin.latitude + cellSize, origin.longitude + cellSize));
             expandedBoundingBox = boundingBox.regionInset(latitudeBuffer, longitudeBuffer);
         }
-        public void addEntity(final OSMWaySegments entity) {
-            if(!containedEntities.contains(entity)) {
-                containedEntities.add(entity);
-                allLines.put(entity.way.osm_id, entity);
+        public void addWay(final OSMWaySegments entity) {
+            if(!containedWays.contains(entity)) {
+                containedWays.add(entity);
+            }
+        }
+        public void addStop(final StopArea stop) {
+            if(!containedStops.contains(stop)) {
+                containedStops.add(stop);
             }
         }
         @Override
         public String toString() {
-            return String.format("Cell #%s: %s (%d entities)", id, boundingBox, containedEntities.size());
+            return String.format("Cell #%s: %s (%d ways, %d stops)", id, boundingBox, containedWays.size(), containedStops.size());
         }
     }
 
@@ -408,17 +415,17 @@ public class RouteConflator implements WaySegmentsObserver {
             OSMEntity newStopPlatform;
             OSMNode newStopPosition;
             for(final StopArea stop : importRoute.stops) {
-                existingStop = allRouteStops.get(stop.platform.osm_id);
+                existingStop = allRouteStops.get(stop.getPlatform().osm_id);
 
                 if(existingStop == null) {
-                    newStopPlatform = workingEntitySpace.addEntity(stop.platform, OSMEntity.TagMergeStrategy.keepTags, null);
+                    newStopPlatform = workingEntitySpace.addEntity(stop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null);
                     if (stop.getStopPosition() != null) {
                         newStopPosition = (OSMNode) workingEntitySpace.addEntity(stop.getStopPosition(), OSMEntity.TagMergeStrategy.keepTags, null);
                     } else {
                         newStopPosition = null;
                     }
                     existingStop = new StopArea(newStopPlatform, newStopPosition);
-                    allRouteStops.put(stop.platform.osm_id, existingStop);
+                    allRouteStops.put(stop.getPlatform().osm_id, existingStop);
                 }
                 exportRouteStops.add(existingStop);
             }
@@ -448,7 +455,7 @@ public class RouteConflator implements WaySegmentsObserver {
 
                 for (final Cell cell : Cell.allCells.values()) {
                     if (Region.intersects(cell.boundingBox, way.getBoundingBox())) {
-                        cell.addEntity(line);
+                        cell.addWay(line);
                     }
                 }
             }

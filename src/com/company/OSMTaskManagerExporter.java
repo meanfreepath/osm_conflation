@@ -4,7 +4,6 @@ import Conflation.StopArea;
 import Conflation.StopConflator;
 import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
-import OSM.OSMNode;
 import OSM.Region;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.json.JSONWriter;
@@ -54,7 +53,7 @@ public class OSMTaskManagerExporter {
             }
         }
         try {
-            conflator.conflateStops(allStops, OSMEntity.KEY_BUS, entitySpace);
+            conflator.conflateStopsWithOSM(allStops, OSMEntity.KEY_BUS, entitySpace);
         } catch (InvalidArgumentException e) {
             e.printStackTrace();
         }

@@ -75,7 +75,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
         successfulPaths = failedPaths = 0;
         for(final PathTree pathTree : allPathTrees) {
             if(pathTree.bestPath == null) {
-                logEvent(RouteLogType.warning, "NO PATH found between " + pathTree.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + pathTree.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
+                logEvent(RouteLogType.warning, "NO PATH found between " + pathTree.fromStop + " and " + pathTree.toStop, this);
                 lastPath = null;
                 for (final RouteLog event : eventLogsForObject(pathTree, null)) {
                     System.out.println("\t" + event.message);
@@ -84,7 +84,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
                 continue;
             } else {
                 successfulPaths++;
-                logEvent(RouteLogType.info, "SUCCESSFUL PATH found between " + pathTree.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " and " + pathTree.toStop.platform.getTag(OSMEntity.KEY_NAME), this);
+                logEvent(RouteLogType.info, "SUCCESSFUL PATH found between " + pathTree.fromStop + " and " + pathTree.toStop, this);
             }
 
             /*for(final OSMWay way : bestPath.getPathWays()) {

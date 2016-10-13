@@ -54,7 +54,7 @@ public class Main {
             importSpace.loadFromXML(importFileName);
 
             /*(final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace);
-            exporter.conflateStops(20.0);
+            exporter.conflateStopsWithOSM();
             exporter.outputForOSMTaskingManager("boxes", "https://www.meanfreepath.com/kcstops/");
             if(Math.random() < 2) {
                 return;
@@ -96,9 +96,9 @@ public class Main {
                     continue;
                 }
 
-                //fetch all existing stops from OSM in the route's bounding box
+                //fetch all existing stops from OSM in the entire route's bounding box, and match them with the route's stops
                 final StopConflator stopConflator = new StopConflator(routeConflator);
-                stopConflator.conflateStops(routeConflator.getAllRouteStops(), routeConflator.routeType, routeConflator.getWorkingEntitySpace());
+                stopConflator.conflateStopsWithOSM();
 
                 //and match the subroutes' routePath to the downloaded OSM ways.  Also matches the stops in the route to their nearest matching way
                 routeConflator.conflateRoutePaths(stopConflator);

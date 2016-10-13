@@ -52,8 +52,8 @@ public class Route {
     }
     public void syncStopsWithRelation() {
         for(final StopArea stop : stops) {
-            if(!routeRelation.containsMember(stop.platform)) {
-                routeRelation.addMember(stop.platform, OSMEntity.MEMBERSHIP_PLATFORM);
+            if(!routeRelation.containsMember(stop.getPlatform())) {
+                routeRelation.addMember(stop.getPlatform(), OSMEntity.MEMBERSHIP_PLATFORM);
             }
             final OSMNode stopPosition = stop.getStopPosition();
             if(stopPosition != null && !routeRelation.containsMember(stopPosition)) {
@@ -175,21 +175,21 @@ public class Route {
         stopTags.put(routeRelation.getTag(OSMEntity.KEY_ROUTE), OSMEntity.TAG_YES);
         for(final PathTree pathTree: routePathTrees) {
             final HashMap<String, String> relTags = new HashMap<>(2);
-            relTags.put(OSMEntity.KEY_NAME, pathTree.fromStop.platform.getTag(OSMEntity.KEY_NAME) + " -> " + pathTree.toStop.platform.getTag(OSMEntity.KEY_NAME));
+            relTags.put(OSMEntity.KEY_NAME, pathTree.fromStop.getPlatform().getTag(OSMEntity.KEY_NAME) + " -> " + pathTree.toStop.getPlatform().getTag(OSMEntity.KEY_NAME));
             relTags.put(OSMEntity.KEY_TYPE, OSMEntity.TAG_ROUTE);
             final OSMRelation pathRelation = segmentSpace.createRelation(relTags, null);
 
             //add the platform nodes
-            pathRelation.addMember(segmentSpace.addEntity(pathTree.fromStop.platform, OSMEntity.TagMergeStrategy.keepTags, null), "platform");
-            pathRelation.addMember(segmentSpace.addEntity(pathTree.toStop.platform, OSMEntity.TagMergeStrategy.keepTags, null), "platform");
+            pathRelation.addMember(segmentSpace.addEntity(pathTree.fromStop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null), "platform");
+            pathRelation.addMember(segmentSpace.addEntity(pathTree.toStop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null), "platform");
 
             //and the closest nodes on the RouteLine
             final RouteLineSegment fromSegment = pathTree.routeLineSegments.get(0), toSegment = pathTree.routeLineSegments.get(pathTree.routeLineSegments.size() - 1);
             final OSMWay fromSegmentWay = routeLineSegmentWays.get(fromSegment.id), toSegmentWay = routeLineSegmentWays.get(toSegment.id);
-            stopTags.put(OSMEntity.KEY_NAME, pathTree.fromStop.platform.getTag(OSMEntity.KEY_NAME));
+            stopTags.put(OSMEntity.KEY_NAME, pathTree.fromStop.getPlatform().getTag(OSMEntity.KEY_NAME));
             fromSegmentWay.getFirstNode().setTags(stopTags);
             pathRelation.addMember(fromSegmentWay.getFirstNode(), "stop");
-            stopTags.put(OSMEntity.KEY_NAME, pathTree.toStop.platform.getTag(OSMEntity.KEY_NAME));
+            stopTags.put(OSMEntity.KEY_NAME, pathTree.toStop.getPlatform().getTag(OSMEntity.KEY_NAME));
             toSegmentWay.getLastNode().setTags(stopTags);
             pathRelation.addMember(toSegmentWay.getLastNode(), "stop");
 

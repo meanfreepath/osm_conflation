@@ -84,6 +84,6 @@ public class PathTree {
     }
     @Override
     public String toString() {
-        return String.format("Path from %s to %s: status %d, %s segments", fromStop.platform.getTag(OSMEntity.KEY_NAME), toStop.platform.getTag(OSMEntity.KEY_NAME), matchStatus, routeLineSegments != null ? Integer.toString(routeLineSegments.size()) : "N/A");
+        return String.format("Path from %s to %s: status %d, %s segments", fromStop, toStop, matchStatus, routeLineSegments != null ? Integer.toString(routeLineSegments.size()) : "N/A");
     }
 }
