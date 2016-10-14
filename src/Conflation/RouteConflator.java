@@ -67,13 +67,11 @@ public class RouteConflator implements WaySegmentsObserver {
 
             //get the min/max extent of the bounded region
             final Point rcOrigin = Cell.getCellOriginForPoint(bounds.origin), rcExtent = Cell.getCellOriginForPoint(bounds.extent);
-            rcOrigin.latitude += cellSize * 0.000001; //small fudge factor to prevent precision issues
-            rcOrigin.longitude += cellSize * 0.000001;
-            rcExtent.latitude += cellSize;
-            rcExtent.longitude += cellSize;
+            final Point rcBufferedOrigin = new Point(rcOrigin.latitude + cellSize * 0.000001, rcOrigin.longitude + cellSize * 0.000001); //includes small fudge factor to prevent precision issues
+            final Point rcBufferedExtent = new Point(rcExtent.latitude + cellSize, rcExtent.longitude + cellSize);
 
-            for(double lat=rcOrigin.latitude; lat < rcExtent.latitude; lat += Cell.cellSize) {
-                for(double lon=rcOrigin.longitude; lon < rcExtent.longitude; lon += Cell.cellSize) {
+            for(double lat=rcBufferedOrigin.latitude; lat < rcBufferedExtent.latitude; lat += Cell.cellSize) {
+                for(double lon=rcBufferedOrigin.longitude; lon < rcBufferedExtent.longitude; lon += Cell.cellSize) {
                     createCellForPoint(new Point(lat, lon));
                 }
             }

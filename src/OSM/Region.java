@@ -4,7 +4,7 @@ package OSM;
  * Created by nick on 10/29/15.
  */
 public class Region implements Cloneable {
-    public final Point origin, extent;
+    public Point origin, extent;
 
     /**
      * Determines whether the regions intersect
@@ -117,26 +117,26 @@ public class Region implements Cloneable {
 
         //expand the region to contain the point
         if(point.longitude < origin.longitude) {
-            origin.longitude = point.longitude;
+            origin = new Point(origin.latitude, point.longitude);
         }
         if(point.latitude < origin.latitude) {
-            origin.latitude = point.latitude;
+            origin = new Point(point.latitude, origin.longitude);
         }
         if(point.longitude > extent.longitude) {
-            extent.longitude = point.longitude;
+            extent = new Point(extent.latitude, point.longitude);
         }
         if(point.latitude > extent.latitude) {
-            extent.latitude = point.latitude;
+            extent = new Point(point.latitude, extent.longitude);
         }
     }
     public void combinedBoxWithRegion(final Region otherRegion) {
         if(otherRegion == null) {
             return;
         }
-        origin.latitude = Math.min(origin.latitude, otherRegion.origin.latitude);
-        origin.longitude = Math.min(origin.longitude, otherRegion.origin.longitude);
-        extent.latitude = Math.max(extent.latitude, otherRegion.extent.latitude);
-        extent.longitude = Math.max(extent.longitude, otherRegion.extent.longitude);
+        double olatitude = Math.min(origin.latitude, otherRegion.origin.latitude), olongitude = Math.min(origin.longitude, otherRegion.origin.longitude);
+        double elatitude = Math.max(extent.latitude, otherRegion.extent.latitude), elongitude = Math.max(extent.longitude, otherRegion.extent.longitude);
+        origin = new Point(olatitude, olongitude);
+        extent = new Point(elatitude, elongitude);
     }
 
     /**
@@ -170,7 +170,7 @@ public class Region implements Cloneable {
         return new Point(0.5 * (origin.latitude + extent.latitude), 0.5 * (origin.longitude + extent.longitude));
     }
 
-    public static Point computeCentroid(final Point[] vertices) {
+    /*public static Point computeCentroid(final Point[] vertices) {
         if(vertices.length < 2) {
             return null;
         }
@@ -211,6 +211,23 @@ public class Region implements Cloneable {
         centroid.latitude /= (6.0*signedArea);
 
         return centroid;
+    }*/
+    public static Point computeCentroid2(final Point[] vertices) {
+        if(vertices.length < 2) {
+            return null;
+        }
+        double Cx = 0.0, Cy = 0.0;
+        for(final Point vertex : vertices) {
+            Cx += vertex.longitude;
+            Cy += vertex.latitude;
+        }
+        Cx /= vertices.length;
+        Cy /= vertices.length;
+
+        /*for(int i=0;i<vertices.length - 1;i++) {
+            Cx += (vertices[i].longitude + vertices[i+1].longitude) * ()
+        }*/
+        return new Point(Cy, Cx);
     }
     @Override
     public Region clone() {

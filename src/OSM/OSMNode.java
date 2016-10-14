@@ -13,7 +13,6 @@ public class OSMNode extends OSMEntity {
             BASE_XML_TAG_FORMAT_OPEN_METADATA = " <node id=\"%d\" lat=\"%.07f\" lon=\"%.07f\" visible=\"%s\" timestamp=\"%s\" version=\"%d\" changeset=\"%d\" uid=\"%d\" user=\"%s\"%s>\n",
             BASE_XML_TAG_FORMAT_CLOSE = " </node>\n";
     private final static OSMType type = OSMType.node;
-    private double lat, lon;
     private Point coordinate;
     public final HashMap<Long, OSMWay> containingWays = new HashMap<>(4);
     public short containingWayCount = 0;
@@ -63,19 +62,10 @@ public class OSMNode extends OSMEntity {
         }
     }
 
-    public double getLat() {
-        return lat;
-    }
-    public double getLon() {
-        return lon;
-    }
-
     public void setCoordinate(final double lat, final double lon) {
         if(this.coordinate != null) { //mark as modified if changing (vs initial assignment)
             markAsModified();
         }
-        this.lat = lat;
-        this.lon = lon;
         coordinate = new Point(lat, lon);
         boundingBox = null; //invalidate the bounding box
     }
@@ -83,9 +73,7 @@ public class OSMNode extends OSMEntity {
         if(this.coordinate != null && Point.distance(this.coordinate, coordinate) > Double.MIN_VALUE) { //mark as modified if changing (vs initial assignment)
             markAsModified();
         }
-        lat = coordinate.latitude;
-        lon = coordinate.longitude;
-        this.coordinate = new Point(lat, lon);
+        this.coordinate = new Point(coordinate);
         boundingBox = null; //invalidate the bounding box
     }
 
@@ -100,7 +88,7 @@ public class OSMNode extends OSMEntity {
             return null;
         }
         if(boundingBox == null) {
-            boundingBox = new Region(lat, lon, 0.0, 0.0);
+            boundingBox = new Region(coordinate.latitude, coordinate.longitude, 0.0, 0.0);
         }
         return boundingBox;
     }
@@ -122,9 +110,9 @@ public class OSMNode extends OSMEntity {
         if(tags != null) {
             final String openTag;
             if(version > 0) {
-                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN_METADATA, osm_id, lat, lon, String.valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user), actionTagAttribute(action));
+                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN_METADATA, osm_id, coordinate.latitude, coordinate.longitude, String.valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user), actionTagAttribute(action));
             } else {
-                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN, osm_id, lat, lon, String.valueOf(visible));
+                openTag = String.format(BASE_XML_TAG_FORMAT_OPEN, osm_id, coordinate.latitude, coordinate.longitude, String.valueOf(visible));
             }
             final StringBuilder xml = new StringBuilder(tags.size() * 64 + openTag.length() + BASE_XML_TAG_FORMAT_CLOSE.length());
             xml.append(openTag);
@@ -135,27 +123,13 @@ public class OSMNode extends OSMEntity {
             return xml.toString();
         } else {
             if(version > 0) {
-                return String.format(BASE_XML_TAG_FORMAT_EMPTY_METADATA, osm_id, lat, lon, String.valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user), actionTagAttribute(action));
+                return String.format(BASE_XML_TAG_FORMAT_EMPTY_METADATA, osm_id, coordinate.latitude, coordinate.longitude, String.valueOf(visible), timestamp, version, changeset, uid, escapeForXML(user), actionTagAttribute(action));
             } else {
-                return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id, lat, lon, String.valueOf(visible));
+                return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id, coordinate.latitude, coordinate.longitude, String.valueOf(visible));
             }
         }
     }
-
-    public void setTag(String name, String value) {
-        switch (name) {
-            case KEY_LATITUDE:
-                lat = Double.parseDouble(value);
-                break;
-            case KEY_LONGITUDE:
-                lon = Double.parseDouble(value);
-                break;
-            default:
-                super.setTag(name, value);
-                break;
-        }
-    }
     public String toString() {
-        return String.format("node@%d (id %d): %.05f,%.05f (%s)", hashCode(), osm_id, lat, lon, complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
+        return String.format("node@%d (id %d): %.05f,%.05f (%s)", hashCode(), osm_id, coordinate.latitude, coordinate.longitude, complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
     }
 }

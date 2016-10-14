@@ -233,12 +233,16 @@ public class OSMWay extends OSMEntity {
 
     @Override
     public Point getCentroid() {
-        Point[] wayPoints = new Point[nodes.size()];
+        final int vertexCount = isClosed() ? nodes.size() - 1 : nodes.size(); //don't include the last node in closed ways
+        final Point[] vertices = new Point[vertexCount];
         int i = 0;
         for(final OSMNode node: nodes) {
-            wayPoints[i++] = new Point(node.getLat(), node.getLon());
+            vertices[i++] = node.getCentroid();
+            if(i == vertexCount) {
+                break;
+            }
         }
-        return Region.computeCentroid(wayPoints);
+        return Region.computeCentroid2(vertices);
     }
 
     @Override
@@ -282,6 +286,19 @@ public class OSMWay extends OSMEntity {
             }
         }
     }
+
+    /**
+     * Whether this way is closed (i.e. first node is same as last node)
+     * @return
+     */
+    public boolean isClosed() {
+        final int nodeCount = nodes.size();
+        if(nodeCount > 1) {
+            return nodes.get(0) == nodes.get(nodeCount - 1);
+        }
+        return false;
+    }
+    @Override
     public String toString() {
         final List<String> nodeIds = new ArrayList<>(nodes.size());
         for(final OSMNode node : nodes) {

@@ -206,10 +206,13 @@ public class StopConflator {
         }
 
         //fetch all possible useful entities that intersect the route's stops' combined bounding box
-        Region stopDownloadRegion = allStops.iterator().next().getPlatform().getBoundingBox().clone();
+        final Point[] includedStops = new Point[allStops.size()];
+        int s = 0;
         for(final StopArea stop : allStops) {
-            stopDownloadRegion.includePoint(stop.getPlatform().getCentroid());
+            includedStops[s++] = stop.getPlatform().getCentroid();
         }
+        Region stopDownloadRegion = new Region(includedStops);
+
         //expand the total area little further, to ensure the start/end of the route is included (problem with King County data)
         final double latitudeDelta = -/*StopArea.maxConflictSearchDistance*/100.0 / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * stopDownloadRegion.getCentroid().latitude / 180.0);
         stopDownloadRegion = stopDownloadRegion.regionInset(latitudeDelta, longitudeDelta);

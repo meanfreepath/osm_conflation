@@ -6,7 +6,7 @@ package OSM;
 public class Point {
     public final static double DEGREE_DISTANCE_AT_EQUATOR = 111319.490779206;
     private final static double RAD_FACTOR = Math.PI / 360.0;
-    public double latitude, longitude;
+    public final double latitude, longitude;
 
     public Point(final double lat, final double lon) {
         latitude = lat;

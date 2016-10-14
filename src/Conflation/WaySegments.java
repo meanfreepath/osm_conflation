@@ -44,7 +44,8 @@ public abstract class WaySegments {
             }
 
             //first get the distance between the 2 nodes
-            final double vectorX = destinationNode.getLon() - originNode.getLon(), vectorY = destinationNode.getLat() - originNode.getLat();
+            final Point destinationPoint = destinationNode.getCentroid(), originPoint = originNode.getCentroid();
+            final double vectorX = destinationPoint.longitude - originPoint.longitude, vectorY = destinationPoint.latitude - originPoint.latitude;
             final double segmentLength = Point.distance(originNode.getCentroid(),destinationNode.getCentroid());
 
             //if less than the length threshold, add as a segment
