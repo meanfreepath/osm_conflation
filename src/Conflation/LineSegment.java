@@ -61,7 +61,7 @@ public abstract class LineSegment {
 
         length = Point.distance(vectorY, vectorX);
 
-        final double latitudeDelta = -RouteConflator.wayMatchingOptions.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * midPointY / 180.0);
+        final double latitudeDelta = -RouteConflator.wayMatchingOptions.segmentSearchBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * midPointY / 180.0);
         searchAreaForMatchingOtherSegments = getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
     }
     public LineSegment(final LineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
@@ -87,7 +87,7 @@ public abstract class LineSegment {
 
         length = Point.distance(vectorY, vectorX);
 
-        final double latitudeDelta = -RouteConflator.wayMatchingOptions.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * midPointY / 180.0);
+        final double latitudeDelta = -RouteConflator.wayMatchingOptions.segmentSearchBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * midPointY / 180.0);
         searchAreaForMatchingOtherSegments = getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
     }
     public Region getBoundingBox() {

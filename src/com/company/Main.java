@@ -26,7 +26,7 @@ public class Main {
 
         //define the options for the comparison routines
         final RouteConflator.LineComparisonOptions options = RouteConflator.wayMatchingOptions;
-        options.boundingBoxSize = 30.0;
+        options.segmentSearchBoxSize = 30.0;
         options.maxSegmentLength = 10.0;
         options.setMaxSegmentAngle(30.0);
         options.maxSegmentOrthogonalDistance = 15.0;

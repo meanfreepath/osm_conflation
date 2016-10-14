@@ -16,7 +16,7 @@ import java.util.zip.CRC32;
  */
 public class RouteConflator implements WaySegmentsObserver {
     public static class LineComparisonOptions {
-        public double maxSegmentLength = 5.0, maxSegmentOrthogonalDistance = 10.0, maxSegmentMidPointDistance = 10.0, boundingBoxSize = 30.0;
+        public double maxSegmentLength = 5.0, maxSegmentOrthogonalDistance = 10.0, maxSegmentMidPointDistance = 10.0, segmentSearchBoxSize = 30.0;
         private double minSegmentDotProduct;
         public void setMaxSegmentAngle(final double angle) {
             minSegmentDotProduct = Math.cos(angle * Math.PI / 180.0);
@@ -59,9 +59,10 @@ public class RouteConflator implements WaySegmentsObserver {
             //wipe any existing cells (i.e. from a previous run)
             allCells.clear();
 
-            //and prepare the region
+            //and prepare the region, including a buffer zone equal to the greatest of the various search/bounding box dimensions
             final double longitudeFactor = Math.cos(Math.PI * bounds.getCentroid().latitude / 180.0);
-            latitudeBuffer = -RouteConflator.wayMatchingOptions.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR;
+            final double bufferSize = Math.max(RouteConflator.wayMatchingOptions.segmentSearchBoxSize, Math.max(StopArea.maxConflictSearchDistance, StopArea.maxDistanceFromPlatformToWay));
+            latitudeBuffer = -bufferSize / Point.DEGREE_DISTANCE_AT_EQUATOR;
             longitudeBuffer = latitudeBuffer / longitudeFactor;
 
             //get the min/max extent of the bounded region
@@ -365,7 +366,7 @@ public class RouteConflator implements WaySegmentsObserver {
         }
 
         //and get the download regions for them
-        final List<Region> downloadRegions = generateCombinedDownloadRegions(routePaths, wayMatchingOptions.boundingBoxSize);
+        final List<Region> downloadRegions = generateCombinedDownloadRegions(routePaths, wayMatchingOptions.segmentSearchBoxSize);
 
         //fetch all possible useful ways that intersect the route's combined bounding box
         final String queryFormat = "[\"%s\"~\"%s\"]";
@@ -438,7 +439,7 @@ public class RouteConflator implements WaySegmentsObserver {
 
         //create the Cell index for all the ways, for faster lookup below
         Cell.initCellsForBounds(workingEntitySpace.getBoundingBox());
-        final double latitudeDelta = -RouteConflator.wayMatchingOptions.boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * workingEntitySpace.getBoundingBox().getCentroid().latitude / 180.0);
+        final double latitudeDelta = -RouteConflator.wayMatchingOptions.segmentSearchBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * workingEntitySpace.getBoundingBox().getCentroid().latitude / 180.0);
 
         //create OSMWaySegments objects for all downloaded ways
         candidateLines = new HashMap<>(workingEntitySpace.allWays.size());

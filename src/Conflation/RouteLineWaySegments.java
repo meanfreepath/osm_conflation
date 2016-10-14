@@ -72,7 +72,6 @@ public class RouteLineWaySegments extends WaySegments {
 
     public void findMatchingLineSegments(final RouteConflator routeConflator) {
         final long timeStartLineComparison = new Date().getTime();
-        final double latitudeDelta = RouteConflator.Cell.getLatitudeBuffer(), longitudeDelta = RouteConflator.Cell.getLongitudeBuffer();
 
         //loop through all the segments in this RouteLine, compiling a list of OSM ways to check for detailed matches
         Date t0 = new Date();
@@ -83,12 +82,11 @@ public class RouteLineWaySegments extends WaySegments {
         for (final LineSegment lineSegment : segments) {
             routeLineSegment = (RouteLineSegment) lineSegment;
             //and loop through the OSM ways that intersect the current RouteLineSegment's bounding box
-            final Region routeSegmentBoundingBox = lineSegment.getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
 
             //get the cells which the routeLineSegment overlaps with
             final List<RouteConflator.Cell> segmentCells = new ArrayList<>(2);
             for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells.values()) {
-                if (Region.intersects(routeSegmentBoundingBox, cell.expandedBoundingBox)) {
+                if (Region.intersects(routeLineSegment.searchAreaForMatchingOtherSegments, cell.expandedBoundingBox)) {
                     if (!segmentCells.contains(cell)) {
                         segmentCells.add(cell);
                     }
@@ -116,7 +114,7 @@ public class RouteLineWaySegments extends WaySegments {
                     }
 
                     //check for candidate lines whose bounding box intersects this segment, and add to the candidate list for this segment
-                    if (Region.intersects(routeSegmentBoundingBox, candidateLine.way.getBoundingBox().regionInset(latitudeDelta, longitudeDelta))) {
+                    if (Region.intersects(routeLineSegment.searchAreaForMatchingOtherSegments, candidateLine.boundingBoxForSegmentMatching)) {
                         if (!lineMatches.containsKey(candidateLine.way.osm_id)) {
                             lineMatches.put(candidateLine.way.osm_id, new LineMatch(this, candidateLine));
                         }

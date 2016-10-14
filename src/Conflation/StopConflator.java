@@ -24,6 +24,11 @@ public class StopConflator {
     public StopConflator(final RouteConflator routeConflator) {
         this.routeConflator = routeConflator;
     }
+
+    /**
+     * Match the routeConflator's stops to the best possible OSM way, based on its name, position,
+     * way's proximity to routeLine, etc
+     */
     public void matchStopsToWays() {
         final int stopCount = routeConflator.getAllRouteStops().size();
         if(stopCount == 0) { //TODO add warning
@@ -41,7 +46,6 @@ public class StopConflator {
         }
 
         final StreetNameMatcher matcher = new StreetNameMatcher(Locale.US);
-        final double latitudeDelta = -StopArea.maxDistanceFromPlatformToWay / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * routeConflator.roughCentroid.latitude / 180.0);
 
         //loop through the route's stops, determining the best-matching way for each one
         for(final StopArea stop : routeConflator.getAllRouteStops()) {
@@ -60,41 +64,45 @@ public class StopConflator {
 
             //find the nearest OSM ways to the stop platforms, checking all lines whose bounding boxes intersect the stop's search area
             final Point platformCentroid = stop.getPlatform().getCentroid();
-            for(final WaySegments line : routeConflator.getCandidateLines().values()) {
-                //check the line's bounding box intersects
-                if(!Region.intersects(line.way.getBoundingBox().regionInset(latitudeDelta, longitudeDelta), stop.getNearbyWaySearchRegion())) {
-                    continue;
-                }
-
-                //skip this line if the nearest segment is not within the maximum distance to the stop
-                if(line.closestSegmentToPoint(platformCentroid, StopArea.maxDistanceFromPlatformToWay) == null) {
-                    //System.out.println("NO MATCH for platform " + stopPlatform.osm_id + "(ref " + stopPlatform.getTag("ref") + "/" + stopPlatform.getTag("name") + ")");
-                    continue;
-                }
-
-                //Check if the way can be matched by name
-                final String wayName = line.way.getTag(OSMEntity.KEY_NAME);
-                if(nameComponents != null && wayName != null) {
-                    final StreetNameMatcher.StreetNameComponents wayNameComponents = matcher.createComponents(wayName);
-                    final String wayBaseName = String.join(" ", wayNameComponents.baseComponents);
-                    final StreetNameMatcher.StreetNameComponents primaryStreetComponents = nameComponents.get(0);
-                    final StreetNameMatcher.StreetNameComponents secondaryStreetComponents = nameComponents.size() > 1 ?  nameComponents.get(1) : null;
-
-                    final String primaryStreetBaseName = String.join(" ", primaryStreetComponents.baseComponents);
-                    final double primaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(primaryStreetBaseName, wayBaseName, 128);
-                    if(debugEnabled) {
-                        System.out.println("CHECK PLATFORM PRINAME: " + stop + ": vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + primaryStringDistance + "/" + primaryStreetBaseName.length() + ", ratio " + (primaryStringDistance / primaryStreetBaseName.length()));
-                    }
-                    if (primaryStringDistance / primaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
-                        stop.addNameMatch(line, StopArea.SegmentMatchType.primaryStreet);
-                    } else if (secondaryStreetComponents != null) {
-                        final String secondaryStreetBaseName = String.join(" ", secondaryStreetComponents.baseComponents);
-                        final double secondaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(secondaryStreetBaseName, wayBaseName, 128);
-                        if(debugEnabled) {
-                            System.out.println("CHECK PLATFORM SECNAME: " + stop + ": vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + secondaryStringDistance + "/" + secondaryStreetBaseName.length() + ", ratio " + (secondaryStringDistance / secondaryStreetBaseName.length()));
+            for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells.values()) {
+                if(Region.intersects(cell.expandedBoundingBox, stop.getNearbyWaySearchRegion())) {
+                    for(final OSMWaySegments line : cell.containedWays) {
+                        //check the line's bounding box intersects
+                        if(!Region.intersects(line.boundingBoxForStopMatching, stop.getNearbyWaySearchRegion())) {
+                            continue;
                         }
-                        if(secondaryStringDistance / secondaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
-                            stop.addNameMatch(line, StopArea.SegmentMatchType.crossStreet);
+
+                        //skip this line if the nearest segment is not within the maximum distance to the stop
+                        if(line.closestSegmentToPoint(platformCentroid, StopArea.maxDistanceFromPlatformToWay) == null) {
+                            //System.out.println("NO MATCH for platform " + stopPlatform.osm_id + "(ref " + stopPlatform.getTag("ref") + "/" + stopPlatform.getTag("name") + ")");
+                            continue;
+                        }
+
+                        //Check if the way can be matched by name
+                        final String wayName = line.way.getTag(OSMEntity.KEY_NAME);
+                        if(nameComponents != null && wayName != null) {
+                            final StreetNameMatcher.StreetNameComponents wayNameComponents = matcher.createComponents(wayName);
+                            final String wayBaseName = String.join(" ", wayNameComponents.baseComponents);
+                            final StreetNameMatcher.StreetNameComponents primaryStreetComponents = nameComponents.get(0);
+                            final StreetNameMatcher.StreetNameComponents secondaryStreetComponents = nameComponents.size() > 1 ?  nameComponents.get(1) : null;
+
+                            final String primaryStreetBaseName = String.join(" ", primaryStreetComponents.baseComponents);
+                            final double primaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(primaryStreetBaseName, wayBaseName, 128);
+                            if(debugEnabled) {
+                                System.out.println("CHECK PLATFORM PRINAME: " + stop + ": vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + primaryStringDistance + "/" + primaryStreetBaseName.length() + ", ratio " + (primaryStringDistance / primaryStreetBaseName.length()));
+                            }
+                            if (primaryStringDistance / primaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
+                                stop.addNameMatch(line, StopArea.SegmentMatchType.primaryStreet);
+                            } else if (secondaryStreetComponents != null) {
+                                final String secondaryStreetBaseName = String.join(" ", secondaryStreetComponents.baseComponents);
+                                final double secondaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(secondaryStreetBaseName, wayBaseName, 128);
+                                if(debugEnabled) {
+                                    System.out.println("CHECK PLATFORM SECNAME: " + stop + ": vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + secondaryStringDistance + "/" + secondaryStreetBaseName.length() + ", ratio " + (secondaryStringDistance / secondaryStreetBaseName.length()));
+                                }
+                                if(secondaryStringDistance / secondaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
+                                    stop.addNameMatch(line, StopArea.SegmentMatchType.crossStreet);
+                                }
+                            }
                         }
                     }
                 }
@@ -107,9 +115,9 @@ public class StopConflator {
                 final Point platformCentroid = routeStop.getPlatform().getCentroid();
                 for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells.values()) {
                     if(cell.containedStops.contains(routeStop)) {
-                        for(final WaySegments osmLine : cell.containedWays) {
+                        for(final OSMWaySegments osmLine : cell.containedWays) {
                             //check the segment's bounding box intersects
-                            if (!Region.intersects(osmLine.way.getBoundingBox().regionInset(latitudeDelta, longitudeDelta), routeStop.getNearbyWaySearchRegion())) {
+                            if (!Region.intersects(osmLine.boundingBoxForStopMatching, routeStop.getNearbyWaySearchRegion())) {
                                 continue;
                             }
 
@@ -202,8 +210,10 @@ public class StopConflator {
         for(final StopArea stop : allStops) {
             stopDownloadRegion.includePoint(stop.getPlatform().getCentroid());
         }
-        final double latitudeDelta = -StopArea.maxConflictSearchDistance / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * stopDownloadRegion.getCentroid().latitude / 180.0);
+        //expand the total area little further, to ensure the start/end of the route is included (problem with King County data)
+        final double latitudeDelta = -/*StopArea.maxConflictSearchDistance*/100.0 / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * stopDownloadRegion.getCentroid().latitude / 180.0);
         stopDownloadRegion = stopDownloadRegion.regionInset(latitudeDelta, longitudeDelta);
+
         final OverpassConverter converter = new OverpassConverter();
         try {
             final String query;
