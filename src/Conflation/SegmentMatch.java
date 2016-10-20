@@ -9,7 +9,7 @@ import OSM.Region;
  */
 public class SegmentMatch {
     private final static double DOT_PRODUCT_FOR_PARALLEL_LINE = 0.999; //segments with a dot product > than this are considered "parallel" for some calculations
-    public final static short matchTypeNone = 0, matchTypeBoundingBox = 1, matchTypeDistance = 2, matchTypeDotProduct = 4, matchTypeTravelDirection = 8;
+    public final static short matchTypeNone = 0, matchTypeBoundingBox = 1, matchTypeDotProduct = 2, matchTypeDistance = 4, matchTypeTravelDirection = 8;
     public final static short matchMaskAll = matchTypeBoundingBox | matchTypeDistance | matchTypeDotProduct | matchTypeTravelDirection;
 
     public final double orthogonalDistance, midPointDistance, dotProduct;
