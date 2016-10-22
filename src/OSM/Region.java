@@ -231,6 +231,6 @@ public class Region implements Cloneable {
     }
     @Override
     public String toString() {
-        return String.format("Region({%.06f,%.06f}{%.06f,%.06f})", origin.y, origin.x, extent.y, extent.x);
+        return String.format("Region({%.03f,%.03f}{%.03f,%.03f})", origin.y, origin.x, extent.y, extent.x);
     }
 }

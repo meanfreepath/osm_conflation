@@ -36,7 +36,6 @@ public class RouteConflator implements WaySegmentsObserver {
         public final static List<Cell> allCells = new ArrayList<>(128);
         public final static double cellSizeInMeters = 500.0;
         private static double cellSize;
-
         private static double searchBuffer = 0.0;
 
         public static void initCellsForBounds(final Region bounds) {
@@ -49,11 +48,8 @@ public class RouteConflator implements WaySegmentsObserver {
 
             //get the min/max extent of the bounded region
             final Point rcOrigin = Cell.getCellOriginForPoint(bounds.origin), rcExtent = Cell.getCellOriginForPoint(bounds.extent);
-            final Point rcBufferedOrigin = new Point(rcOrigin.x + cellSize * 0.000001, rcOrigin.y + cellSize * 0.000001); //includes small fudge factor to prevent precision issues
-            final Point rcBufferedExtent = new Point(rcExtent.x + cellSize, rcExtent.y + cellSize);
-
-            for(double y = rcBufferedOrigin.y; y < rcBufferedExtent.y; y += Cell.cellSize) {
-                for(double x = rcBufferedOrigin.x; x < rcBufferedExtent.x; x += Cell.cellSize) {
+            for(double y = rcOrigin.y; y < rcExtent.y; y += Cell.cellSize) {
+                for(double x = rcOrigin.x; x < rcExtent.x; x += Cell.cellSize) {
                     createCellForPoint(new Point(x, y));
                 }
             }
