@@ -1,9 +1,6 @@
 package Conflation;
 
-import OSM.OSMEntity;
-import OSM.OSMNode;
-import OSM.Point;
-import OSM.Region;
+import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.util.*;
@@ -197,11 +194,9 @@ public class StopArea implements WaySegmentsObserver {
 
     public void setPlatform(OSMEntity platform) {
         this.platform = platform;
-        final double latitudeDeltaWays = -maxDistanceFromPlatformToWay / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDeltaWays = latitudeDeltaWays / Math.cos(Math.PI * platform.getCentroid().latitude / 180.0);
-        nearbyWaySearchRegion = platform.getBoundingBox().regionInset(latitudeDeltaWays, longitudeDeltaWays);
-
-        final double latitudeDeltaStops = -maxConflictSearchDistance / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDeltaStops = latitudeDeltaStops / Math.cos(Math.PI * platform.getCentroid().latitude / 180.0);
-        nearbyStopSearchRegion = platform.getBoundingBox().regionInset(latitudeDeltaStops, longitudeDeltaStops);
+        final double waySearchBuffer = -SphericalMercator.metersToCoordDelta(maxDistanceFromPlatformToWay, platform.getCentroid().y), stopSearchBuffer = -SphericalMercator.metersToCoordDelta(maxConflictSearchDistance, platform.getCentroid().y);
+        nearbyWaySearchRegion = platform.getBoundingBox().regionInset(waySearchBuffer, waySearchBuffer);
+        nearbyStopSearchRegion = platform.getBoundingBox().regionInset(stopSearchBuffer, stopSearchBuffer);
     }
     public Region getNearbyWaySearchRegion() {
         return nearbyWaySearchRegion;

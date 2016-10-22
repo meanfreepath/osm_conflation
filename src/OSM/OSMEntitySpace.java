@@ -102,14 +102,14 @@ public class OSMEntitySpace {
 
     /**
      * Create a new Node in this space
-     * @param latitude
-     * @param longitude
+     * @param x
+     * @param y
      * @param withTags tags to add to the node, if any
      * @return the new node
      */
-    public OSMNode createNode(final double latitude, final double longitude, final Map<String, String> withTags) {
+    public OSMNode createNode(final double x, final double y, final Map<String, String> withTags) {
         final OSMNode newNode = new OSMNode(--osmIdSequence);
-        newNode.setCoordinate(latitude, longitude);
+        newNode.setCoordinate(x, y);
         newNode.setComplete(true);
         newNode.markAsModified();
 
@@ -722,7 +722,7 @@ public class OSMEntitySpace {
                     case tagNode: //nodes are simply added to the entity array
                         final OSMNode curNode = new OSMNode(Long.parseLong(attributes.getValue(keyId)));
                         curNode.setComplete(true);
-                        curNode.setCoordinate(Double.parseDouble(attributes.getValue("lat")), Double.parseDouble(attributes.getValue("lon")));
+                        curNode.setCoordinate(SphericalMercator.latLonToMercator(Double.parseDouble(attributes.getValue("lat")), Double.parseDouble(attributes.getValue("lon"))));
                         processBaseValues(curNode, attributes);
 
                         final OSMNode addedNode = (OSMNode) addEntity(curNode, OSMEntity.TagMergeStrategy.keepTags, null);
@@ -852,7 +852,8 @@ public class OSMEntitySpace {
         final FileWriter writer = new FileWriter(fileName);
         writer.write(String.format(XML_DOCUMENT_OPEN, Boolean.toString(canUpload)));
         if(fileBoundingBox != null) {
-            writer.write(String.format(XML_BOUNDING_BOX, fileBoundingBox.origin.latitude, fileBoundingBox.origin.longitude, fileBoundingBox.extent.latitude, fileBoundingBox.extent.longitude));
+            final LatLonRegion latLonBoundingBox = SphericalMercator.mercatorToLatLon(fileBoundingBox);
+            writer.write(String.format(XML_BOUNDING_BOX, latLonBoundingBox.origin.latitude, latLonBoundingBox.origin.longitude, latLonBoundingBox.extent.latitude, latLonBoundingBox.extent.longitude));
         }
 
         for(final OSMNode node: allNodes.values()) {

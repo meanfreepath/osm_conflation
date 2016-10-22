@@ -1,6 +1,5 @@
 package Conflation;
 
-import OSM.OSMEntity;
 import OSM.Point;
 import OSM.Region;
 
@@ -99,16 +98,14 @@ public class SegmentMatch {
             yInt = xInt * vecA + vecC;
         }
 
-        final double latitudeFactor = Math.cos(routeLineSegment.midPointY * Math.PI / 180.0);
-        final double oDiffX = (xInt - routeLineSegment.midPointX) * latitudeFactor, oDiffY = yInt - routeLineSegment.midPointY, mDiffX = (osmLineSegment.midPointX - routeLineSegment.midPointX) * latitudeFactor, mDiffY = (osmLineSegment.midPointY - routeLineSegment.midPointY);
-
-        final double orthogonalDistance = Point.distance(oDiffY, oDiffX);
-        final double midPointDistance = Point.distance(mDiffY, mDiffX);
+        //calculate the orthogonal and midpoint distance
+        final double orthogonalDistance = Point.distance(routeLineSegment.midPointX, routeLineSegment.midPointY, xInt, yInt), midPointDistance = Point.distance(osmLineSegment.midPointX, osmLineSegment.midPointY, routeLineSegment.midPointX, routeLineSegment.midPointY);
 
         if(debugOutput) {
-            System.out.println(String.format("RTE %03d/%04d: [%.08f,%.08f] :: point:(%.05f,%.05f)", routeLineSegment.nodeIndex, routeLineSegment.segmentIndex, routeLineSegment.vectorX, routeLineSegment.vectorY, routeLineSegment.midPointX, routeLineSegment.midPointY));
-            System.out.println(String.format("OSM %03d/%04d: [%.08f,%.08f] :: point:(%.05f,%.05f)", osmLineSegment.nodeIndex, osmLineSegment.segmentIndex, osmLineSegment.vectorX, osmLineSegment.vectorY, osmLineSegment.midPointX, osmLineSegment.midPointY));
-            System.out.println(String.format("DP MATCH for %s: %.05f, dist (%f,%f), oDist:%f, intersect(%f,%f)", osmLineSegment.getParent().way.getTag("name"), dotProduct, oDiffX, oDiffY, orthogonalDistance, yInt, xInt));
+            final double oDiffX = (xInt - routeLineSegment.midPointX), oDiffY = yInt - routeLineSegment.midPointY;
+            System.out.println(String.format("RTE %03d/%04d: [%.01f,%.01f] :: point:(%.01f,%.01f)", routeLineSegment.nodeIndex, routeLineSegment.segmentIndex, routeLineSegment.vectorX, routeLineSegment.vectorY, routeLineSegment.midPointX, routeLineSegment.midPointY));
+            System.out.println(String.format("OSM %03d/%04d: [%.01f,%.01f] :: point:(%.01f,%.01f)", osmLineSegment.nodeIndex, osmLineSegment.segmentIndex, osmLineSegment.vectorX, osmLineSegment.vectorY, osmLineSegment.midPointX, osmLineSegment.midPointY));
+            System.out.println(String.format("DP MATCH for %s: %.05f, dist (%.01f,%.01f), oDist:%.02f, mDist: %.02f intersect(%.01f,%.01f)", osmLineSegment.getParent().way.getTag("name"), dotProduct, oDiffX, oDiffY, orthogonalDistance, midPointDistance, yInt, xInt));
         }
         if(Region.intersects(routeLineSegment.searchAreaForMatchingOtherSegments, osmLineSegment.searchAreaForMatchingOtherSegments)) {
 

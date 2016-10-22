@@ -18,7 +18,7 @@ import java.util.HashMap;
  * A simple Java wrapper for the OpenStreetMap Overpass API
  */
 public class ApiClient {
-    public final static int CONNECT_TIMEOUT = 5000, READ_TIMEOUT = 25000;
+    public final static int CONNECT_TIMEOUT = 5000, READ_TIMEOUT = 25000, MIN_QUERY_WAIT_TIME = 2000;
     public final static String ENDPOINT_URL = "http://overpass-api.de/api/interpreter";
     private final static String QUERY_TEMPLATE = "[out:%s];%sout meta;", GEOJSON_QUERY_TEMPLATE = "[out:%s];%sout body geom;";
 
@@ -87,8 +87,8 @@ public class ApiClient {
                 writer.close();
             }
 
-            //wait a little before making the next request
-            Thread.sleep(500);
+            //wait a little before making the next request (avoid Overpass API query limitations)
+            Thread.sleep(MIN_QUERY_WAIT_TIME);
         } catch (Exceptions.OverpassError | IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {

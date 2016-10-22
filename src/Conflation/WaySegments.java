@@ -29,13 +29,18 @@ public abstract class WaySegments {
     public final double maxSegmentLength;
     protected List<WaySegmentsObserver> observers = null;
 
+    /**
+     * Create a new object, split into segments with the given maximum length
+     * @param way the way to use
+     * @param maxSegmentLength the maximum segment length, in meters
+     */
     public WaySegments(final OSMWay way, final double maxSegmentLength) {
         this.way = way;
         this.maxSegmentLength = maxSegmentLength;
         oneWayDirection = determineOneWayDirection(way);
 
         //generate a list of line segments out of this line
-        segments = new ArrayList<>((int) Math.ceil(way.length() / maxSegmentLength)); //TODO base on total line length, to handle the newly-created segments
+        segments = new ArrayList<>((int) Math.ceil(way.length() / maxSegmentLength));
         OSMNode originNode = way.getFirstNode();
         int nodeIndex = 0, segmentIndex = 0;
         for(final OSMNode destinationNode: way.getNodes()) {
@@ -45,7 +50,7 @@ public abstract class WaySegments {
 
             //first get the distance between the 2 nodes
             final Point destinationPoint = destinationNode.getCentroid(), originPoint = originNode.getCentroid();
-            final double vectorX = destinationPoint.longitude - originPoint.longitude, vectorY = destinationPoint.latitude - originPoint.latitude;
+            final double vectorX = destinationPoint.x - originPoint.x, vectorY = destinationPoint.y - originPoint.y;
             final double segmentLength = Point.distance(originNode.getCentroid(),destinationNode.getCentroid());
 
             //if less than the length threshold, add as a segment
@@ -60,9 +65,9 @@ public abstract class WaySegments {
 
                 //add the first segment (with the origin node) and subsequent segments (which have no existing nodes)
                 for (int seg = 0; seg < segmentsToAdd - 1; seg++) {
-                    destinationLon = miniOrigin.longitude + vectorX / segmentsToAdd;
-                    destinationLat = miniOrigin.latitude + vectorY / segmentsToAdd;
-                    miniDestination = new Point(destinationLat, destinationLon);
+                    destinationLon = miniOrigin.x + vectorX / segmentsToAdd;
+                    destinationLat = miniOrigin.y + vectorY / segmentsToAdd;
+                    miniDestination = new Point(destinationLon, destinationLat);
 
                     segments.add(createLineSegment(miniOrigin, miniDestination, miniOriginNode, null, segmentIndex++, nodeIndex));
 
@@ -212,7 +217,7 @@ public abstract class WaySegments {
     /**
      * Returns the segment which is closest to the given point
      * @param point
-     * @param maxSearchDistance
+     * @param maxSearchDistance - the maximum distance to search, in meters
      * @return the closest LineSegment
      */
     public final LineSegment closestSegmentToPoint(final Point point, final double maxSearchDistance) {

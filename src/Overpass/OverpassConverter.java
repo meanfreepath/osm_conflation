@@ -20,8 +20,18 @@ public class OverpassConverter {
     public OSMEntitySpace getEntitySpace() {
         return entitySpace;
     }
+
+    /**
+     * Fetch the data from the given location
+     * @param tagQuery - tags to search by
+     * @param boundingBox - a bounding box, in Mercator coordinates
+     * @param boundingBoxPadding - additional padding, in meters
+     * @param entityType (node, way, relation)
+     * @return The formatted overpass query
+     */
     public String queryForBoundingBox(final String tagQuery, final Region boundingBox, final double boundingBoxPadding, final OSMEntity.OSMType entityType) {
-        final Region expandedBoundingBox = boundingBox.regionInset(-boundingBoxPadding, -boundingBoxPadding);
+        final double paddingInCoords = SphericalMercator.metersToCoordDelta(boundingBoxPadding, boundingBox.getCentroid().y);
+        final LatLonRegion expandedBoundingBox = SphericalMercator.mercatorToLatLon(boundingBox.regionInset(-paddingInCoords, -paddingInCoords));
         switch (entityType) {
             case node:
                 return String.format(NODE_QUERY_FORMAT, tagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude);
@@ -54,7 +64,7 @@ public class OverpassConverter {
                 if(elementType.equals(OSMEntity.OSMType.node.name())) {
                     final OSMNode node = new OSMNode(curElement.getLong(keyId));
                     node.setComplete(true);
-                    node.setCoordinate(curElement.getDouble("lat"), curElement.getDouble("lon"));
+                    node.setCoordinate(SphericalMercator.latLonToMercator(curElement.getDouble("lat"), curElement.getDouble("lon")));
 
                     if(curElement.has(keyTags)) {
                         addTags(curElement, node);

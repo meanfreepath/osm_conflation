@@ -2,9 +2,7 @@ package com.company;
 
 import Conflation.StopArea;
 import Conflation.StopConflator;
-import OSM.OSMEntity;
-import OSM.OSMEntitySpace;
-import OSM.Region;
+import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.json.JSONWriter;
 
@@ -24,7 +22,7 @@ public class OSMTaskManagerExporter {
     private static class DividedBox {
         private static int idGenerator = 0;
         private final static String BOX_FILE_FORMAT = "box_%d.osm";
-        public final static double BOX_SIZE = 0.045;
+        public final static double BOX_SIZE = 5000.0; //standard box size, in meters
 
         public final int id;
         public final Region region;
@@ -71,11 +69,14 @@ public class OSMTaskManagerExporter {
         }
 
         //get the bounding box of all the data (plus a little buffer to ensure everything's contained
-        final Region boundingBox = entitySpace.getBoundingBox().regionInset(-0.0001, -0.0001);
+        final double coordFactor = SphericalMercator.metersToCoordDelta(1.0, entitySpace.getBoundingBox().getCentroid().y);
+        final double boundingBoxBuffer = -10.0 * coordFactor;
+        final Region boundingBox = entitySpace.getBoundingBox().regionInset(boundingBoxBuffer, boundingBoxBuffer);
 
         //run a rough calculation of the number of boxes needed
-        final int horizontalBoxCount = (int) Math.ceil((boundingBox.origin.longitude - boundingBox.origin.longitude) / DividedBox.BOX_SIZE);
-        final int verticalBoxCount = (int) Math.ceil((boundingBox.origin.latitude - boundingBox.origin.latitude) / DividedBox.BOX_SIZE);
+        final double boxSizeInCoords = DividedBox.BOX_SIZE * coordFactor;
+        final int horizontalBoxCount = (int) Math.ceil((boundingBox.origin.x - boundingBox.origin.x) / boxSizeInCoords);
+        final int verticalBoxCount = (int) Math.ceil((boundingBox.origin.y - boundingBox.origin.y) / boxSizeInCoords);
         final List<DividedBox> subBoxes = new ArrayList<>(horizontalBoxCount * verticalBoxCount);
 
         //include all GTFS stops, and any existing stops that conflict with them
@@ -87,8 +88,7 @@ public class OSMTaskManagerExporter {
         }
 
         //divide the bounding box into multiple smaller boxes
-        final double boxWidth = DividedBox.BOX_SIZE / Math.cos(0.5 * (boundingBox.origin.latitude + boundingBox.extent.latitude) * Math.PI / 180.0);
-        createSubBoxesInRegion(boundingBox, boxWidth, DividedBox.BOX_SIZE, filteredEntities, subBoxes);
+        createSubBoxesInRegion(boundingBox, boxSizeInCoords, boxSizeInCoords, filteredEntities, subBoxes);
 
         //now subdivide boxes with a large number of stops into smaller boxes
         final List<DividedBox> boxesToRemove = new ArrayList<>(128);
@@ -96,10 +96,10 @@ public class OSMTaskManagerExporter {
         for(final DividedBox box : subBoxes) {
             final int stopsInBox = box.containedEntities.size();
             if(stopsInBox > 250) { //break into 9 boxes
-                createSubBoxesInRegion(box.region, boxWidth / 3.0, DividedBox.BOX_SIZE / 3.0, filteredEntities, boxesToAdd);
+                createSubBoxesInRegion(box.region, boxSizeInCoords / 3.0, boxSizeInCoords / 3.0, filteredEntities, boxesToAdd);
                 boxesToRemove.add(box);
             } else if(stopsInBox > 100) { //break into 4 boxes
-                createSubBoxesInRegion(box.region, boxWidth / 2.0, DividedBox.BOX_SIZE / 2.0, filteredEntities, boxesToAdd);
+                createSubBoxesInRegion(box.region, boxSizeInCoords / 2.0, boxSizeInCoords / 2.0, filteredEntities, boxesToAdd);
                 boxesToRemove.add(box);
             }
         }
@@ -139,6 +139,7 @@ public class OSMTaskManagerExporter {
         //features array: output the boxes and their geometries
         jsonWriter.key("features").array();
         for(final DividedBox box : subBoxes) {
+            final LatLonRegion boxRegionLL = SphericalMercator.mercatorToLatLon(box.region);
             jsonWriter.object();
             jsonWriter.key("type").value("Feature");
 
@@ -153,11 +154,11 @@ public class OSMTaskManagerExporter {
             jsonWriter.key("geometry").object();
             jsonWriter.key("type").value("Polygon");
             jsonWriter.key("coordinates").array().array();
-            jsonWriter.array().value(box.region.origin.longitude).value(box.region.origin.latitude).endArray();
-            jsonWriter.array().value(box.region.extent.longitude).value(box.region.origin.latitude).endArray();
-            jsonWriter.array().value(box.region.extent.longitude).value(box.region.extent.latitude).endArray();
-            jsonWriter.array().value(box.region.origin.longitude).value(box.region.extent.latitude).endArray();
-            jsonWriter.array().value(box.region.origin.longitude).value(box.region.origin.latitude).endArray();
+            jsonWriter.array().value(boxRegionLL.origin.longitude).value(boxRegionLL.origin.latitude).endArray();
+            jsonWriter.array().value(boxRegionLL.extent.longitude).value(boxRegionLL.origin.latitude).endArray();
+            jsonWriter.array().value(boxRegionLL.extent.longitude).value(boxRegionLL.extent.latitude).endArray();
+            jsonWriter.array().value(boxRegionLL.origin.longitude).value(boxRegionLL.extent.latitude).endArray();
+            jsonWriter.array().value(boxRegionLL.origin.longitude).value(boxRegionLL.origin.latitude).endArray();
             jsonWriter.endArray().endArray();
             jsonWriter.endObject();
 
@@ -179,9 +180,9 @@ public class OSMTaskManagerExporter {
     }
     private static void createSubBoxesInRegion(final Region region, final double boxWidth, final double boxHeight, final List<OSMEntity> filteredEntities, final List<DividedBox> boxList) {
         final double boxWidthTolerance = boxWidth * 0.01, boxHeightTolerance = boxHeight * 0.01;
-        for(double lon=region.origin.longitude;region.extent.longitude - lon > boxWidthTolerance;lon += boxWidth) {
-            for(double lat=region.origin.latitude;region.extent.latitude - lat > boxHeightTolerance;lat += boxHeight) {
-                final Region boxRegion = new Region(lat, lon, boxHeight, boxWidth);
+        for(double lon = region.origin.x; region.extent.x - lon > boxWidthTolerance; lon += boxWidth) {
+            for(double lat = region.origin.y; region.extent.y - lat > boxHeightTolerance; lat += boxHeight) {
+                final Region boxRegion = new Region(lon, lat, boxWidth, boxHeight);
 
                 //create a sub-box if the boxRegion contains at least one of the desired node types
                 final DividedBox box = new DividedBox(boxRegion);

@@ -76,16 +76,13 @@ public class RouteLineWaySegments extends WaySegments {
         //loop through all the segments in this RouteLine, compiling a list of OSM ways to check for detailed matches
         Date t0 = new Date();
         RouteLineSegment routeLineSegment;
-        //final Collection<OSMWaySegments> routeCandidateLines = routeConflator.candidateLines.values();
-        final Map<Long, RouteConflator.Cell> allCells = RouteConflator.Cell.allCells;
         int totalIterations = 0;
         for (final LineSegment lineSegment : segments) {
             routeLineSegment = (RouteLineSegment) lineSegment;
-            //and loop through the OSM ways that intersect the current RouteLineSegment's bounding box
 
-            //get the cells which the routeLineSegment overlaps with
+            //get the cells which the routeLineSegment overlaps with...
             final List<RouteConflator.Cell> segmentCells = new ArrayList<>(2);
-            for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells.values()) {
+            for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
                 if (Region.intersects(routeLineSegment.searchAreaForMatchingOtherSegments, cell.expandedBoundingBox)) {
                     if (!segmentCells.contains(cell)) {
                         segmentCells.add(cell);

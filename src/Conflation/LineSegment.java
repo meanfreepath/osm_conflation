@@ -3,6 +3,7 @@ package Conflation;
 import OSM.OSMNode;
 import OSM.Point;
 import OSM.Region;
+import OSM.SphericalMercator;
 
 import java.nio.charset.Charset;
 import java.text.DecimalFormat;
@@ -13,7 +14,7 @@ import java.util.zip.CRC32;
  */
 public abstract class LineSegment {
     private final static DecimalFormat DEBUG_OUTPUT_FORMATTER = new DecimalFormat("#.####");
-    private final static String ID_HASH_FORMAT = "%d:%d:%.08f,%.08f:%.08f,%.08f";
+    private final static String ID_HASH_FORMAT = "%d:%d:%.03f,%.03f:%.03f,%.03f";
     public final Point originPoint, midPoint, destinationPoint;
     public final OSMNode originNode, destinationNode;
 
@@ -26,16 +27,15 @@ public abstract class LineSegment {
      * The index of the originNode in the parent Way (if originNode is null, should be the index of the most recent node in the way)
      */
     public final long id;
-    public int nodeIndex;
-    public int segmentIndex;
+    public int nodeIndex, segmentIndex;
     public final double vectorX, vectorY, orthogonalVectorX, orthogonalVectorY, midPointX, midPointY;
     public final double vectorMagnitude;
     public final double length;
-    public final Region searchAreaForMatchingOtherSegments;
+    public final Region boundingBox, searchAreaForMatchingOtherSegments;
 
     private static long generateIdForPoints(final long parent_id, final int segmentIndex, final Point origin, final Point destination) {
         idGenerator.reset();
-        idGenerator.update(String.format(ID_HASH_FORMAT, parent_id, segmentIndex, origin.latitude, origin.longitude, destination.latitude, destination.longitude).getBytes(Charset.forName("ascii")));
+        idGenerator.update(String.format(ID_HASH_FORMAT, parent_id, segmentIndex, origin.y, origin.x, destination.y, destination.x).getBytes(Charset.forName("ascii")));
         return idGenerator.getValue();
     }
     public LineSegment(final long parent_id, final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
@@ -47,22 +47,22 @@ public abstract class LineSegment {
         this.segmentIndex = segmentIndex;
         this.id = generateIdForPoints(parent_id, segmentIndex, originPoint, destinationPoint);
 
-        vectorX = destination.longitude - origin.longitude;
-        vectorY = destination.latitude - origin.latitude;
+        vectorX = destinationPoint.x - originPoint.x;
+        vectorY = destinationPoint.y - originPoint.y;
         vectorMagnitude = Math.sqrt(vectorX * vectorX + vectorY * vectorY);
 
         orthogonalVectorX = -vectorY;
         //noinspection SuspiciousNameCombination
         orthogonalVectorY = vectorX;
 
-        midPointX = origin.longitude + 0.5 * vectorX;
-        midPointY = origin.latitude + 0.5 * vectorY;
-        midPoint = new Point(midPointY, midPointX);
+        midPointX = originPoint.x + 0.5 * vectorX;
+        midPointY = originPoint.y + 0.5 * vectorY;
+        midPoint = new Point(midPointX, midPointY);
 
-        length = Point.distance(vectorY, vectorX);
-
-        final double latitudeDelta = -RouteConflator.wayMatchingOptions.segmentSearchBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * midPointY / 180.0);
-        searchAreaForMatchingOtherSegments = getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
+        length = Point.distance(vectorX, vectorY, midPointY);
+        boundingBox = new Region(Math.min(originPoint.x, destinationPoint.x), Math.min(originPoint.y, destinationPoint.y), Math.abs(vectorX), Math.abs(vectorY));
+        final double searchAreaBuffer = -SphericalMercator.metersToCoordDelta(RouteConflator.wayMatchingOptions.segmentSearchBoxSize, midPointY);
+        searchAreaForMatchingOtherSegments = boundingBox.regionInset(searchAreaBuffer, searchAreaBuffer);
     }
     public LineSegment(final LineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
         this.originPoint = segmentToCopy.originPoint;
@@ -73,27 +73,23 @@ public abstract class LineSegment {
         this.segmentIndex = segmentToCopy.segmentIndex;
         this.id = generateIdForPoints(segmentToCopy.getParent().way.osm_id, segmentIndex, originPoint, destinationPoint);
 
-        vectorX = destination.longitude - originPoint.longitude;
-        vectorY = destination.latitude - originPoint.latitude;
+        vectorX = destinationPoint.x - originPoint.x;
+        vectorY = destinationPoint.y - originPoint.y;
         vectorMagnitude = Math.sqrt(vectorX * vectorX + vectorY * vectorY);
 
         orthogonalVectorX = -vectorY;
         //noinspection SuspiciousNameCombination
         orthogonalVectorY = vectorX;
 
-        midPointX = originPoint.longitude + 0.5 * vectorX;
-        midPointY = originPoint.latitude + 0.5 * vectorY;
-        midPoint = new Point(midPointY, midPointX);
+        midPointX = originPoint.x + 0.5 * vectorX;
+        midPointY = originPoint.y + 0.5 * vectorY;
+        midPoint = new Point(midPointX, midPointY);
 
-        length = Point.distance(vectorY, vectorX);
-
-        final double latitudeDelta = -RouteConflator.wayMatchingOptions.segmentSearchBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * midPointY / 180.0);
-        searchAreaForMatchingOtherSegments = getBoundingBox().regionInset(latitudeDelta, longitudeDelta);
+        length = Point.distance(vectorX, vectorY, midPointY);
+        boundingBox = new Region(Math.min(originPoint.x, destinationPoint.x), Math.min(originPoint.y, destinationPoint.y), Math.abs(vectorX), Math.abs(vectorY));
+        final double searchAreaBuffer = -SphericalMercator.metersToCoordDelta(RouteConflator.wayMatchingOptions.segmentSearchBoxSize, midPointY);
+        searchAreaForMatchingOtherSegments = boundingBox.regionInset(searchAreaBuffer, searchAreaBuffer);
     }
-    public Region getBoundingBox() {
-        return new Region(Math.min(originPoint.latitude, destinationPoint.latitude), Math.min(originPoint.longitude, destinationPoint.longitude), Math.abs(vectorY), Math.abs(vectorX));
-    }
-
 
     /*public void copyMatches(final LineSegment fromSegment) {
         //TODO: may be more accurate to rematch rather than copy
@@ -113,8 +109,8 @@ public abstract class LineSegment {
      * @return
      */
     public Point closestPointToPoint(final Point point) {
-        final double apX = point.longitude - originPoint.longitude;
-        final double apY = point.latitude - originPoint.latitude;
+        final double apX = point.x - originPoint.x;
+        final double apY = point.y - originPoint.y;
 
         final double ab2 = vectorX * vectorX + vectorY * vectorY;
         final double ap_ab = apX * vectorX + apY * vectorY;
@@ -125,6 +121,6 @@ public abstract class LineSegment {
         } else if (t > 1.0) {
             t = 1.0;
         }
-        return new Point(originPoint.latitude + vectorY * t, originPoint.longitude + vectorX * t);
+        return new Point(originPoint.x + vectorX * t, originPoint.y + vectorY * t);
     }
 }

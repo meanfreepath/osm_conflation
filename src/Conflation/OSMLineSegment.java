@@ -32,6 +32,6 @@ public class OSMLineSegment extends LineSegment {
         this.parentSegments = segmentToCopy.getParent();
     }
     public String toString() {
-        return String.format("OSMSeg %d #%d/%d [%.04f, %.04f], nd[%d/%d]", parentSegments.way.osm_id, nodeIndex, segmentIndex, midPoint.latitude, midPoint.longitude, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
+        return String.format("OSMSeg %d #%d/%d [%.01f, %.01f], nd[%d/%d]", parentSegments.way.osm_id, nodeIndex, segmentIndex, midPoint.y, midPoint.x, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
 }

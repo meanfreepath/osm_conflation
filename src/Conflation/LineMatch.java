@@ -1,6 +1,9 @@
 package Conflation;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Class for tracking the match status between two WaySegmentsObjects, including

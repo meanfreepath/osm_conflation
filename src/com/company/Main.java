@@ -53,12 +53,13 @@ public class Main {
         try {
             importSpace.loadFromXML(importFileName);
 
-            /*(final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace);
-            exporter.conflateStopsWithOSM();
+            /*final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace);
+            exporter.conflateStops();
             exporter.outputForOSMTaskingManager("boxes", "https://www.meanfreepath.com/kcstops/");
             if(Math.random() < 2) {
                 return;
             }*/
+
             //first create a list of all the route_master relations in the import dataset
             final List<OSMRelation> importRouteMasterRelations = new ArrayList<>(importSpace.allRelations.size());
             String relationType;

@@ -37,7 +37,7 @@ public class StopConflator {
         }
 
         //first, add all the route's stops to the Cell index
-        for (final RouteConflator.Cell cell : RouteConflator.Cell.allCells.values()) {
+        for (final RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
             for(final StopArea stop : routeConflator.getAllRouteStops()) {
                 if (Region.intersects(cell.boundingBox, stop.getNearbyStopSearchRegion())) {
                     cell.addStop(stop);
@@ -64,7 +64,7 @@ public class StopConflator {
 
             //find the nearest OSM ways to the stop platforms, checking all lines whose bounding boxes intersect the stop's search area
             final Point platformCentroid = stop.getPlatform().getCentroid();
-            for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells.values()) {
+            for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
                 if(Region.intersects(cell.expandedBoundingBox, stop.getNearbyWaySearchRegion())) {
                     for(final OSMWaySegments line : cell.containedWays) {
                         //check the line's bounding box intersects
@@ -113,7 +113,7 @@ public class StopConflator {
         for(final Route route : routeConflator.getExportRoutes()) {
             for(final StopArea routeStop : route.stops) {
                 final Point platformCentroid = routeStop.getPlatform().getCentroid();
-                for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells.values()) {
+                for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
                     if(cell.containedStops.contains(routeStop)) {
                         for(final OSMWaySegments osmLine : cell.containedWays) {
                             //check the segment's bounding box intersects
@@ -165,7 +165,7 @@ public class StopConflator {
 
             OSMNode nearestNodeOnWay = bestSegment.getParent().way.nearestNodeAtPoint(nearestPointOnSegment, StopArea.stopNodeTolerance);
             if(nearestNodeOnWay == null) {
-                nearestNodeOnWay = bestSegment.getParent().insertNode(entitySpace.createNode(nearestPointOnSegment.latitude, nearestPointOnSegment.longitude, null), bestSegment);
+                nearestNodeOnWay = bestSegment.getParent().insertNode(entitySpace.createNode(nearestPointOnSegment.x, nearestPointOnSegment.y, null), bestSegment);
                 stopArea.chooseBestWayMatch();
             }
 
@@ -214,19 +214,20 @@ public class StopConflator {
         Region stopDownloadRegion = new Region(includedStops);
 
         //expand the total area little further, to ensure the start/end of the route is included (problem with King County data)
-        final double latitudeDelta = -/*StopArea.maxConflictSearchDistance*/100.0 / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * stopDownloadRegion.getCentroid().latitude / 180.0);
-        stopDownloadRegion = stopDownloadRegion.regionInset(latitudeDelta, longitudeDelta);
+        final double stopSearchBuffer = -SphericalMercator.metersToCoordDelta(100.0/*StopArea.maxConflictSearchDistance*/, stopDownloadRegion.getCentroid().y);
+        stopDownloadRegion = stopDownloadRegion.regionInset(stopSearchBuffer, stopSearchBuffer);
 
         final OverpassConverter converter = new OverpassConverter();
         try {
             final String query;
             switch (routeType) {
-                case OSMEntity.TAG_BUS: //bus stops are always nodes
+                case OSMEntity.TAG_BUS: //bus stops are typically nodes, but may also be ways
+                    final LatLonRegion stopDownloadRegionLL = SphericalMercator.mercatorToLatLon(stopDownloadRegion);
                     final String[] queryComponents = {
-                            String.format("node[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
-                            String.format("node[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
-                            String.format("way[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude),
-                            String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegion.origin.latitude, stopDownloadRegion.origin.longitude, stopDownloadRegion.extent.latitude, stopDownloadRegion.extent.longitude)
+                            String.format("node[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("node[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("way[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude)
                     };
                     query = "(" + String.join(";", queryComponents) + ");(._;>;);";
                     break;

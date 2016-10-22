@@ -333,7 +333,7 @@ public class Path {
                     if (lineSegment.destinationNode != null) {
                         matchLastNode = (OSMNode) entitySpace.addEntity(lineSegment.destinationNode, OSMEntity.TagMergeStrategy.keepTags, null);
                     } else {
-                        matchLastNode = entitySpace.createNode(lineSegment.destinationPoint.latitude, lineSegment.destinationPoint.longitude, null);
+                        matchLastNode = entitySpace.createNode(lineSegment.destinationPoint.x, lineSegment.destinationPoint.y, null);
                     }
 
                     final OSMWay pathSegmentWay = entitySpace.createWay(null, null);
@@ -370,7 +370,7 @@ public class Path {
                     if (lineSegment.originNode != null) {
                         matchLastNode = (OSMNode) entitySpace.addEntity(lineSegment.originNode, OSMEntity.TagMergeStrategy.keepTags, null);
                     } else {
-                        matchLastNode = entitySpace.createNode(lineSegment.originPoint.latitude, lineSegment.originPoint.longitude, null);
+                        matchLastNode = entitySpace.createNode(lineSegment.originPoint.x, lineSegment.originPoint.y, null);
                     }
 
                     final OSMWay pathSegmentWay = entitySpace.createWay(null, null);

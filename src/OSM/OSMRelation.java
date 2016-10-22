@@ -98,7 +98,7 @@ public class OSMRelation extends OSMEntity {
     @Override
     public Point getCentroid() {
         Region boundingBox = getBoundingBox();
-        return new Point(0.5 * (boundingBox.origin.latitude + boundingBox.extent.latitude), 0.5 * (boundingBox.origin.longitude + boundingBox.extent.longitude));
+        return new Point(0.5 * (boundingBox.origin.x + boundingBox.extent.x), 0.5 * (boundingBox.origin.y + boundingBox.extent.y));
     }
 
     @Override

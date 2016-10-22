@@ -3,7 +3,10 @@ package Conflation;
 import OSM.OSMNode;
 import OSM.Point;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Created by nick on 9/30/16.
@@ -129,6 +132,6 @@ public class RouteLineSegment extends LineSegment {
         return bestMatchForLine;
     }
     public String toString() {
-        return String.format("RLSeg #%d/%d [%.04f, %.04f], nd[%d/%d]", nodeIndex, segmentIndex, midPoint.latitude, midPoint.longitude, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
+        return String.format("RLSeg #%d/%d [%.01f, %.01f], nd[%d/%d]", nodeIndex, segmentIndex, midPoint.y, midPoint.x, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
 }

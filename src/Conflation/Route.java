@@ -104,7 +104,7 @@ public class Route {
                     } else if(Point.distance(closestPointOnRouteLine, closestSegment.originPoint) < nodeTolerance) {
                         closestPointToPlatform = closestSegment.originPoint;
                     } else {
-                        closestPointToPlatform = new Point(closestPointOnRouteLine.latitude, closestPointOnRouteLine.longitude);
+                        closestPointToPlatform = new Point(closestPointOnRouteLine.x, closestPointOnRouteLine.y);
                         routeLine.insertPoint(closestPointToPlatform, closestSegment, 0.0);
                     }
 
@@ -134,7 +134,7 @@ public class Route {
         final OSMEntitySpace segmentSpace = new OSMEntitySpace(entitySpace.allWays.size() + entitySpace.allNodes.size());
         final DecimalFormat format = new DecimalFormat("#.###");
 
-        final short matchMask = SegmentMatch.matchTypeTravelDirection;//SegmentMatch.matchMaskAll;//SegmentMatch.matchTypeDotProduct | SegmentMatch.matchTypeDistance;//0*SegmentMatch.matchMaskAll;
+        final short matchMask = SegmentMatch.matchMaskAll;//SegmentMatch.matchTypeDotProduct | SegmentMatch.matchTypeDistance;//0*SegmentMatch.matchMaskAll;
 
         //output the route's shape segments
         OSMNode originNode = null, lastNode;
@@ -146,20 +146,20 @@ public class Route {
                 if(mainSegment.originNode != null) {
                     originNode = (OSMNode) segmentSpace.addEntity(mainSegment.originNode, OSMEntity.TagMergeStrategy.keepTags, null);
                 } else {
-                    originNode = segmentSpace.createNode(mainSegment.originPoint.latitude, mainSegment.originPoint.longitude, null);
+                    originNode = segmentSpace.createNode(mainSegment.originPoint.x, mainSegment.originPoint.y, null);
                 }
             }
             if(mainSegment.destinationNode != null) {
                 lastNode = (OSMNode) segmentSpace.addEntity(mainSegment.destinationNode, OSMEntity.TagMergeStrategy.keepTags, null);
             } else {
-                lastNode = segmentSpace.createNode(mainSegment.destinationPoint.latitude, mainSegment.destinationPoint.longitude, null);
+                lastNode = segmentSpace.createNode(mainSegment.destinationPoint.x, mainSegment.destinationPoint.y, null);
             }
             segmentWay.appendNode(originNode);
             segmentWay.appendNode(lastNode);
             segmentWay.setTag("segid", Long.toString(mainSegment.id));
             segmentWay.setTag(OSMEntity.KEY_REF, routeLine.way.getTag(OSMEntity.KEY_NAME));
             segmentWay.setTag(OSMEntity.KEY_NAME, String.format("#%d/%d", mainSegment.segmentIndex, mainSegment.nodeIndex));
-            segmentWay.setTag(OSMEntity.KEY_DESCRIPTION, String.format("[%.04f, %.04f], nd[%d/%d]: %d matches", mainSegment.midPoint.latitude, mainSegment.midPoint.longitude, mainSegment.originNode != null ? mainSegment.originNode.osm_id : 0, mainSegment.destinationNode != null ? mainSegment.destinationNode.osm_id : 0, mainSegment.bestMatchForLine.size()));
+            segmentWay.setTag(OSMEntity.KEY_DESCRIPTION, String.format("[%.04f, %.04f], nd[%d/%d]: %d matches", mainSegment.midPoint.y, mainSegment.midPoint.x, mainSegment.originNode != null ? mainSegment.originNode.osm_id : 0, mainSegment.destinationNode != null ? mainSegment.destinationNode.osm_id : 0, mainSegment.bestMatchForLine.size()));
             OSMEntity.copyTag(routeLine.way, segmentWay, "highway");
             OSMEntity.copyTag(routeLine.way, segmentWay, "railway");
             segmentWay.setTag("oneway", OSMEntity.TAG_YES);
@@ -184,22 +184,24 @@ public class Route {
             pathRelation.addMember(segmentSpace.addEntity(pathTree.toStop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null), "platform");
 
             //and the closest nodes on the RouteLine
-            final RouteLineSegment fromSegment = pathTree.routeLineSegments.get(0), toSegment = pathTree.routeLineSegments.get(pathTree.routeLineSegments.size() - 1);
-            final OSMWay fromSegmentWay = routeLineSegmentWays.get(fromSegment.id), toSegmentWay = routeLineSegmentWays.get(toSegment.id);
-            stopTags.put(OSMEntity.KEY_NAME, pathTree.fromStop.getPlatform().getTag(OSMEntity.KEY_NAME));
-            fromSegmentWay.getFirstNode().setTags(stopTags);
-            pathRelation.addMember(fromSegmentWay.getFirstNode(), "stop");
-            stopTags.put(OSMEntity.KEY_NAME, pathTree.toStop.getPlatform().getTag(OSMEntity.KEY_NAME));
-            toSegmentWay.getLastNode().setTags(stopTags);
-            pathRelation.addMember(toSegmentWay.getLastNode(), "stop");
+            if(pathTree.routeLineSegments != null) {
+                final RouteLineSegment fromSegment = pathTree.routeLineSegments.get(0), toSegment = pathTree.routeLineSegments.get(pathTree.routeLineSegments.size() - 1);
+                final OSMWay fromSegmentWay = routeLineSegmentWays.get(fromSegment.id), toSegmentWay = routeLineSegmentWays.get(toSegment.id);
+                stopTags.put(OSMEntity.KEY_NAME, pathTree.fromStop.getPlatform().getTag(OSMEntity.KEY_NAME));
+                fromSegmentWay.getFirstNode().setTags(stopTags);
+                pathRelation.addMember(fromSegmentWay.getFirstNode(), "stop");
+                stopTags.put(OSMEntity.KEY_NAME, pathTree.toStop.getPlatform().getTag(OSMEntity.KEY_NAME));
+                toSegmentWay.getLastNode().setTags(stopTags);
+                pathRelation.addMember(toSegmentWay.getLastNode(), "stop");
 
-            //and add the associated RouteLineSegment ways created in the previous loop
-            for(final RouteLineSegment segment : pathTree.routeLineSegments) {
-                final OSMWay segmentWay = routeLineSegmentWays.get(segment.id);
-                if(segmentWay != null) {
-                    pathRelation.addMember(segmentWay, "");
-                } else {
-                    System.out.println("NULL SEG");
+                //and add the associated RouteLineSegment ways created in the previous loop
+                for (final RouteLineSegment segment : pathTree.routeLineSegments) {
+                    final OSMWay segmentWay = routeLineSegmentWays.get(segment.id);
+                    if (segmentWay != null) {
+                        pathRelation.addMember(segmentWay, "");
+                    } else {
+                        System.out.println("NULL SEG");
+                    }
                 }
             }
         }
@@ -230,27 +232,27 @@ public class Route {
                 for (final SegmentMatch osmLineMatch : routeLineSegmentMatches) {
 
                     //look up the origin node in the segment space, and use it if already present
-                    pointMatchKeyOrigin = String.format(nodeMatchFormat, osmLineMatch.matchingSegment.originPoint.latitude, osmLineMatch.matchingSegment.originPoint.longitude);
+                    pointMatchKeyOrigin = String.format(nodeMatchFormat, osmLineMatch.matchingSegment.originPoint.y, osmLineMatch.matchingSegment.originPoint.x);
                     matchOriginNode = nodeSpaceMap.get(pointMatchKeyOrigin);
                     if (matchOriginNode == null) {
                         if (osmLineMatch.matchingSegment.originNode != null && entitySpace.allNodes.containsKey(osmLineMatch.matchingSegment.originNode.osm_id)) {
                             matchOriginNode = (OSMNode) segmentSpace.addEntity(entitySpace.allNodes.get(osmLineMatch.matchingSegment.originNode.osm_id), OSMEntity.TagMergeStrategy.keepTags, null);
                             matchOriginNode.setTag("node_id", Long.toString(osmLineMatch.matchingSegment.originNode.osm_id));
                         } else {
-                            matchOriginNode = segmentSpace.createNode(osmLineMatch.matchingSegment.originPoint.latitude, osmLineMatch.matchingSegment.originPoint.longitude, null);
+                            matchOriginNode = segmentSpace.createNode(osmLineMatch.matchingSegment.originPoint.x, osmLineMatch.matchingSegment.originPoint.y, null);
                         }
                         nodeSpaceMap.put(pointMatchKeyOrigin, matchOriginNode);
                     }
 
                     //look up the destination node in the segment space, and use it if already present
-                    pointMatchKeyDestination = String.format(nodeMatchFormat, osmLineMatch.matchingSegment.destinationPoint.latitude, osmLineMatch.matchingSegment.destinationPoint.longitude);
+                    pointMatchKeyDestination = String.format(nodeMatchFormat, osmLineMatch.matchingSegment.destinationPoint.y, osmLineMatch.matchingSegment.destinationPoint.x);
                     matchLastNode = nodeSpaceMap.get(pointMatchKeyDestination);
                     if (matchLastNode == null) {
                         if (osmLineMatch.matchingSegment.destinationNode != null && entitySpace.allNodes.containsKey(osmLineMatch.matchingSegment.destinationNode.osm_id)) {
                             matchLastNode = (OSMNode) segmentSpace.addEntity(entitySpace.allNodes.get(osmLineMatch.matchingSegment.destinationNode.osm_id), OSMEntity.TagMergeStrategy.keepTags, null);
                             matchLastNode.setTag("node_id", Long.toString(osmLineMatch.matchingSegment.destinationNode.osm_id));
                         } else {
-                            matchLastNode = segmentSpace.createNode(osmLineMatch.matchingSegment.destinationPoint.latitude, osmLineMatch.matchingSegment.destinationPoint.longitude, null);
+                            matchLastNode = segmentSpace.createNode(osmLineMatch.matchingSegment.destinationPoint.x, osmLineMatch.matchingSegment.destinationPoint.y, null);
                         }
                         nodeSpaceMap.put(pointMatchKeyDestination, matchLastNode);
                     }
@@ -289,14 +291,14 @@ public class Route {
         }
 
         //output the cells generated to process the area
-        for(RouteConflator.Cell cell : RouteConflator.Cell.allCells.values()) {
+        for(RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
             final Region bbox = cell.boundingBox;
             List<OSMNode> cellNodes = new ArrayList<>(5);
-            final OSMNode oNode = segmentSpace.createNode(bbox.origin.latitude, bbox.origin.longitude, null);
+            final OSMNode oNode = segmentSpace.createNode(bbox.origin.x, bbox.origin.y, null);
             cellNodes.add(oNode);
-            cellNodes.add(segmentSpace.createNode(bbox.origin.latitude, bbox.extent.longitude, null));
-            cellNodes.add(segmentSpace.createNode(bbox.extent.latitude, bbox.extent.longitude, null));
-            cellNodes.add(segmentSpace.createNode(bbox.extent.latitude, bbox.origin.longitude, null));
+            cellNodes.add(segmentSpace.createNode(bbox.extent.x, bbox.origin.y, null));
+            cellNodes.add(segmentSpace.createNode(bbox.extent.x, bbox.extent.y, null));
+            cellNodes.add(segmentSpace.createNode(bbox.origin.x, bbox.extent.y, null));
             cellNodes.add(oNode);
             final OSMWay cellWay = segmentSpace.createWay(null, cellNodes);
             cellWay.setTag("landuse", "construction");

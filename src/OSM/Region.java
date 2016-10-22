@@ -13,10 +13,10 @@ public class Region implements Cloneable {
      * @return
      */
     public static boolean intersects(final Region region1, final Region region2) {
-        return !(region1.extent.longitude < region2.origin.longitude ||
-                region1.origin.longitude > region2.extent.longitude ||
-                region1.extent.latitude < region2.origin.latitude ||
-                region1.origin.latitude > region2.extent.latitude);
+        return !(region1.extent.x < region2.origin.x ||
+                region1.origin.x > region2.extent.x ||
+                region1.extent.y < region2.origin.y ||
+                region1.origin.y > region2.extent.y);
     }
 
     /**
@@ -26,10 +26,10 @@ public class Region implements Cloneable {
      * @return
      */
     public static boolean contains(final Region region1, final Region region2) {
-        return region1.origin.latitude <= region2.origin.latitude &&
-                region1.extent.latitude >= region2.extent.latitude &&
-                region1.origin.longitude <= region2.origin.longitude &&
-                region1.extent.longitude >= region2.extent.longitude;
+        return region1.origin.y <= region2.origin.y &&
+                region1.extent.y >= region2.extent.y &&
+                region1.origin.x <= region2.origin.x &&
+                region1.extent.x >= region2.extent.x;
     }
 
     /**
@@ -39,8 +39,8 @@ public class Region implements Cloneable {
      * @return
      */
     public static Region union(final Region region1, final Region region2) {
-        final Point unionOrigin = new Point(Math.min(region1.origin.latitude, region2.origin.latitude), Math.min(region1.origin.longitude, region2.origin.longitude));
-        final Point unionExtent = new Point(Math.max(region1.extent.latitude, region2.extent.latitude), Math.max(region1.extent.longitude, region2.extent.longitude));
+        final Point unionOrigin = new Point(Math.min(region1.origin.x, region2.origin.x), Math.min(region1.origin.y, region2.origin.y));
+        final Point unionExtent = new Point(Math.max(region1.extent.x, region2.extent.x), Math.max(region1.extent.y, region2.extent.y));
         return new Region(unionOrigin, unionExtent);
     }
     /**
@@ -50,13 +50,13 @@ public class Region implements Cloneable {
      * @return
      */
     public static Region intersection(final Region region1, final Region region2) {
-        final double xmin = Math.max(region1.origin.latitude, region2.origin.latitude);
-        final double xmax = Math.min(region1.extent.latitude, region2.extent.latitude);
+        final double xmin = Math.max(region1.origin.y, region2.origin.y);
+        final double xmax = Math.min(region1.extent.y, region2.extent.y);
         if (xmax > xmin) {
-            final double ymin = Math.max(region1.origin.longitude, region2.origin.longitude);
-            final double ymax = Math.min(region1.extent.longitude, region2.extent.longitude);
+            final double ymin = Math.max(region1.origin.x, region2.origin.x);
+            final double ymax = Math.min(region1.extent.x, region2.extent.x);
             if (ymax > ymin) {
-                return new Region(xmin, ymin, xmax - xmin, ymax - ymin);
+                return new Region(ymin, xmin, ymax - ymin, xmax - xmin);
             }
         }
         return null;
@@ -75,24 +75,24 @@ public class Region implements Cloneable {
         }
 
         double minLat, minLon, maxLat, maxLon;
-        minLat = Math.min(region1.origin.latitude, region2.origin.latitude);
-        minLon = Math.min(region1.origin.longitude, region2.origin.longitude);
-        maxLat = Math.max(region1.extent.latitude, region2.extent.latitude);
-        maxLon = Math.max(region1.extent.longitude, region2.extent.longitude);
+        minLat = Math.min(region1.origin.y, region2.origin.y);
+        minLon = Math.min(region1.origin.x, region2.origin.x);
+        maxLat = Math.max(region1.extent.y, region2.extent.y);
+        maxLon = Math.max(region1.extent.x, region2.extent.x);
         return new Region(new Point(minLat, minLon), new Point(maxLat, maxLon));
     }*/
     public Region(final Point origin, final Point extent) {
-        this.origin = new Point(origin.latitude, origin.longitude);
-        this.extent = new Point(extent.latitude, extent.longitude);
+        this.origin = new Point(origin.x, origin.y);
+        this.extent = new Point(extent.x, extent.y);
     }
-    public Region(final double latitude, final double longitude, final double latitudeDelta, final double longitudeDelta) {
-        origin = new Point(latitude, longitude);
-        extent = new Point(latitude + latitudeDelta, longitude + longitudeDelta);
+    public Region(final double x, final double y, final double deltaX, final double deltaY) {
+        origin = new Point(x, y);
+        extent = new Point(x + deltaX, y + deltaY);
     }
     public Region(final Point[] includedPoints) {
         final Point point1 = includedPoints[0], point2 = includedPoints[1];
-        origin = new Point(Math.min(point1.latitude, point2.latitude), Math.min(point1.longitude, point2.longitude));
-        extent = new Point(Math.max(point1.latitude, point2.latitude), Math.max(point1.longitude, point2.longitude));
+        origin = new Point(Math.min(point1.x, point2.x), Math.min(point1.y, point2.y));
+        extent = new Point(Math.max(point1.x, point2.x), Math.max(point1.y, point2.y));
         for(int p=2;p<includedPoints.length;p++) {
             includePoint(includedPoints[p]);
         }
@@ -102,8 +102,8 @@ public class Region implements Cloneable {
      * @param regionToCopy the region to copy
      */
     public Region(final Region regionToCopy) {
-        origin = new Point(regionToCopy.origin.latitude, regionToCopy.origin.longitude);
-        extent = new Point(regionToCopy.extent.latitude, regionToCopy.extent.longitude);
+        origin = new Point(regionToCopy.origin.x, regionToCopy.origin.y);
+        extent = new Point(regionToCopy.extent.x, regionToCopy.extent.y);
     }
 
     /**
@@ -116,27 +116,27 @@ public class Region implements Cloneable {
         }
 
         //expand the region to contain the point
-        if(point.longitude < origin.longitude) {
-            origin = new Point(origin.latitude, point.longitude);
+        if(point.x < origin.x) {
+            origin = new Point(point.x, origin.y);
         }
-        if(point.latitude < origin.latitude) {
-            origin = new Point(point.latitude, origin.longitude);
+        if(point.y < origin.y) {
+            origin = new Point(origin.x, point.y);
         }
-        if(point.longitude > extent.longitude) {
-            extent = new Point(extent.latitude, point.longitude);
+        if(point.x > extent.x) {
+            extent = new Point(point.x, extent.y);
         }
-        if(point.latitude > extent.latitude) {
-            extent = new Point(point.latitude, extent.longitude);
+        if(point.y > extent.y) {
+            extent = new Point(extent.x, point.y);
         }
     }
     public void combinedBoxWithRegion(final Region otherRegion) {
         if(otherRegion == null) {
             return;
         }
-        double olatitude = Math.min(origin.latitude, otherRegion.origin.latitude), olongitude = Math.min(origin.longitude, otherRegion.origin.longitude);
-        double elatitude = Math.max(extent.latitude, otherRegion.extent.latitude), elongitude = Math.max(extent.longitude, otherRegion.extent.longitude);
-        origin = new Point(olatitude, olongitude);
-        extent = new Point(elatitude, elongitude);
+        double oY = Math.min(origin.y, otherRegion.origin.y), oX = Math.min(origin.x, otherRegion.origin.x);
+        double eY = Math.max(extent.y, otherRegion.extent.y), eX = Math.max(extent.x, otherRegion.extent.x);
+        origin = new Point(oX, oY);
+        extent = new Point(eX, eY);
     }
 
     /**
@@ -144,9 +144,7 @@ public class Region implements Cloneable {
      * @return
      */
     public double area() {
-        final double dLat = extent.latitude - origin.latitude, dY = dLat * Point.DEGREE_DISTANCE_AT_EQUATOR, latFactor = Math.cos((origin.latitude + 0.5 * dLat) * Math.PI / 180.0);
-        final double dX = (extent.longitude - origin.longitude) * latFactor * Point.DEGREE_DISTANCE_AT_EQUATOR;
-        return dX * dY;
+        return (extent.x - origin.x) * (extent.y - origin.y);
     }
     /**
      * Check whether the given point is inside this region (inclusive)
@@ -154,20 +152,18 @@ public class Region implements Cloneable {
      * @return
      */
     public boolean containsPoint(final Point point) {
-        return !(point.latitude < origin.latitude || point.latitude > extent.latitude || point.longitude < origin.longitude || point.longitude > extent.longitude);
+        return !(point.y < origin.y || point.y > extent.y || point.x < origin.x || point.x > extent.x);
     }
 
     /**
      * Returns a region inset by the given amounts.  Negative values will expand
-     * @param bufferLat
-     * @param bufferLon
      * @return
      */
-    public Region regionInset(final double bufferLat, final double bufferLon) {
-        return new Region(origin.latitude + 0.5 * bufferLat, origin.longitude + 0.5 * bufferLon, extent.latitude - origin.latitude - bufferLat, extent.longitude - origin.longitude - bufferLon);
+    public Region regionInset(final double bufferX, final double bufferY) {
+        return new Region(origin.x + 0.5 * bufferX, origin.y + 0.5 * bufferY, extent.x - origin.x - bufferX, extent.y - origin.y - bufferY);
     }
     public Point getCentroid() {
-        return new Point(0.5 * (origin.latitude + extent.latitude), 0.5 * (origin.longitude + extent.longitude));
+        return new Point(0.5 * (origin.x + extent.x), 0.5 * (origin.y + extent.y));
     }
 
     /*public static Point computeCentroid(final Point[] vertices) {
@@ -185,30 +181,30 @@ public class Region implements Cloneable {
         // For all vertices except last
         int i;
         for (i=0; i<vertices.length-1; ++i) {
-            x0 = vertices[i].longitude;
-            y0 = vertices[i].latitude;
-            x1 = vertices[i+1].longitude;
-            y1 = vertices[i+1].latitude;
+            x0 = vertices[i].x;
+            y0 = vertices[i].y;
+            x1 = vertices[i+1].x;
+            y1 = vertices[i+1].y;
             a = x0*y1 - x1*y0;
             signedArea += a;
-            centroid.longitude += (x0 + x1)*a;
-            centroid.latitude += (y0 + y1)*a;
+            centroid.x += (x0 + x1)*a;
+            centroid.y += (y0 + y1)*a;
         }
 
         // Do last vertex separately to avoid performing an expensive
         // modulus operation in each iteration.
-        x0 = vertices[i].longitude;
-        y0 = vertices[i].latitude;
-        x1 = vertices[0].longitude;
-        y1 = vertices[0].latitude;
+        x0 = vertices[i].x;
+        y0 = vertices[i].y;
+        x1 = vertices[0].x;
+        y1 = vertices[0].y;
         a = x0*y1 - x1*y0;
         signedArea += a;
-        centroid.longitude += (x0 + x1)*a;
-        centroid.latitude += (y0 + y1)*a;
+        centroid.x += (x0 + x1)*a;
+        centroid.y += (y0 + y1)*a;
 
         signedArea *= 0.5;
-        centroid.longitude /= (6.0*signedArea);
-        centroid.latitude /= (6.0*signedArea);
+        centroid.x /= (6.0*signedArea);
+        centroid.y /= (6.0*signedArea);
 
         return centroid;
     }*/
@@ -218,23 +214,23 @@ public class Region implements Cloneable {
         }
         double Cx = 0.0, Cy = 0.0;
         for(final Point vertex : vertices) {
-            Cx += vertex.longitude;
-            Cy += vertex.latitude;
+            Cx += vertex.x;
+            Cy += vertex.y;
         }
         Cx /= vertices.length;
         Cy /= vertices.length;
 
         /*for(int i=0;i<vertices.length - 1;i++) {
-            Cx += (vertices[i].longitude + vertices[i+1].longitude) * ()
+            Cx += (vertices[i].x + vertices[i+1].x) * ()
         }*/
-        return new Point(Cy, Cx);
+        return new Point(Cx, Cy);
     }
     @Override
     public Region clone() {
-        return new Region(origin.latitude, origin.longitude, extent.latitude - origin.latitude, extent.longitude - origin.longitude);
+        return new Region(origin.x, origin.y, extent.x - origin.x, extent.y - origin.y);
     }
     @Override
     public String toString() {
-        return String.format("Region({%.06f,%.06f}{%.06f,%.06f})", origin.latitude, origin.longitude, extent.latitude, extent.longitude);
+        return String.format("Region({%.06f,%.06f}{%.06f,%.06f})", origin.y, origin.x, extent.y, extent.x);
     }
 }

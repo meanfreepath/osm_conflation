@@ -8,7 +8,6 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.zip.CRC32;
 
 /**
  * Tracks and processes a route_master-type OSM relation
@@ -34,87 +33,49 @@ public class RouteConflator implements WaySegmentsObserver {
      * bounding box checks
      */
     public static class Cell {
-        public final static Map<Long, Cell> allCells = new HashMap<>(128);
-        public final static double cellSize = 0.01; //must be a multiple of 10!
+        public final static List<Cell> allCells = new ArrayList<>(128);
+        public final static double cellSizeInMeters = 500.0;
+        private static double cellSize;
 
-        public static double getLatitudeBuffer() {
-            return latitudeBuffer;
-        }
+        private static double searchBuffer = 0.0;
 
-        public static double getLongitudeBuffer() {
-            return longitudeBuffer;
-        }
-
-        private static double latitudeBuffer = 0.0, longitudeBuffer = 0.0;
-        private final static String ID_FORMAT;
-        private final static int CELL_DIMS;
-        private final static CRC32 idGenerator = new CRC32();
-
-        static {
-            CELL_DIMS = (int) Math.round(1.0 / cellSize);
-            final int precision = (int) Math.abs(Math.floor(Math.log10(cellSize)));
-            ID_FORMAT = String.format("%% 0%d.%df:%% 0%d.%df", precision + 4, precision, precision + 4, precision);
-        }
         public static void initCellsForBounds(final Region bounds) {
             //wipe any existing cells (i.e. from a previous run)
             allCells.clear();
 
             //and prepare the region, including a buffer zone equal to the greatest of the various search/bounding box dimensions
-            final double longitudeFactor = Math.cos(Math.PI * bounds.getCentroid().latitude / 180.0);
-            final double bufferSize = Math.max(RouteConflator.wayMatchingOptions.segmentSearchBoxSize, Math.max(StopArea.maxConflictSearchDistance, StopArea.maxDistanceFromPlatformToWay));
-            latitudeBuffer = -bufferSize / Point.DEGREE_DISTANCE_AT_EQUATOR;
-            longitudeBuffer = latitudeBuffer / longitudeFactor;
+            cellSize = SphericalMercator.metersToCoordDelta(cellSizeInMeters, bounds.getCentroid().y);
+            searchBuffer = -SphericalMercator.metersToCoordDelta(Math.max(RouteConflator.wayMatchingOptions.segmentSearchBoxSize, Math.max(StopArea.maxConflictSearchDistance, StopArea.maxDistanceFromPlatformToWay)), bounds.getCentroid().y);
 
             //get the min/max extent of the bounded region
             final Point rcOrigin = Cell.getCellOriginForPoint(bounds.origin), rcExtent = Cell.getCellOriginForPoint(bounds.extent);
-            final Point rcBufferedOrigin = new Point(rcOrigin.latitude + cellSize * 0.000001, rcOrigin.longitude + cellSize * 0.000001); //includes small fudge factor to prevent precision issues
-            final Point rcBufferedExtent = new Point(rcExtent.latitude + cellSize, rcExtent.longitude + cellSize);
+            final Point rcBufferedOrigin = new Point(rcOrigin.x + cellSize * 0.000001, rcOrigin.y + cellSize * 0.000001); //includes small fudge factor to prevent precision issues
+            final Point rcBufferedExtent = new Point(rcExtent.x + cellSize, rcExtent.y + cellSize);
 
-            for(double lat=rcBufferedOrigin.latitude; lat < rcBufferedExtent.latitude; lat += Cell.cellSize) {
-                for(double lon=rcBufferedOrigin.longitude; lon < rcBufferedExtent.longitude; lon += Cell.cellSize) {
-                    createCellForPoint(new Point(lat, lon));
+            for(double y = rcBufferedOrigin.y; y < rcBufferedExtent.y; y += Cell.cellSize) {
+                for(double x = rcBufferedOrigin.x; x < rcBufferedExtent.x; x += Cell.cellSize) {
+                    createCellForPoint(new Point(x, y));
                 }
             }
         }
 
         public static Cell createCellForPoint(final Point point) {
-            final Long pointId = getIdForPoint(point);
             final Point cellOrigin = getCellOriginForPoint(point);
-            Cell cell = new Cell(pointId, cellOrigin);
-            allCells.put(pointId, cell);
+            Cell cell = new Cell(cellOrigin);
+            allCells.add(cell);
             return cell;
         }
-        public static Cell getCellForPoint(final Point point) {
-            final Long pointId = getIdForPoint(point);
-            return allCells.get(pointId);
-        }
         public static Point getCellOriginForPoint(final Point point) {
-            double result[] = {0.0, 0.0};
-            getCellOriginForLatLon(point.latitude, point.longitude, result);
-            return new Point(result[0], result[1]);
-        }
-        public static void getCellOriginForLatLon(final double latitude, final double longitude, double result[]) {
-            result[0] = Math.floor(latitude * CELL_DIMS) / CELL_DIMS;
-            result[1] = Math.floor(longitude * CELL_DIMS) / CELL_DIMS;
-        }
-        public static Long getIdForPoint(final Point point) {
-            double result[] = {0.0, 0.0};
-            getCellOriginForLatLon(point.latitude, point.longitude, result);
-            final String crcString = String.format(ID_FORMAT, result[0], result[1]);
-            idGenerator.reset();
-            idGenerator.update(crcString.getBytes());
-            return idGenerator.getValue();
+            return new Point(Math.floor(point.x * cellSize) / cellSize, Math.floor(point.y / cellSize) * cellSize);
         }
 
-        public final Long id;
         public final Region boundingBox, expandedBoundingBox;
         public final List<OSMWaySegments> containedWays = new ArrayList<>(1024); //contains OSM ways only
         public final List<StopArea> containedStops = new ArrayList<>(64); //contains stop platforms only
 
-        private Cell(final Long id, final Point origin) {
-            this.id = id;
-            boundingBox = new Region(origin, new Point(origin.latitude + cellSize, origin.longitude + cellSize));
-            expandedBoundingBox = boundingBox.regionInset(latitudeBuffer, longitudeBuffer);
+        private Cell(final Point origin) {
+            boundingBox = new Region(origin, new Point(origin.x + cellSize, origin.y + cellSize));
+            expandedBoundingBox = boundingBox.regionInset(searchBuffer, searchBuffer);
         }
         public void addWay(final OSMWaySegments entity) {
             if(!containedWays.contains(entity)) {
@@ -128,7 +89,7 @@ public class RouteConflator implements WaySegmentsObserver {
         }
         @Override
         public String toString() {
-            return String.format("Cell #%s: %s (%d ways, %d stops)", id, boundingBox, containedWays.size(), containedStops.size());
+            return String.format("Cell %s (%d ways, %d stops)", boundingBox, containedWays.size(), containedStops.size());
         }
     }
 
@@ -138,9 +99,8 @@ public class RouteConflator implements WaySegmentsObserver {
     private OSMRelation exportRouteMaster;
     private List<Route> exportRoutes;
     private HashMap<Long, StopArea> allRouteStops;
-    public Point roughCentroid = null; //crappy hack so we can have a latitude value to work with
     public static boolean debugEnabled = false;
-    public final long debugRouteId = -544741L;//*0L;
+    public final long debugRouteId = -429426L;//*0L;
     private OSMEntitySpace workingEntitySpace = null;
     public final static LineComparisonOptions wayMatchingOptions = new LineComparisonOptions();
     protected HashMap<Long, OSMWaySegments> candidateLines = null;
@@ -254,7 +214,6 @@ public class RouteConflator implements WaySegmentsObserver {
             }
             //System.out.println("USING " + routeStops.getKey().osm_id + ": " + String.join(":", routeStops.getValue()));
             importRoutes.add(new Route(routeStops.getKey(), wayMatchingOptions));
-            roughCentroid = routeStops.getKey().getCentroid();
         }
     }
     public static boolean validateRouteType(final String routeType) {
@@ -317,7 +276,7 @@ public class RouteConflator implements WaySegmentsObserver {
      * @param relationType
      * @return
      */
-    public Map<String, List<String>>  platformTagsForRouteType(final String relationType) {
+    public Map<String, List<String>> platformTagsForRouteType(final String relationType) {
         String[] keys;
         String[][] tags;
         switch (relationType) {
@@ -357,14 +316,21 @@ public class RouteConflator implements WaySegmentsObserver {
 
         //get a handle on the route path geometries for the subroutes
         final List<OSMWay> routePaths = new ArrayList<>(importRoutes.size());
+        Region routePathsBoundingBox = null;
         for(final Route route : importRoutes) {
             if(route.routeType != null && route.routeType.equals(OSMEntity.TAG_ROUTE)) {
                 routePaths.add(route.routePath);
+                if(routePathsBoundingBox == null) {
+                    routePathsBoundingBox = new Region(route.routePath.getBoundingBox());
+                } else {
+                    routePathsBoundingBox = Region.union(routePathsBoundingBox, route.routePath.getBoundingBox());
+                }
             }
         }
 
         //and get the download regions for them
-        final List<Region> downloadRegions = generateCombinedDownloadRegions(routePaths, wayMatchingOptions.segmentSearchBoxSize);
+        final double boundingBoxSize = SphericalMercator.metersToCoordDelta(wayMatchingOptions.segmentSearchBoxSize, routePathsBoundingBox.getCentroid().y);
+        final List<Region> downloadRegions = generateCombinedDownloadRegions(routePaths, boundingBoxSize);
 
         //fetch all possible useful ways that intersect the route's combined bounding box
         final String queryFormat = "[\"%s\"~\"%s\"]";
@@ -391,11 +357,11 @@ public class RouteConflator implements WaySegmentsObserver {
         if (debugEnabled) {
             for (final Region r : downloadRegions) {
                 List<OSMNode> rNodes = new ArrayList<>(5);
-                rNodes.add(workingEntitySpace.createNode(r.origin.latitude, r.origin.longitude, null));
-                rNodes.add(workingEntitySpace.createNode(r.origin.latitude, r.extent.longitude, null));
-                rNodes.add(workingEntitySpace.createNode(r.extent.latitude, r.extent.longitude, null));
-                rNodes.add(workingEntitySpace.createNode(r.extent.latitude, r.origin.longitude, null));
-                rNodes.add(workingEntitySpace.createNode(r.origin.latitude, r.origin.longitude, null));
+                rNodes.add(workingEntitySpace.createNode(r.origin.x, r.origin.y, null));
+                rNodes.add(workingEntitySpace.createNode(r.extent.x, r.origin.y, null));
+                rNodes.add(workingEntitySpace.createNode(r.extent.x, r.extent.y, null));
+                rNodes.add(workingEntitySpace.createNode(r.origin.x, r.extent.y, null));
+                rNodes.add(workingEntitySpace.createNode(r.origin.x, r.origin.y, null));
                 final OSMWay regionWay = workingEntitySpace.createWay(null, rNodes);
                 regionWay.setTag("landuse", "construction");
                 regionWay.setTag("gtfs:ignore", "yes");
@@ -437,7 +403,6 @@ public class RouteConflator implements WaySegmentsObserver {
 
         //create the Cell index for all the ways, for faster lookup below
         Cell.initCellsForBounds(workingEntitySpace.getBoundingBox());
-        final double latitudeDelta = -RouteConflator.wayMatchingOptions.segmentSearchBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * workingEntitySpace.getBoundingBox().getCentroid().latitude / 180.0);
 
         //create OSMWaySegments objects for all downloaded ways
         candidateLines = new HashMap<>(workingEntitySpace.allWays.size());
@@ -452,14 +417,19 @@ public class RouteConflator implements WaySegmentsObserver {
                 candidateLines.put(way.osm_id, line);
                 line.addObserver(this);
 
-                for (final Cell cell : Cell.allCells.values()) {
+                for (final Cell cell : Cell.allCells) {
                     if (Region.intersects(cell.boundingBox, way.getBoundingBox())) {
                         cell.addWay(line);
                     }
                 }
             }
         }
-        //System.out.println(candidateLines.size() + "lines, " + Cell.allLines.size() + " indexed");
+
+        /*int linesIndexed = 0;
+        for(final Cell cell : Cell.allCells.values()) {
+            linesIndexed += cell.containedWays.size();
+        }
+        System.out.println(candidateLines.size() + " lines, " + linesIndexed + " indexed");//*/
 
         return true;
     }
@@ -467,7 +437,7 @@ public class RouteConflator implements WaySegmentsObserver {
      * Generates a set of rectangular regions which roughly corresponds with the download area for the given ways
      * TODO: improve algorithm to reduce overlap etc
      * @param ways
-     * @param expansionAmount
+     * @param expansionAmount - the amount to expand the download regions, in meters
      * @return
      */
     private static List<Region> generateCombinedDownloadRegions(final List<OSMWay> ways, final double expansionAmount) {
@@ -522,11 +492,9 @@ public class RouteConflator implements WaySegmentsObserver {
         }
         return downloadRegions;
     }
+
     private static List<Region> generateDownloadRegionsForWay(final OSMWay way, final double boundingBoxSize) {
         final double maxRectArea = 5000000.0;
-        final Region wayBoundingBox = way.getBoundingBox();
-        final double latitudeDelta = -boundingBoxSize / Point.DEGREE_DISTANCE_AT_EQUATOR, longitudeDelta = latitudeDelta / Math.cos(Math.PI * (wayBoundingBox.origin.latitude + wayBoundingBox.extent.latitude) / 360.0);
-
         final List<Region> regions = new ArrayList<>((int) Math.ceil(way.getBoundingBox().area() / maxRectArea));
         final OSMNode firstNodeInWay = way.getFirstNode(), lastNodeInWay = way.getLastNode();
         OSMNode lastNode = null;
@@ -549,7 +517,7 @@ public class RouteConflator implements WaySegmentsObserver {
             if(!virginRegion) {
                 testRegion.includePoint(node.getCentroid());
             }
-            testRegion = testRegion.regionInset(latitudeDelta, longitudeDelta);
+            testRegion = testRegion.regionInset(-boundingBoxSize, -boundingBoxSize);
 
             //check if the test region's area is within the max value
             if(node == lastNodeInWay || testRegion.area() > maxRectArea) { //if not
@@ -571,6 +539,7 @@ public class RouteConflator implements WaySegmentsObserver {
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
+                System.out.println("skipping (not a flagged route)");
                 continue;
             }
 
