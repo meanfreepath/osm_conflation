@@ -14,13 +14,12 @@ import java.util.zip.CRC32;
  */
 public abstract class LineSegment {
     private final static DecimalFormat DEBUG_OUTPUT_FORMATTER = new DecimalFormat("#.####");
-    private final static String ID_HASH_FORMAT = "%d:%d:%.03f,%.03f:%.03f,%.03f";
+    private final static String ID_HASH_FORMAT = "%d:%.03f,%.03f:%.03f,%.03f";
     public final Point originPoint, midPoint, destinationPoint;
     public final OSMNode originNode, destinationNode;
 
     public abstract WaySegments getParent();
     public abstract void setParent(WaySegments newParent);
-    public abstract void updateMatches();
     private final static CRC32 idGenerator = new CRC32();
 
     /**
@@ -33,9 +32,9 @@ public abstract class LineSegment {
     public final double length;
     public final Region boundingBox, searchAreaForMatchingOtherSegments;
 
-    private static long generateIdForPoints(final long parent_id, final int segmentIndex, final Point origin, final Point destination) {
+    private static long generateIdForPoints(final long parent_id, final Point origin, final Point destination) {
         idGenerator.reset();
-        idGenerator.update(String.format(ID_HASH_FORMAT, parent_id, segmentIndex, origin.y, origin.x, destination.y, destination.x).getBytes(Charset.forName("ascii")));
+        idGenerator.update(String.format(ID_HASH_FORMAT, parent_id, origin.y, origin.x, destination.y, destination.x).getBytes(Charset.forName("ascii")));
         return idGenerator.getValue();
     }
     public LineSegment(final long parent_id, final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
@@ -45,7 +44,7 @@ public abstract class LineSegment {
         this.destinationNode = destinationNode;
         this.nodeIndex = nodeIndex;
         this.segmentIndex = segmentIndex;
-        this.id = generateIdForPoints(parent_id, segmentIndex, originPoint, destinationPoint);
+        this.id = generateIdForPoints(parent_id, originPoint, destinationPoint);
 
         vectorX = destinationPoint.x - originPoint.x;
         vectorY = destinationPoint.y - originPoint.y;
@@ -71,7 +70,7 @@ public abstract class LineSegment {
         this.destinationNode = destinationNode;
         this.nodeIndex = segmentToCopy.nodeIndex;
         this.segmentIndex = segmentToCopy.segmentIndex;
-        this.id = generateIdForPoints(segmentToCopy.getParent().way.osm_id, segmentIndex, originPoint, destinationPoint);
+        this.id = generateIdForPoints(segmentToCopy.getParent().way.osm_id, originPoint, destinationPoint);
 
         vectorX = destinationPoint.x - originPoint.x;
         vectorY = destinationPoint.y - originPoint.y;
