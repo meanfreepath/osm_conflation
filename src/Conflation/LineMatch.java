@@ -34,11 +34,12 @@ public class LineMatch {
      * Add a match to the
      * @param match
      */
-    public void addMatch(final SegmentMatch match) {
+    protected void addMatch(final SegmentMatch match) {
         if(match.matchingSegment.getParent() != osmLine) {
             throw new RuntimeException("Tried to add match for different line: " + this.toString());
         }
         matchingSegments.add(match);
+        //System.out.println("ADD SM " + match);
 
         //also group the segments by the matchingSegment's Id property
         List<SegmentMatch> routeLineBySegment = matchedSegmentsByRouteLineSegmentId.get(match.mainSegment.id);
@@ -55,6 +56,23 @@ public class LineMatch {
             matchedSegmentsByOSMLineSegmentId.put(match.matchingSegment.id, osmLineBySegment);
         }
         osmLineBySegment.add(match);
+    }
+    protected void removeMatch(final SegmentMatch oldMatch) {
+        matchingSegments.remove(oldMatch);
+        matchedSegmentsByRouteLineSegmentId.remove(oldMatch.mainSegment.id);
+        List<SegmentMatch> osmLineBySegment = matchedSegmentsByOSMLineSegmentId.get(oldMatch.matchingSegment.id);
+        osmLineBySegment.remove(oldMatch);
+
+        /*boolean removedMain = matchingSegments.remove(oldMatch);
+        List<SegmentMatch> removedRL = matchedSegmentsByRouteLineSegmentId.remove(oldMatch.mainSegment.id);
+
+        List<SegmentMatch> osmLineBySegment = matchedSegmentsByOSMLineSegmentId.get(oldMatch.matchingSegment.id);
+        int osmCount = osmLineBySegment.size();
+        boolean removedOSM = osmLineBySegment.remove(oldMatch);
+        System.out.format("REMOVED %s: %s/%s/%s (%d OSM present)\n", oldMatch, Boolean.toString(removedMain), Boolean.toString(removedRL != null), Boolean.toString(removedOSM), osmCount);
+        /*for(final SegmentMatch match : osmLineBySegment) {
+            System.out.println("\t" + match);
+        }*/
     }
 
     private static List<SegmentMatch> applyMask(final List<SegmentMatch> segmentMatches, final short matchMask) {
@@ -96,7 +114,7 @@ public class LineMatch {
         }
         return applyMask(bySegment, matchMask);
     }
-    private void resyncMatchesForSegments(final List<LineSegment> segments) {
+    /*private void resyncMatchesForSegments(final List<LineSegment> segments) {
         final List<SegmentMatch> matchesToRemove = new ArrayList<>(matchingSegments.size());
         for(final SegmentMatch match : matchingSegments) {
             if(!segments.contains(match.matchingSegment)) {
@@ -105,12 +123,12 @@ public class LineMatch {
         }
         //System.out.println("Removed " + matchesToRemove.size() + " segment matches: " + matchingSegments.size() + " left");
         matchingSegments.removeAll(matchesToRemove);
-    }
+    }*/
 
     /**
      * Consolidates all the segment matches and calculates the various totals
      */
-    public void summarize() {
+    protected void summarize() {
         bestMatchingSegments.clear();
 
         //now re-add the consolidated segments, calculating the average dot product and distance for each matching segment

@@ -13,7 +13,8 @@ import java.util.Map;
  */
 public class RouteLineSegment extends LineSegment {
     public final RouteLineWaySegments parentSegments;
-    private final List<OSMWaySegments> candidateWaySegments;
+    private final List<OSMWaySegments> candidateWaySegments; //TODO: may not be needed
+
     /**
      * The OSMLineSegment matches, keyed by their way's OSM id
      */
@@ -27,13 +28,20 @@ public class RouteLineSegment extends LineSegment {
         matchingSegments = new HashMap<>(8);
         bestMatchForLine = new HashMap<>(8);
     }
-    public RouteLineSegment(final RouteLineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
+
+    /**
+     * Copy constructor used when splitting segments
+     * @param segmentToCopy
+     * @param destination
+     * @param destinationNode
+     */
+    protected RouteLineSegment(final RouteLineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
         super(segmentToCopy, destination, destinationNode);
         this.parentSegments = segmentToCopy.parentSegments;
 
-        //TODO recalculate instead of copy matches???
+        //also recalculate the matches
         candidateWaySegments = new ArrayList<>(segmentToCopy.candidateWaySegments);
-        matchingSegments = new HashMap<>(segmentToCopy.matchingSegments);
+        matchingSegments = new HashMap<>(segmentToCopy.matchingSegments.size());
         bestMatchForLine = new HashMap<>(segmentToCopy.bestMatchForLine);
     }
     public void addCandidateLine(final OSMWaySegments candidate) {
@@ -53,6 +61,7 @@ public class RouteLineSegment extends LineSegment {
     }
     public void summarize() {
         //look up the matching segments we have for the given OSM way
+        bestMatchForLine.clear();
         for(final Map.Entry<Long, List<SegmentMatch>> matchesForLine : matchingSegments.entrySet() ) {
             //and loop through them, picking the one with the best score as the best match
             SegmentMatch bestMatch = chooseBestMatchForMatchType(matchesForLine.getValue(), SegmentMatch.matchMaskAll);
@@ -89,10 +98,6 @@ public class RouteLineSegment extends LineSegment {
     @Override
     public void setParent(WaySegments newParent) {
         throw new RuntimeException("Can’t set parent for RouteLineSegment");
-    }
-    @Override
-    public void updateMatches() {
-        //TODO rerun matches
     }
     public Map<Long, List<SegmentMatch>> getMatchingSegments(final short matchMask) {
         if (matchMask == SegmentMatch.matchTypeNone) {
@@ -131,7 +136,13 @@ public class RouteLineSegment extends LineSegment {
     public Map<Long, SegmentMatch> getBestMatchingSegments() {
         return bestMatchForLine;
     }
+    @Override
     public String toString() {
-        return String.format("RLSeg #%d/%d [%.01f, %.01f], nd[%d/%d]", nodeIndex, segmentIndex, midPoint.y, midPoint.x, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
+        return String.format("RLSeg #%d [%d/%d] [%.01f, %.01f], nd[%d/%d]", id, nodeIndex, segmentIndex, midPoint.y, midPoint.x, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
+    /*@Override
+    public void finalize() throws Throwable {
+        System.out.println("DELETE " + this);
+        super.finalize();
+    }*/
 }

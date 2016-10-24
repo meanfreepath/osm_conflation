@@ -137,10 +137,6 @@ public abstract class WaySegments {
         segments.add(insertedSegment.segmentIndex, insertedSegment);
         way.insertNode(node, insertedSegment.nodeIndex);
 
-        //update any matches related to the segments (TODO maybe use observers instead?)
-        insertedSegment.updateMatches();
-        newOnSegment.updateMatches();
-
         //and notify any observers
         if(observers != null) {
             final List<WaySegmentsObserver> observersToNotify = new ArrayList<>(observers);

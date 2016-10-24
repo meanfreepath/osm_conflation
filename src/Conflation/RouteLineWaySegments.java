@@ -12,7 +12,36 @@ import java.util.*;
  * Created by nick on 9/30/16.
  */
 public class RouteLineWaySegments extends WaySegments {
+    private static class DebugMatchCounting {
+        public int preciseMatches = 0, dotProductMatches = 0, distanceMatches = 0, travelDirectionMatches = 0, bboxMatches = 0;
+
+        public void updateCounts(final short matchMask) {
+            if(matchMask == SegmentMatch.matchMaskAll) {
+                preciseMatches++;
+            }
+            if((matchMask & SegmentMatch.matchTypeDotProduct) != 0) {
+                dotProductMatches++;
+            }
+            if((matchMask & SegmentMatch.matchTypeDistance) != 0) {
+                distanceMatches++;
+            }
+            if((matchMask & SegmentMatch.matchTypeTravelDirection) != 0) {
+                travelDirectionMatches++;
+            }
+            if((matchMask & SegmentMatch.matchTypeBoundingBox) != 0) {
+                bboxMatches++;
+            }
+        }
+    }
+
+    /**
+     * OSM way matches, keyed by their osm_id
+     */
     public final HashMap<Long,LineMatch> lineMatches = new HashMap<>(512);
+
+    /**
+     * OSM way matches, keyed by RouteLineSegments' ids
+     */
     public final HashMap<Long,List<LineMatch>> lineMatchesBySegmentId;
 
     public RouteLineWaySegments(final OSMWay way, final double maxSegmentLength) {
@@ -35,13 +64,13 @@ public class RouteLineWaySegments extends WaySegments {
      * @param onSegment The segment to add the node to
      * @return If an existing node is within the tolerance distance, that node, otherwise the input node
      */
-    public Point insertPoint(final Point point, final RouteLineSegment onSegment, final double nodeTolerance) {
+    public Point insertPoint(final Point point,  RouteLineSegment onSegment, final double nodeTolerance) {
 
         //create a new segment starting from the node, and ending at onSegment's destination Point
-        final LineSegment insertedSegment = createLineSegment(point, onSegment.destinationPoint, null, onSegment.destinationNode, onSegment.segmentIndex + 1, onSegment.nodeIndex + 1);
+        final RouteLineSegment insertedSegment = (RouteLineSegment) createLineSegment(point, onSegment.destinationPoint, null, onSegment.destinationNode, onSegment.segmentIndex + 1, onSegment.nodeIndex + 1);
 
         //and replace onSegment with a version of itself that's truncated to the new node's position
-        final LineSegment newOnSegment = copyLineSegment(onSegment, point, null);
+        final RouteLineSegment newOnSegment = (RouteLineSegment) copyLineSegment(onSegment, point, null);
         segments.set(segments.indexOf(onSegment), newOnSegment);
 
         //increment the node index of all following segments
@@ -55,9 +84,33 @@ public class RouteLineWaySegments extends WaySegments {
         //add the segment and node to this line and its way
         segments.add(insertedSegment.segmentIndex, insertedSegment);
 
-        //update any matches related to the segments (TODO maybe use observers instead?)
-        insertedSegment.updateMatches();
-        newOnSegment.updateMatches();
+        //update any matches related to the segments
+        SegmentMatch currentMatch;
+        final RouteLineSegment[] splitSegments = {newOnSegment, insertedSegment};
+        final Map<Long, List<SegmentMatch>> matchListForOriginalSegment = onSegment.getMatchingSegments(SegmentMatch.matchTypeNone);
+        final Map<Long,LineMatch> affectedLineMatches = new HashMap<>(matchListForOriginalSegment.size());
+        for(final List<SegmentMatch> matchListForLine : matchListForOriginalSegment.values()) {
+            for(final SegmentMatch existingMatch : matchListForLine) {
+                //remove the old match from the dependent indexes
+                final LineMatch affectedLineMatch = removeMatchFromDependentIndexes(existingMatch);
+                if(!affectedLineMatches.containsKey(affectedLineMatch.osmLine.way.osm_id)) {
+                    affectedLineMatches.put(affectedLineMatch.osmLine.way.osm_id, affectedLineMatch);
+                }
+
+                //check the existingMatch's matched segment against the newly-split RouteLineSegments
+                for(final RouteLineSegment splitSegment : splitSegments) {
+                    currentMatch = SegmentMatch.checkCandidateForMatch(RouteConflator.wayMatchingOptions, splitSegment, existingMatch.matchingSegment);
+                    if (currentMatch != null) {
+                        splitSegment.addMatch(currentMatch);
+                    }
+                }
+            }
+        }
+
+        //and summarize their matches again, to ensure all dependent SegmentMatch data is updated
+        insertedSegment.summarize();
+        newOnSegment.summarize();
+        affectedLineMatches.values().forEach(LineMatch::summarize);
 
         //and notify any observers
         if(observers != null) {
@@ -126,7 +179,7 @@ public class RouteLineWaySegments extends WaySegments {
         OSMLineSegment osmLineSegment;
         SegmentMatch currentMatch;
         System.out.println(routeConflator.candidateLines.size() + " route candidates, " + lineMatches.size() + " bb matches, " + segments.size() + "segments to match");
-        int preciseMatches = 0, dotProductMatches = 0, distanceMatches = 0, travelDirectionMatches = 0, bboxMatches = 0;
+        final DebugMatchCounting matchCounting = new DebugMatchCounting();
         for (final LineSegment segment : segments) { //iterate over the RouteLine's segments
             routeLineSegment = (RouteLineSegment) segment;
             for (final OSMWaySegments candidateLine : ((RouteLineSegment) segment).getCandidateLines()) { //and the OSM ways matched on the previous step
@@ -140,47 +193,15 @@ public class RouteLineWaySegments extends WaySegments {
                         //track the individual RouteLine->OSM segment matches
                         routeLineSegment.addMatch(currentMatch);
 
-                        final LineMatch lineMatch = lineMatches.get(osmLineSegment.getParent().way.osm_id);
-                        lineMatch.addMatch(currentMatch);
+                        //and the respective match indexes
+                        addMatchToDependentIndexes(currentMatch);
 
-                        if(currentMatch.type == SegmentMatch.matchMaskAll) {
-                            preciseMatches++;
-                        }
-                        if((currentMatch.type & SegmentMatch.matchTypeDotProduct) != 0) {
-                            dotProductMatches++;
-                        }
-                        if((currentMatch.type & SegmentMatch.matchTypeDistance) != 0) {
-                            distanceMatches++;
-                        }
-                        if((currentMatch.type & SegmentMatch.matchTypeTravelDirection) != 0) {
-                            travelDirectionMatches++;
-                        }
-                        if((currentMatch.type & SegmentMatch.matchTypeBoundingBox) != 0) {
-                            bboxMatches++;
-                        }
-
-
-                        List<LineMatch> lineMatchesForRouteLineSegment = lineMatchesBySegmentId.get(routeLineSegment.id);
-                        if(lineMatchesForRouteLineSegment == null) {
-                            lineMatchesForRouteLineSegment = new ArrayList<>(4);
-                            lineMatchesBySegmentId.put(routeLineSegment.id, lineMatchesForRouteLineSegment);
-                        }
-                        if(!lineMatchesForRouteLineSegment.contains(lineMatch)) {
-                            lineMatchesForRouteLineSegment.add(lineMatch);
-                        }
-
-                        //also track the individual segment matches, keyed by the OSM segment's id
-                        /*List<SegmentMatch> existingMatches = matchingOSMSegments.get(match.matchingSegment.id);
-                        if (existingMatches == null) {
-                            existingMatches = new ArrayList<>(4);
-                            matchingOSMSegments.put(match.matchingSegment.id, existingMatches);
-                        }
-                        existingMatches.add(match);*/
+                        matchCounting.updateCounts(currentMatch.type);
                     }
                 }
             }
         }
-        System.out.format("%d/%d/%d/%d/%d bbox/dotproduct/travel/distance/precise Matches in %dms\n", bboxMatches, dotProductMatches, travelDirectionMatches, distanceMatches, preciseMatches, new Date().getTime() - t0.getTime());
+        System.out.format("%d/%d/%d/%d/%d bbox/dotproduct/travel/distance/precise Matches in %dms\n", matchCounting.bboxMatches, matchCounting.dotProductMatches, matchCounting.travelDirectionMatches, matchCounting.distanceMatches, matchCounting.preciseMatches, new Date().getTime() - t0.getTime());
 
         //consolidate the segment match data for each matching line
         /*first, collapse the segment matchers down by their index (each segment in mainWaySegments
@@ -195,12 +216,49 @@ public class RouteLineWaySegments extends WaySegments {
             lineMatch.summarize();
         }
 
-        //and generate an index of matches for easier lookup in later steps
-
-
         System.out.println("Matched lines in " + (new Date().getTime() - timeStartLineComparison) + "ms");
     }
 
+    /**
+     * Add the current SegmentMatch to the by-segment, by-OSMWay, etc indexes
+     * @param currentMatch
+     */
+    private void addMatchToDependentIndexes(final SegmentMatch currentMatch) {
+        //update the dependent indexes
+        final LineMatch lineMatch = lineMatches.get(currentMatch.matchingSegment.getParent().way.osm_id);
+        lineMatch.addMatch(currentMatch);
+
+        List<LineMatch> lineMatchesForRouteLineSegment = lineMatchesBySegmentId.get(currentMatch.mainSegment.id);
+        if(lineMatchesForRouteLineSegment == null) {
+            lineMatchesForRouteLineSegment = new ArrayList<>(4);
+            lineMatchesBySegmentId.put(currentMatch.mainSegment.id, lineMatchesForRouteLineSegment);
+        }
+        if(!lineMatchesForRouteLineSegment.contains(lineMatch)) {
+            lineMatchesForRouteLineSegment.add(lineMatch);
+        }
+
+        //also track the individual segment matches, keyed by the OSM segment's id
+        /*List<SegmentMatch> existingMatches = matchingOSMSegments.get(currentMatch.matchingSegment.id);
+        if (existingMatches == null) {
+            existingMatches = new ArrayList<>(4);
+            matchingOSMSegments.put(currentMatch.matchingSegment.id, existingMatches);
+        }
+        existingMatches.add(currentMatch);*/
+    }
+
+    /**
+     * Removes the given match from the dependent indexes
+     * @param match
+     * @return
+     */
+    private LineMatch removeMatchFromDependentIndexes(final SegmentMatch match) {
+        final LineMatch lineMatch = lineMatches.get(match.matchingSegment.getParent().way.osm_id);
+        if(match != null) {
+            lineMatchesBySegmentId.remove(match.mainSegment.id);
+            lineMatch.removeMatch(match);
+        }
+        return lineMatch;
+    }
     /*private void resyncLineMatches() {
         final List<Long> lineMatchesToRemove = new ArrayList<>(lineMatches.size());
         for(final LineMatch lineMatch : lineMatches.values()) {

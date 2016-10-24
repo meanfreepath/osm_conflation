@@ -22,10 +22,6 @@ public class OSMLineSegment extends LineSegment {
     public void setParent(WaySegments newParent) {
         parentSegments = newParent;
     }
-    @Override
-    public void updateMatches() {
-        //TODO rerun matches
-    }
 
     public OSMLineSegment(LineSegment segmentToCopy, Point destination, OSMNode destinationNode) {
         super(segmentToCopy, destination, destinationNode);
