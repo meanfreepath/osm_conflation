@@ -271,7 +271,7 @@ public class PathTree implements WaySegmentsObserver {
         //check if the path should be deleted
     }
     @Override
-    public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment newSegment) {
+    public void waySegmentsAddedSegment(final WaySegments waySegments, final LineSegment oldSegment, final LineSegment[] newSegments) {
 
     }
     @Override

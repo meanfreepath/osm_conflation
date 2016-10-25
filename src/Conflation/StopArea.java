@@ -72,14 +72,18 @@ public class StopArea implements WaySegmentsObserver {
         public final OSMWaySegments line;
         public OSMLineSegment closestSegmentToStop = null;
         public NameMatch nameMatch = null;
-        public final List<SegmentProximityMatch> proximityMatches = new ArrayList<>(8);
+        public final Map<Long, SegmentProximityMatch> proximityMatches = new HashMap<>(8); //keyed by the OSM segment's id
         private double nameScore = 0.0, dpScore = 0.0, distanceScore = 0.0;
 
         public StopWayMatch(final OSMWaySegments candidateLine) {
             line = candidateLine;
         }
         private void addStopSegmentMatch(final RouteLineWaySegments routeLine, final OSMLineSegment osmLineSegment, final double distance, final SegmentMatchType matchType) {
-            proximityMatches.add(new SegmentProximityMatch(routeLine, osmLineSegment, distance, matchType));
+            SegmentProximityMatch proximityMatch = proximityMatches.get(osmLineSegment.id);
+            if(proximityMatch == null) {
+                proximityMatch = new SegmentProximityMatch(routeLine, osmLineSegment, distance, matchType);
+            }
+            proximityMatches.put(osmLineSegment.id, proximityMatch);
         }
         private void setNameMatch(final SegmentMatchType matchType) {
             nameMatch = new NameMatch(matchType);
@@ -101,7 +105,7 @@ public class StopArea implements WaySegmentsObserver {
 
             //and the proximity matches
             double dpFactor, odFactor, oneWayFactor;
-            for(final SegmentProximityMatch proximityMatch : proximityMatches) {
+            for(final SegmentProximityMatch proximityMatch : proximityMatches.values()) {
                 if(proximityMatch.closestRouteLineSegment == null) {
                     System.out.println("WARNING: No nearby routeline segment for " + platform.getTag(OSMEntity.KEY_NAME) + "(" + platform.osm_id + ")");
                     continue;
@@ -253,7 +257,7 @@ public class StopArea implements WaySegmentsObserver {
 
         //create the proximity matches for the newly-split ways
         for(final WaySegments ws : splitWaySegments) {
-            for(final StopWayMatch.SegmentProximityMatch segmentMatch : originalWayMatch.proximityMatches) {
+            for(final StopWayMatch.SegmentProximityMatch segmentMatch : originalWayMatch.proximityMatches.values()) {
                 if(ws.segments.contains(segmentMatch.candidateSegment)) {
                     addProximityMatch(segmentMatch.routeLine, segmentMatch.candidateSegment, segmentMatch.distance, segmentMatch.matchType);
                     //System.out.println("Moved proximity for segment from " + originalWayMatch.line.way.osm_id + " to line " + segmentMatch.candidateSegment.parentSegments.way.osm_id + "/" + ws.way.osm_id);
@@ -276,14 +280,17 @@ public class StopArea implements WaySegmentsObserver {
 
     }
     @Override
-    public void waySegmentsAddedSegment(final WaySegments waySegments, final LineSegment newSegment) {
+    public void waySegmentsAddedSegment(final WaySegments waySegments, final LineSegment oldSegment, final LineSegment[] newSegments) {
         //update the way matches to include the new segment
         for(final StopWayMatch wayMatch : wayMatches.values()) {
-            for(final StopWayMatch.SegmentProximityMatch proximityMatch : wayMatch.proximityMatches) {
-                if(proximityMatch.candidateSegment.getParent() == waySegments) {
+            final StopWayMatch.SegmentProximityMatch proximityMatch = wayMatch.proximityMatches.get(oldSegment.id);
+
+            //add the new LineSegments to the proximity matches list, removing the old match
+            if(proximityMatch != null) {
+                for(final LineSegment newSegment : newSegments) {
                     addProximityMatch(proximityMatch.routeLine, (OSMLineSegment) newSegment, Point.distance(newSegment.midPoint, platform.getCentroid()), SegmentMatchType.proximityToOSMWay);
-                    break;
                 }
+                wayMatch.proximityMatches.remove(oldSegment.id);
             }
         }
         chooseBestWayMatch();

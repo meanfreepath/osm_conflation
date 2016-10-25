@@ -202,7 +202,7 @@ public class RoutePathFinder implements WaySegmentsObserver {
         candidateLines.remove(waySegments.way.osm_id);
     }
     @Override
-    public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment newSegment) {
+    public void waySegmentsAddedSegment(final WaySegments waySegments, final LineSegment oldSegment, final LineSegment[] newSegments) {
 
     }
 }

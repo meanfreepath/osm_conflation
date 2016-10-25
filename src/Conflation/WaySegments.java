@@ -139,9 +139,10 @@ public abstract class WaySegments {
 
         //and notify any observers
         if(observers != null) {
+            final LineSegment[] newSegments = {newOnSegment, insertedSegment};
             final List<WaySegmentsObserver> observersToNotify = new ArrayList<>(observers);
             for (final WaySegmentsObserver observer : observersToNotify) {
-                observer.waySegmentsAddedSegment(this, insertedSegment);
+                observer.waySegmentsAddedSegment(this, onSegment, newSegments);
             }
         }
 

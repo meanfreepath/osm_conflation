@@ -8,5 +8,5 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 public interface WaySegmentsObserver {
     void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException;
     void waySegmentsWasDeleted(final WaySegments waySegments) throws InvalidArgumentException;
-    void waySegmentsAddedSegment(final WaySegments waySegments, final LineSegment newSegment);
+    void waySegmentsAddedSegment(final WaySegments waySegments, final LineSegment oldSegment, final LineSegment[] newSegments);
 }

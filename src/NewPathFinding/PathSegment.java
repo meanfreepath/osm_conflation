@@ -307,7 +307,7 @@ public class PathSegment implements WaySegmentsObserver {
     }
 
     @Override
-    public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment newSegment) {
+    public void waySegmentsAddedSegment(final WaySegments waySegments, final LineSegment oldSegment, final LineSegment[] newSegments) {
 
     }
 }
