@@ -17,13 +17,13 @@ public class StopArea implements WaySegmentsObserver {
         }
     };
     private final static long debugPlatformId = 4018777638L;
+    public static boolean debugEnabled = false;
 
     /**
      * The size of the bounding boxes (in meters) to check for existing stops, ways
      */
     public final static double duplicateStopPlatformBoundingBoxSize = 50.0, waySearchAreaBoundingBoxSize = 50.0;
     public final static double stopNodeTolerance = 3.0, maxDistanceFromPlatformToWay = waySearchAreaBoundingBoxSize / 2.0, maxDistanceBetweenDuplicateStops = duplicateStopPlatformBoundingBoxSize / 2.0;
-    public static boolean debugEnabled = false;
     private OSMEntity platform; //can be a node or way
     private OSMNode stopPosition = null;
     private Region nearbyWaySearchRegion, nearbyStopSearchRegion;
@@ -63,17 +63,15 @@ public class StopArea implements WaySegmentsObserver {
             }
         }
         public class NameMatch {
-            public final WaySegments candidateLine;
             public final SegmentMatchType matchType;
-            public NameMatch(final WaySegments candidateLine, final SegmentMatchType matchType) {
-                this.candidateLine = candidateLine;
+            public NameMatch(final SegmentMatchType matchType) {
                 this.matchType = matchType;
             }
         }
 
         public final OSMWaySegments line;
         public OSMLineSegment closestSegmentToStop = null;
-        public final List<NameMatch> nameMatches = new ArrayList<>(8);
+        public NameMatch nameMatch = null;
         public final List<SegmentProximityMatch> proximityMatches = new ArrayList<>(8);
         private double nameScore = 0.0, dpScore = 0.0, distanceScore = 0.0;
 
@@ -83,8 +81,8 @@ public class StopArea implements WaySegmentsObserver {
         private void addStopSegmentMatch(final RouteLineWaySegments routeLine, final OSMLineSegment osmLineSegment, final double distance, final SegmentMatchType matchType) {
             proximityMatches.add(new SegmentProximityMatch(routeLine, osmLineSegment, distance, matchType));
         }
-        private void addNameMatch(final WaySegments toOSMLine, final SegmentMatchType matchType) {
-            nameMatches.add(new NameMatch(toOSMLine, matchType));
+        private void setNameMatch(final SegmentMatchType matchType) {
+            nameMatch = new NameMatch(matchType);
         }
         public void summarizeMatches() {
             nameScore = dpScore = distanceScore = 0.0;
@@ -92,9 +90,9 @@ public class StopArea implements WaySegmentsObserver {
                 return;
             }
 
-            //sum up the name matches
-            for(final NameMatch nameMatch : nameMatches) {
-                nameScore += scoreFactorForMatchType(nameMatch.matchType);
+            //include the name match, if any
+            if(nameMatch != null) {
+                nameScore = scoreFactorForMatchType(nameMatch.matchType);
             }
 
             //check the oneway direction of the line, and whether it goes with or against
@@ -160,10 +158,9 @@ public class StopArea implements WaySegmentsObserver {
         if(wayMatch == null) { //init a match object for the line, if not yet present
             wayMatch = new StopWayMatch(line);
             wayMatches.put(line.way.osm_id, wayMatch);
+            line.addObserver(this);
         }
-        wayMatch.addNameMatch(line, matchType);
-
-        line.addObserver(this);
+        wayMatch.setNameMatch(matchType);
     }
     protected void addProximityMatch(final RouteLineWaySegments toRouteLine, final OSMLineSegment segment, final double distance, final SegmentMatchType matchType) {
         StopWayMatch wayMatch = wayMatches.get(segment.getParent().way.osm_id);
@@ -188,8 +185,9 @@ public class StopArea implements WaySegmentsObserver {
         Collections.sort(matchList, STOP_WAY_MATCH_COMPARATOR);
         bestWayMatch = matchList.get(0);
 
-        if(debugEnabled) {
+        if(platform.osm_id == debugPlatformId) {
             System.out.println("BEST PLATFORM MATCH: " + platform.getTag("name") + "(" + platform.getTag("ref") + "):: on " + bestWayMatch.line.way.getTag(OSMEntity.KEY_NAME) + "(" + bestWayMatch.line.way.osm_id + ") with score " + bestWayMatch.nameScore + "/" + bestWayMatch.dpScore + "/" + bestWayMatch.distanceScore + ": " + (bestWayMatch.nameScore + bestWayMatch.dpScore + bestWayMatch.distanceScore));
+
             if ((bestWayMatch.nameScore + bestWayMatch.dpScore + bestWayMatch.distanceScore) < 1000.0) {
                 for (final StopWayMatch otherMatch : matchList) {
                     if (otherMatch == bestWayMatch) {
@@ -238,38 +236,24 @@ public class StopArea implements WaySegmentsObserver {
             throw new InvalidArgumentException(errMsg);
         }
 
+        //delete the old match reference (will be regenerated below)
+        wayMatches.remove(originalWaySegments.way.osm_id);
+
         //System.out.println("Stop " + platform.getTag("name") + " observed split: " + originalWaySegments.way.getTag("name"));
 
-        //copy the name matches to the new lines, if present.  No need to check for proximity here
-        StopWayMatch.NameMatch existingNameMatch = null;
-        for(final StopWayMatch.NameMatch nameMatch : originalWayMatch.nameMatches) {
-            if(nameMatch.candidateLine == originalWaySegments) {
-                existingNameMatch = nameMatch;
-                break;
-            }
-        }
-        if(existingNameMatch != null) {
+        //copy the name match to the new lines, if present.  No need to check for proximity here
+        if(originalWayMatch.nameMatch != null) {
             for (final WaySegments ws : splitWaySegments) {
                 if (ws == originalWaySegments) {
                     continue;
                 }
-                addNameMatch((OSMWaySegments) ws, existingNameMatch.matchType);
+                addNameMatch((OSMWaySegments) ws, originalWayMatch.nameMatch.matchType);
             }
         }
 
-        //remove the proximity matches from segments that are no longer on the original line
-        final List<StopWayMatch.SegmentProximityMatch> oldProximityMatches = new ArrayList<>(originalWayMatch.proximityMatches.size());
-        for(final StopWayMatch.SegmentProximityMatch segmentMatch : originalWayMatch.proximityMatches) {
-            if(!originalWayMatch.line.segments.contains(segmentMatch.candidateSegment)) {
-                oldProximityMatches.add(segmentMatch);
-            }
-        }
-        originalWayMatch.proximityMatches.removeAll(oldProximityMatches);
-
-        //update the proximity matches to refer to the correct line
-        //System.out.println("removed " + oldProximityMatches.size() + " stale proximity matches");
+        //create the proximity matches for the newly-split ways
         for(final WaySegments ws : splitWaySegments) {
-            for(final StopWayMatch.SegmentProximityMatch segmentMatch : oldProximityMatches) {
+            for(final StopWayMatch.SegmentProximityMatch segmentMatch : originalWayMatch.proximityMatches) {
                 if(ws.segments.contains(segmentMatch.candidateSegment)) {
                     addProximityMatch(segmentMatch.routeLine, segmentMatch.candidateSegment, segmentMatch.distance, segmentMatch.matchType);
                     //System.out.println("Moved proximity for segment from " + originalWayMatch.line.way.osm_id + " to line " + segmentMatch.candidateSegment.parentSegments.way.osm_id + "/" + ws.way.osm_id);

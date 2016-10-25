@@ -86,15 +86,7 @@ public class PathSegment implements WaySegmentsObserver {
         final OSMLineSegment firstTraveledSegment = findFirstTraveledSegment();
         ProcessingStatus segmentStatus;
         if(firstTraveledSegment == null) { //Shouldn't happen
-            System.out.println("NO FIRST for " + originJunction.junctionNode + " traveling " + travelDirection.toString());
-            for(final LineSegment segment : line.segments) {
-                System.out.println("\t" + (segment.originNode != null ? segment.originNode : "NA") + "->" + (segment.destinationNode != null ? segment.destinationNode : "NA"));
-            }
-            try {
-                Thread.sleep(10000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            System.out.println("ERROR: no firstTraveledSegment found for " + originJunction.junctionNode + " traveling " + travelDirection.toString());
             processingStatus = ProcessingStatus.noFirstTraveledSegment;
             return;
         }
@@ -211,13 +203,7 @@ public class PathSegment implements WaySegmentsObserver {
                 }
             }
         } else {
-            if(originJunction.junctionNode.osm_id == 4273776216L) {
-                System.out.println("CHKCOMPARE: " + line.way.osm_id);
-            }
             for(final LineSegment segment : line.segments) {
-                if(originJunction.junctionNode.osm_id == 4273776216L) {
-                    System.out.println("COMPARE: " + segment.originNode + "/" + segment.destinationNode);
-                }
                 if (segment.destinationNode == originJunction.junctionNode) {
                     return (OSMLineSegment) segment;
                 }
