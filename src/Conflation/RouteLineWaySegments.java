@@ -268,7 +268,7 @@ public class RouteLineWaySegments extends WaySegments {
             if(lineMatch.isSummarized()) {
                 lineMatch.summarize();
                 if(lineMatch.matchingSegments.size() == 0) { //and remove if no segment matches present
-                    lineMatchesToRemove.add(lineMatch.routeLine.way.osm_id);
+                    lineMatchesToRemove.add(lineMatch.routeLineSegment.way.osm_id);
                 }
             }
         }

@@ -110,7 +110,7 @@ public class PathSegment implements WaySegmentsObserver {
     }
     private Junction determineEndJunction() {
         //determine the direction of this line relative to the direction of route travel
-        final LineMatch lineMatch = null;//TODO 222 line.getMatchForLine(parentPathTree.parentPathFinder.route.routeLine);
+        final LineMatch lineMatch = null;//TODO 222 line.getMatchForLine(parentPathTree.parentPathFinder.route.routeLineSegment);
         if(lineMatch == null) {
             parentPathTree.parentPathFinder.logEvent(RoutePathFinder.RouteLogType.error, "No match for line " + line.way.getTag(OSMEntity.KEY_NAME) + "(" + line.way.osm_id + ")", this);
             return new Junction(originJunction.junctionNode, this, Junction.JunctionProcessStatus.deadEnd);

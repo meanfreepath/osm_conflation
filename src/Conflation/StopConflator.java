@@ -27,7 +27,7 @@ public class StopConflator {
 
     /**
      * Match the routeConflator's stops to the best possible OSM way, based on its name, position,
-     * way's proximity to routeLine, etc
+     * way's proximity to routeLineSegment, etc
      */
     public void matchStopsToWays() {
         final int stopCount = routeConflator.getAllRouteStops().size();
@@ -122,7 +122,7 @@ public class StopConflator {
                             }
 
                             //find the nearest segment to the platform on the way
-                            final LineSegment nearestSegment = osmLine.closestSegmentToPoint(platformCentroid, StopArea.maxDistanceFromPlatformToWay);
+                            final OSMLineSegment nearestSegment = (OSMLineSegment) osmLine.closestSegmentToPoint(platformCentroid, StopArea.maxDistanceFromPlatformToWay);
 
                             //skip this line if not within the maximum distance to the stop
                             if (nearestSegment != null) {
@@ -161,6 +161,10 @@ public class StopConflator {
 
             //Create (or update an existing node) to serve as the stop position node for the platform
             final LineSegment bestSegment = stopArea.bestWayMatch.closestSegmentToStop;
+            if(bestSegment == null) {
+                System.out.println("WARNING: " + stopArea + " has no nearby matching segment");
+                continue;
+            }
             final Point nearestPointOnSegment = bestSegment.closestPointToPoint(stopArea.getPlatform().getCentroid());
 
             OSMNode nearestNodeOnWay = bestSegment.getParent().way.nearestNodeAtPoint(nearestPointOnSegment, StopArea.stopNodeTolerance);
@@ -214,7 +218,7 @@ public class StopConflator {
         Region stopDownloadRegion = new Region(includedStops);
 
         //expand the total area little further, to ensure the start/end of the route is included (problem with King County data)
-        final double stopSearchBuffer = -SphericalMercator.metersToCoordDelta(100.0/*StopArea.maxConflictSearchDistance*/, stopDownloadRegion.getCentroid().y);
+        final double stopSearchBuffer = -SphericalMercator.metersToCoordDelta(100.0/*StopArea.duplicateStopPlatformBoundingBoxSize*/, stopDownloadRegion.getCentroid().y);
         stopDownloadRegion = stopDownloadRegion.regionInset(stopSearchBuffer, stopSearchBuffer);
 
         final OverpassConverter converter = new OverpassConverter();
@@ -301,7 +305,7 @@ public class StopConflator {
 
                 if(!idMatchFound) { //if no matching stops found, check that the import data doesn't conflict with existing stops
                     final double stopDistance = Point.distance(stop.getPlatform().getCentroid(), existingStopPlatform.getCentroid());
-                    if(stopDistance < StopArea.maxConflictSearchDistance) {
+                    if(stopDistance < StopArea.maxDistanceBetweenDuplicateStops) {
                         //System.out.println("Within distance of " + stop + "! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME) + ", dist " + stopDistance);
                         stop.getPlatform().setTag("gtfs:conflict", "yes");
                     }

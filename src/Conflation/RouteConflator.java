@@ -1,9 +1,8 @@
 package Conflation;
 
+import NewPathFinding.PathTree;
 import OSM.*;
 import Overpass.OverpassConverter;
-import PathFinding.PathTree;
-import PathFinding.RoutePathFinder;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
@@ -32,37 +31,32 @@ public class RouteConflator implements WaySegmentsObserver {
      * Class used for indexing OSMWays in the downloaded region into subregions, for more efficient
      * bounding box checks
      */
-    public static class Cell {
+    protected static class Cell {
         public final static List<Cell> allCells = new ArrayList<>(128);
         public final static double cellSizeInMeters = 500.0;
         private static double cellSize;
         private static double searchBuffer = 0.0;
 
-        public static void initCellsForBounds(final Region bounds) {
+        private static void initCellsForBounds(final Region bounds) {
             //wipe any existing cells (i.e. from a previous run)
             allCells.clear();
 
             //and prepare the region, including a buffer zone equal to the greatest of the various search/bounding box dimensions
             cellSize = SphericalMercator.metersToCoordDelta(cellSizeInMeters, bounds.getCentroid().y);
-            searchBuffer = -SphericalMercator.metersToCoordDelta(Math.max(RouteConflator.wayMatchingOptions.segmentSearchBoxSize, Math.max(StopArea.maxConflictSearchDistance, StopArea.maxDistanceFromPlatformToWay)), bounds.getCentroid().y);
+            searchBuffer = -SphericalMercator.metersToCoordDelta(Math.max(RouteConflator.wayMatchingOptions.segmentSearchBoxSize, Math.max(StopArea.duplicateStopPlatformBoundingBoxSize, StopArea.waySearchAreaBoundingBoxSize)), bounds.getCentroid().y);
 
-            //get the min/max extent of the bounded region
-            final Point rcOrigin = Cell.getCellOriginForPoint(bounds.origin), rcExtent = Cell.getCellOriginForPoint(bounds.extent);
-            for(double y = rcOrigin.y; y < rcExtent.y; y += Cell.cellSize) {
-                for(double x = rcOrigin.x; x < rcExtent.x; x += Cell.cellSize) {
+            //generate the cells needed to fill the entire bounds (plus the searchBuffer)
+            final Region baseCellRegion = bounds.regionInset(searchBuffer, searchBuffer);
+            for(double y = baseCellRegion.origin.y; y <= baseCellRegion.extent.y; y += Cell.cellSize) {
+                for(double x = baseCellRegion.origin.x; x <= baseCellRegion.extent.x; x += Cell.cellSize) {
                     createCellForPoint(new Point(x, y));
                 }
             }
         }
-
-        public static Cell createCellForPoint(final Point point) {
-            final Point cellOrigin = getCellOriginForPoint(point);
-            Cell cell = new Cell(cellOrigin);
+        private static Cell createCellForPoint(final Point point) {
+            Cell cell = new Cell(point);
             allCells.add(cell);
             return cell;
-        }
-        public static Point getCellOriginForPoint(final Point point) {
-            return new Point(Math.floor(point.x * cellSize) / cellSize, Math.floor(point.y / cellSize) * cellSize);
         }
 
         public final Region boundingBox, expandedBoundingBox;
@@ -315,11 +309,11 @@ public class RouteConflator implements WaySegmentsObserver {
         Region routePathsBoundingBox = null;
         for(final Route route : importRoutes) {
             if(route.routeType != null && route.routeType.equals(OSMEntity.TAG_ROUTE)) {
-                routePaths.add(route.routePath);
+                routePaths.add(route.routeLine.way);
                 if(routePathsBoundingBox == null) {
-                    routePathsBoundingBox = new Region(route.routePath.getBoundingBox());
+                    routePathsBoundingBox = new Region(route.routeLine.way.getBoundingBox());
                 } else {
-                    routePathsBoundingBox = Region.union(routePathsBoundingBox, route.routePath.getBoundingBox());
+                    routePathsBoundingBox = Region.union(routePathsBoundingBox, route.routeLine.way.getBoundingBox());
                 }
             }
         }
@@ -398,7 +392,7 @@ public class RouteConflator implements WaySegmentsObserver {
         }
 
         //create the Cell index for all the ways, for faster lookup below
-        Cell.initCellsForBounds(workingEntitySpace.getBoundingBox());
+        Cell.initCellsForBounds(routePathsBoundingBox);
 
         //create OSMWaySegments objects for all downloaded ways
         candidateLines = new HashMap<>(workingEntitySpace.allWays.size());
@@ -509,7 +503,7 @@ public class RouteConflator implements WaySegmentsObserver {
             }
 
             //create a copy of the region to test its properties
-            Region testRegion = curRegion.clone();
+            Region testRegion = new Region(curRegion);
             if(!virginRegion) {
                 testRegion.includePoint(node.getCentroid());
             }
@@ -539,7 +533,7 @@ public class RouteConflator implements WaySegmentsObserver {
                 continue;
             }
 
-            //get a handle on the WaySegments that geographically match the route's routeLine
+            //get a handle on the WaySegments that geographically match the route's routeLineSegment
             route.routeLine.findMatchingLineSegments(this);
         }
 
@@ -549,70 +543,51 @@ public class RouteConflator implements WaySegmentsObserver {
         stopConflator.createStopPositionsForPlatforms(workingEntitySpace);
         System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
 
-        for(final Route route : exportRoutes) {
-            route.spliteRouteLineByStops(workingEntitySpace);
-
-            try {
-                route.debugOutputSegments(workingEntitySpace, candidateLines.values());
-            } catch (IOException e) {
-                e.printStackTrace();
-            } catch (InvalidArgumentException e) {
-                e.printStackTrace();
-            }
-        }
-
 
         //TODO: debug bail
-        if(Math.random() < 2)
-            return;
+       /* if(Math.random() < 2)
+            return;*/
 
         //with the candidate lines determined, begin the pathfinding stage to lock down the path between the route's stops
-        final List<RoutePathFinder> routePathFinderFinders = new ArrayList<>(exportRoutes.size());
         for(final Route route : exportRoutes) {
             System.out.println("Begin PathFinding for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
+                System.out.println("skipping (not a flagged route)");
                 continue;
             }
-            final RoutePathFinder routePathFinder = new RoutePathFinder(route, candidateLines, allowedRouteTags);
-            routePathFinderFinders.add(routePathFinder);
-            routePathFinder.findPaths(workingEntitySpace);
 
-            //if the route wasn't fully matched, mark it
-            if(routePathFinder.getFailedPaths() > 0) {
-                workingEntitySpace.addEntity(route.routePath, OSMEntity.TagMergeStrategy.keepTags, null);
-                route.routeRelation.addMember(route.routePath, "");
-                route.routeRelation.setTag(OSMEntity.KEY_NAME, "**" + route.routeRelation.getTag(OSMEntity.KEY_NAME));
-            }
+            //run the pathfinding algorithm for each route
+            route.findRoutePaths(this);
 
             //and add the stops data to the OSMRelation for the route
             route.syncStopsWithRelation();
 
             if(debugEnabled) {
-                System.out.println("--------------------------------------------------------\nPRE-SPLIT Paths for " + routePathFinder.route.routeRelation.osm_id + ":");
-                for (final PathTree pathTree : routePathFinder.allPathTrees) {
+                System.out.println("--------------------------------------------------------\nPRE-SPLIT Paths for " + route.routePathFinder.route.routeRelation.osm_id + ":");
+                for (final PathTree pathTree : route.routePathFinder.routePathTrees) {
                     System.out.println("PATH: " + pathTree.bestPath);
                 }
             }
 
             //split any ways that aren't fully contained by the route path
-            routePathFinder.splitWaysAtIntersections(workingEntitySpace);
+            route.routePathFinder.splitWaysAtIntersections(workingEntitySpace);
 
             //debug paths
             if(debugEnabled) {
-                System.out.println("--------------------------------------------------------\nFinal Paths for " + routePathFinder.route.routeRelation.osm_id + ":");
-                for (final PathTree pathTree : routePathFinder.allPathTrees) {
+                System.out.println("--------------------------------------------------------\nFinal Paths for " + route.routePathFinder.route.routeRelation.osm_id + ":");
+                for (final PathTree pathTree : route.routePathFinder.routePathTrees) {
                     System.out.println("PATH: " + pathTree.bestPath);
                 }
             }
 
             //and finally, add the ways associated with the routeFinder's best path to the OSM route relation
-            routePathFinder.addWaysToRouteRelation();
+            route.routePathFinder.addWaysToRouteRelation();
 
-            if(debugEnabled) {
+            if(true||debugEnabled) {
                 try {
                     workingEntitySpace.outputXml("newresult" + route.routeRelation.osm_id + ".osm");
                     route.debugOutputSegments(workingEntitySpace, candidateLines.values());
-                    routePathFinder.debugOutputPaths(workingEntitySpace);
+                    route.routePathFinder.debugOutputPaths(workingEntitySpace);
                 } catch (IOException | InvalidArgumentException e) {
                     e.printStackTrace();
                 }

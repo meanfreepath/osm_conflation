@@ -23,7 +23,7 @@ public class OSMLineSegment extends LineSegment {
         parentSegments = newParent;
     }
 
-    public OSMLineSegment(LineSegment segmentToCopy, Point destination, OSMNode destinationNode) {
+    public OSMLineSegment(OSMLineSegment segmentToCopy, Point destination, OSMNode destinationNode) {
         super(segmentToCopy, destination, destinationNode);
         this.parentSegments = segmentToCopy.getParent();
     }

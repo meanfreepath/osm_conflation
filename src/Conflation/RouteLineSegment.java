@@ -39,7 +39,7 @@ public class RouteLineSegment extends LineSegment {
         super(segmentToCopy, destination, destinationNode);
         this.parentSegments = segmentToCopy.parentSegments;
 
-        //also recalculate the matches
+        //also copy the matches
         candidateWaySegments = new ArrayList<>(segmentToCopy.candidateWaySegments);
         matchingSegments = new HashMap<>(segmentToCopy.matchingSegments.size());
         bestMatchForLine = new HashMap<>(segmentToCopy.bestMatchForLine);
@@ -138,7 +138,7 @@ public class RouteLineSegment extends LineSegment {
     }
     @Override
     public String toString() {
-        return String.format("RLSeg #%d [%d/%d] [%.01f, %.01f], nd[%d/%d]", id, nodeIndex, segmentIndex, midPoint.y, midPoint.x, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
+        return String.format("RLSeg #%d [%d/%d] [%.01f, %.01f], nd[%d/%d]", id, segmentIndex, nodeIndex, midPoint.x, midPoint.y, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
     /*@Override
     public void finalize() throws Throwable {

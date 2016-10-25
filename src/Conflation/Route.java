@@ -1,6 +1,7 @@
 package Conflation;
 
 import NewPathFinding.PathTree;
+import NewPathFinding.RoutePathFinder;
 import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
@@ -18,9 +19,8 @@ public class Route {
     public final OSMRelation routeRelation;
     public final String routeType;
     public final List<StopArea> stops;
-    public final OSMWay routePath;
     public final RouteLineWaySegments routeLine;
-    public final List<PathTree> routePathTrees;
+    public final RoutePathFinder routePathFinder;
 
     public Route(final OSMRelation routeRelation, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
         this.routeRelation = routeRelation;
@@ -28,7 +28,7 @@ public class Route {
         routeType = routeRelation.getTag(OSMEntity.KEY_TYPE);
 
         final List<OSMRelation.OSMRelationMember> members = routeRelation.getMembers("");
-        routePath = (OSMWay) members.get(0).member;
+        final OSMWay routePath = (OSMWay) members.get(0).member;
         routePath.setTag("gtfs:ignore", "yes");
         routeLine = new RouteLineWaySegments(routePath, wayMatchingOptions.maxSegmentLength);
 
@@ -37,18 +37,26 @@ public class Route {
         for(final OSMRelation.OSMRelationMember stopMember : routeStops) {
             stops.add(new StopArea(stopMember.member, null));
         }
-        routePathTrees = new ArrayList<>(stops.size());
+
+        routePathFinder = new RoutePathFinder(this);
     }
-    public Route(final Route oldRoute, final OSMEntitySpace newEntitySpace, final List<StopArea> stops) {
+
+    /**
+     * Copy contructor used for transferring routes between entity spaces
+     * @param oldRoute
+     * @param newEntitySpace
+     * @param stops
+     */
+    protected Route(final Route oldRoute, final OSMEntitySpace newEntitySpace, final List<StopArea> stops) {
         this.wayMatchingOptions = oldRoute.wayMatchingOptions;
         routeRelation = newEntitySpace.createRelation(oldRoute.routeRelation.getTags(), null);
         routeType = routeRelation.getTag(OSMEntity.KEY_TYPE);
-        routePath = oldRoute.routePath; //NOTE: not added to new route's entity space!
-        routeLine = new RouteLineWaySegments(routePath, wayMatchingOptions.maxSegmentLength);
+        routeLine = new RouteLineWaySegments(oldRoute.routeLine.way, wayMatchingOptions.maxSegmentLength);
 
         //add the imported route's stops to the new entity space
-        this.stops = stops;
-        routePathTrees = new ArrayList<>(stops.size());
+        this.stops = new ArrayList<>(stops); //TODO - add to entity space?
+
+        routePathFinder = new RoutePathFinder(this); //TODO - any special cases?
     }
     public void syncStopsWithRelation() {
         for(final StopArea stop : stops) {
@@ -68,65 +76,19 @@ public class Route {
         return stops.indexOf(stop) == stops.size()-1;
     }
 
-    /**
-     * Takes the stop data and uses it to split the RouteLine into route legs, for later path discovery
-     */
-    public void spliteRouteLineByStops(final OSMEntitySpace workingEntitySpace) {
-        final HashMap<String, String> debugTags = new HashMap<>(2);
-        debugTags.put(OSMEntity.KEY_PUBLIC_TRANSPORT, OSMEntity.TAG_STOP_POSITION);
-        debugTags.put(OSMEntity.KEY_BUS, OSMEntity.TAG_YES);
+    public void findRoutePaths(final RouteConflator routeConflator) {
+        routePathFinder.splitRouteLineByStops();
 
-        System.out.println("Route " + routeLine.way.osm_id + ": " + stops.size() + " stops");
-        //Find the closest segment and point on the routeLine to the stops' positions
-        PathTree lastLeg = null;
-        for(final StopArea curStop : stops) {
-            //create the PathTree starting at the current stop, and cap the previous PathTree, if any
-            final PathTree curLeg = new PathTree(routeLine, curStop, lastLeg);
-            routePathTrees.add(curLeg);
-            if(lastLeg != null) {
-                lastLeg.setToStop(curStop);
-            }
+        routePathFinder.findPaths(routeConflator);
 
-            //try to match the position of the stop's platform to a segment on the RouteLine
-            if(curStop.getStopPosition() != null) {
-                final Point stopPoint = curStop.getStopPosition().getCentroid();
-                final RouteLineSegment closestSegment = (RouteLineSegment) routeLine.closestSegmentToPoint(stopPoint, StopArea.maxDistanceFromPlatformToWay);
-
-                if(closestSegment != null) {
-                    //get the closest point on the closest segment, and use it to split the it at that point
-                    final Point closestPointOnRouteLine = closestSegment.closestPointToPoint(stopPoint);
-                    final Point closestPointToPlatform;
-                    final double nodeTolerance = closestSegment.length / 5.0;
-
-                    //do a quick tolerance check on the LineSegment's existing points (no need to split segment if close enough to an existing point)
-                    if(Point.distance(closestPointOnRouteLine, closestSegment.destinationPoint) < nodeTolerance) {
-                        closestPointToPlatform = closestSegment.destinationPoint;
-                    } else if(Point.distance(closestPointOnRouteLine, closestSegment.originPoint) < nodeTolerance) {
-                        closestPointToPlatform = closestSegment.originPoint;
-                    } else {
-                        closestPointToPlatform = new Point(closestPointOnRouteLine.x, closestPointOnRouteLine.y);
-                        routeLine.insertPoint(closestPointToPlatform, closestSegment, 0.0);
-                    }
-
-                    //set the newly-added node as the start/end point of the current/last leg
-                    curLeg.setRouteLineStart(closestPointToPlatform);
-                    if(lastLeg != null) {
-                        lastLeg.setRouteLineEnd(closestPointToPlatform);
-                    }
-                }
-            }
-            lastLeg = curLeg;
-        }
-        //remove the last leg, since it "starts" at the last stop
-        if(routePathTrees.size() > 0) {
-            routePathTrees.remove(routePathTrees.size() - 1);
-        }
-
-        //and do some final processing on the PathTrees to get them ready for the path matching stage
-        for(final PathTree routeLeg : routePathTrees) {
-            routeLeg.compileRouteLineSegments();
+        //if the route wasn't fully matched, mark it
+        if(routePathFinder.getFailedPaths() > 0) {
+            routeConflator.getWorkingEntitySpace().addEntity(routeLine.way, OSMEntity.TagMergeStrategy.keepTags, null);
+            routeRelation.addMember(routeLine.way, "");
+            routeRelation.setTag(OSMEntity.KEY_NAME, "**" + routeRelation.getTag(OSMEntity.KEY_NAME));
         }
     }
+
     /**
      * Outputs the segment ways to an OSM XML file
      */
@@ -173,24 +135,24 @@ public class Route {
         final HashMap<String, String> stopTags = new HashMap<>(3);
         stopTags.put(OSMEntity.KEY_PUBLIC_TRANSPORT, OSMEntity.TAG_STOP_POSITION);
         stopTags.put(routeRelation.getTag(OSMEntity.KEY_ROUTE), OSMEntity.TAG_YES);
-        for(final PathTree pathTree: routePathTrees) {
+        for(final PathTree pathTree: routePathFinder.routePathTrees) {
             final HashMap<String, String> relTags = new HashMap<>(2);
-            relTags.put(OSMEntity.KEY_NAME, pathTree.fromStop.getPlatform().getTag(OSMEntity.KEY_NAME) + " -> " + pathTree.toStop.getPlatform().getTag(OSMEntity.KEY_NAME));
+            relTags.put(OSMEntity.KEY_NAME, pathTree.originStop.getPlatform().getTag(OSMEntity.KEY_NAME) + " -> " + pathTree.destinationStop.getPlatform().getTag(OSMEntity.KEY_NAME));
             relTags.put(OSMEntity.KEY_TYPE, OSMEntity.TAG_ROUTE);
             final OSMRelation pathRelation = segmentSpace.createRelation(relTags, null);
 
             //add the platform nodes
-            pathRelation.addMember(segmentSpace.addEntity(pathTree.fromStop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null), "platform");
-            pathRelation.addMember(segmentSpace.addEntity(pathTree.toStop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null), "platform");
+            pathRelation.addMember(segmentSpace.addEntity(pathTree.originStop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null), "platform");
+            pathRelation.addMember(segmentSpace.addEntity(pathTree.destinationStop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null), "platform");
 
             //and the closest nodes on the RouteLine
             if(pathTree.routeLineSegments != null) {
                 final RouteLineSegment fromSegment = pathTree.routeLineSegments.get(0), toSegment = pathTree.routeLineSegments.get(pathTree.routeLineSegments.size() - 1);
                 final OSMWay fromSegmentWay = routeLineSegmentWays.get(fromSegment.id), toSegmentWay = routeLineSegmentWays.get(toSegment.id);
-                stopTags.put(OSMEntity.KEY_NAME, pathTree.fromStop.getPlatform().getTag(OSMEntity.KEY_NAME));
+                stopTags.put(OSMEntity.KEY_NAME, pathTree.originStop.getPlatform().getTag(OSMEntity.KEY_NAME));
                 fromSegmentWay.getFirstNode().setTags(stopTags);
                 pathRelation.addMember(fromSegmentWay.getFirstNode(), "stop");
-                stopTags.put(OSMEntity.KEY_NAME, pathTree.toStop.getPlatform().getTag(OSMEntity.KEY_NAME));
+                stopTags.put(OSMEntity.KEY_NAME, pathTree.destinationStop.getPlatform().getTag(OSMEntity.KEY_NAME));
                 toSegmentWay.getLastNode().setTags(stopTags);
                 pathRelation.addMember(toSegmentWay.getLastNode(), "stop");
 

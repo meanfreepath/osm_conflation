@@ -28,7 +28,7 @@ public class Main {
         final RouteConflator.LineComparisonOptions options = RouteConflator.wayMatchingOptions;
         options.segmentSearchBoxSize = 30.0;
         options.maxSegmentLength = 10.0;
-        options.setMaxSegmentAngle(30.0);
+        options.setMaxSegmentAngle(50.0);
         options.maxSegmentOrthogonalDistance = 15.0;
         options.maxSegmentMidPointDistance = Math.sqrt(options.maxSegmentOrthogonalDistance * options.maxSegmentOrthogonalDistance + 4.0 * options.maxSegmentLength * options.maxSegmentLength);
 
@@ -47,8 +47,8 @@ public class Main {
         //selectedRoutes.add("100221");
         //selectedRoutes.add("100062"); //errors splitting
         //selectedRoutes.add("102581"); //D-Line: not preferring matching trunk_link near NB stop "15th Ave NW & NW Leary Way"
-        selectedRoutes.add("102615"); // E-Line
-        //selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
+        //selectedRoutes.add("102615"); // E-Line
+        selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
 
         try {
             importSpace.loadFromXML(importFileName);
