@@ -46,6 +46,6 @@ public class Point {
     }
     @Override
     public String toString() {
-        return "Point[" + x + "," + y + "]";
+        return String.format("Point[%.03f,%.03f]", x, y);
     }
 }

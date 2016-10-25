@@ -1,7 +1,5 @@
 package OSM;
 
-import java.util.Collection;
-
 /**
  * Simple container class for lat/lon coordinates
  * Created by nick on 10/22/16.

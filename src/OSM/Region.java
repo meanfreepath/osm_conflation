@@ -3,7 +3,7 @@ package OSM;
 /**
  * Created by nick on 10/29/15.
  */
-public class Region implements Cloneable {
+public class Region {
     public Point origin, extent;
 
     /**
@@ -226,11 +226,7 @@ public class Region implements Cloneable {
         return new Point(Cx, Cy);
     }
     @Override
-    public Region clone() {
-        return new Region(origin.x, origin.y, extent.x - origin.x, extent.y - origin.y);
-    }
-    @Override
     public String toString() {
-        return String.format("Region({%.03f,%.03f}{%.03f,%.03f})", origin.y, origin.x, extent.y, extent.x);
+        return String.format("Region([%.03f,%.03f][%.03f,%.03f])", origin.x, origin.y, extent.x, extent.y);
     }
 }
