@@ -41,9 +41,18 @@ public class SegmentMatch {
         totalCount++;
     }
     public static SegmentMatch checkCandidateForMatch(final RouteConflator.LineComparisonOptions options, final RouteLineSegment routeLineSegment, final OSMLineSegment osmLineSegment) {
+        //run some basic validation checks
+        if(routeLineSegment.vectorMagnitude <= Double.MIN_VALUE) {
+            //System.out.println("ERROR: " + osmLineSegment + " has zero magnitude");
+            return null;
+        }
+        if(osmLineSegment.vectorMagnitude < Double.MIN_VALUE) {
+            //System.out.println("ERROR: " + osmLineSegment + " has zero magnitude");
+            return null;
+        }
+
         //take the dot product
         final double dotProduct = (routeLineSegment.vectorX * osmLineSegment.vectorX + routeLineSegment.vectorY * osmLineSegment.vectorY) / (routeLineSegment.vectorMagnitude * osmLineSegment.vectorMagnitude);
-
         final boolean debugOutput = false;//osmLineSegment.parentSegments.way.osm_id == WaySegments.debugWayId && routeLineSegment.nodeIndex == 18 && osmLineSegment.nodeIndex == 14;
 
         //find the intersection of the orthogonal vector with the candidate segment
