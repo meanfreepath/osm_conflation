@@ -16,7 +16,7 @@ public class StopArea implements WaySegmentsObserver {
             return o1.getScore() < o2.getScore() ? 1 : -1;
         }
     };
-    private final static long debugPlatformId = 4018777638L;
+    private final static long debugPlatformId = 0L;
     public static boolean debugEnabled = false;
 
     /**
@@ -24,6 +24,7 @@ public class StopArea implements WaySegmentsObserver {
      */
     public final static double duplicateStopPlatformBoundingBoxSize = 50.0, waySearchAreaBoundingBoxSize = 50.0;
     public final static double stopNodeTolerance = 3.0, maxDistanceFromPlatformToWay = waySearchAreaBoundingBoxSize / 2.0, maxDistanceBetweenDuplicateStops = duplicateStopPlatformBoundingBoxSize / 2.0;
+    public final static String KEY_GTFS_STOP_ID = "gtfs:stop_id", KEY_GTFS_CONFLICT = "gtfs:conflict";
     private OSMEntity platform; //can be a node or way
     private OSMNode stopPosition = null;
     private Region nearbyWaySearchRegion, nearbyStopSearchRegion;
@@ -63,6 +64,10 @@ public class StopArea implements WaySegmentsObserver {
             }
             public void updateClosestRouteLineSegment() {
                 closestRouteLineSegment = getClosestRouteLineSegmentToPlatform(routeLine);
+            }
+            @Override
+            public String toString() {
+                return String.format("SegmentProximityMatch for %s, OSMSeg %s type %s, distance %.01f, rlSeg: %s", StopArea.this, candidateSegment, matchType.toString(), distance, closestRouteLineSegment);
             }
         }
         public class NameMatch {
@@ -111,6 +116,7 @@ public class StopArea implements WaySegmentsObserver {
             for(final SegmentProximityMatch proximityMatch : proximityMatches.values()) {
                 if(proximityMatch.closestRouteLineSegment == null) {
                     System.out.println("WARNING: No nearby routeline segment for " + platform.getTag(OSMEntity.KEY_NAME) + "(" + platform.osm_id + ")");
+                    System.out.println(proximityMatch);
                     continue;
                 }
                 final SegmentMatch bestMatchForRouteLine = proximityMatch.closestRouteLineSegment.bestMatchForLine.get(proximityMatch.candidateSegment.getParent().way.osm_id);
@@ -159,6 +165,20 @@ public class StopArea implements WaySegmentsObserver {
     }
     public void setStopPosition(final OSMNode stopNode) {
         stopPosition = stopNode;
+
+        //set the tags of the node to ensure they match the platform
+        if(stopPosition != null) {
+            OSMPresetFactory.makeStopPosition(stopNode);
+            if (platform.hasTag(OSMEntity.KEY_NAME)) {
+                stopNode.setTag(OSMEntity.KEY_NAME, platform.getTag(OSMEntity.KEY_NAME));
+            }
+            if (platform.hasTag(OSMEntity.KEY_REF)) {
+                stopNode.setTag(OSMEntity.KEY_REF, platform.getTag(OSMEntity.KEY_REF));
+            }
+            if (platform.hasTag(KEY_GTFS_STOP_ID)) {
+                stopNode.setTag(KEY_GTFS_STOP_ID, platform.getTag(KEY_GTFS_STOP_ID));
+            }
+        }
     }
     protected void addNameMatch(final OSMWaySegments line, final SegmentMatchType matchType) {
         StopWayMatch wayMatch = wayMatches.get(line.way.osm_id);
@@ -314,6 +334,6 @@ public class StopArea implements WaySegmentsObserver {
     }
     @Override
     public String toString() {
-        return String.format("StopArea P(#%d: “%s”[ref:%s]), *S(#%s: %s[ref:%s])", platform.osm_id, platform.getTag(OSMEntity.KEY_NAME), platform.getTag(OSMEntity.KEY_REF), stopPosition != null ? stopPosition.osm_id : "N/A", stopPosition != null ? stopPosition.getTag(OSMEntity.KEY_NAME) : "", stopPosition != null ? stopPosition.getTag(OSMEntity.KEY_REF) : "");
+        return String.format("StopArea @%d P(#%d: “%s”[ref:%s]), *S(#%s: %s[ref:%s])", hashCode(), platform.osm_id, platform.getTag(OSMEntity.KEY_NAME), platform.getTag(OSMEntity.KEY_REF), stopPosition != null ? stopPosition.osm_id : "N/A", stopPosition != null ? stopPosition.getTag(OSMEntity.KEY_NAME) : "", stopPosition != null ? stopPosition.getTag(OSMEntity.KEY_REF) : "");
     }
 }

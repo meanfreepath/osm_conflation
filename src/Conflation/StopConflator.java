@@ -5,10 +5,7 @@ import Overpass.OverpassConverter;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 /**
  * Manages the association of stops/waypoints with their respective OSM ways
@@ -159,7 +156,7 @@ public class StopConflator {
                 continue;
             }
 
-            //Create (or update an existing node) to serve as the stop position node for the platform
+            //get a handle on the best-matching way to the StopArea, and the nearest point to it
             final LineSegment bestSegment = stopArea.bestWayMatch.closestSegmentToStop;
             if(bestSegment == null) {
                 System.out.println("WARNING: " + stopArea + " has no nearby matching segment");
@@ -167,21 +164,41 @@ public class StopConflator {
             }
             final Point nearestPointOnSegment = bestSegment.closestPointToPoint(stopArea.getPlatform().getCentroid());
 
+            //check if there's an existing stop_position node that can be associated with the StopArea, and if so there's no need to set now
+            if(stopArea.getStopPosition() != null) {
+                System.out.println(stopArea.getStopPosition() + " already set");
+                continue;
+            } else {
+                System.out.println("Create stop position for " + stopArea);
+            }
+
+            //Create (or update an existing node) to serve as the stop position node for the platform
             OSMNode nearestNodeOnWay = bestSegment.getParent().way.nearestNodeAtPoint(nearestPointOnSegment, StopArea.stopNodeTolerance);
+
+            //double check the nearest node doesn't have already have a stop_position tag - may belong to another nearby stop!
+            if(nearestNodeOnWay != null && OSMEntity.TAG_STOP_POSITION.equals(nearestNodeOnWay.getTag(OSMEntity.KEY_PUBLIC_TRANSPORT))) {
+                final String stopAreaRef = stopArea.getPlatform().getTag(OSMEntity.KEY_REF);
+                final String stopAreaGtfsId = stopArea.getPlatform().getTag(StopArea.KEY_GTFS_STOP_ID);
+                final String nearestNodeRef = nearestNodeOnWay.getTag(OSMEntity.KEY_REF);
+                final String nearestNodeGtfsId = nearestNodeOnWay.getTag(StopArea.KEY_GTFS_STOP_ID);
+
+                //if the node has a ref or gtfs:stop_id tag, don't use it if they do not match the StopArea's values
+                if(stopAreaRef != null && nearestNodeRef != null && !stopAreaRef.equals(nearestNodeRef)) {
+                    nearestNodeOnWay = null;
+                } else if(stopAreaGtfsId != null && nearestNodeGtfsId != null && !stopAreaGtfsId.equals(nearestNodeGtfsId)) {
+                    nearestNodeOnWay = null;
+                }
+            }
+
+            //and create a new node if a good candidate can't be found on the way
             if(nearestNodeOnWay == null) {
                 nearestNodeOnWay = bestSegment.getParent().insertNode(entitySpace.createNode(nearestPointOnSegment.x, nearestPointOnSegment.y, null), bestSegment);
                 stopArea.chooseBestWayMatch();
             }
 
-            //then add a node on the nearest point and add to the relation and the way
-            OSMPresetFactory.makeStopPosition(nearestNodeOnWay);
-            nearestNodeOnWay.setTag(OSMEntity.KEY_NAME, stopArea.getPlatform().getTag(OSMEntity.KEY_NAME));
-            nearestNodeOnWay.setTag(OSMEntity.KEY_REF, stopArea.getPlatform().getTag(OSMEntity.KEY_REF));
-            nearestNodeOnWay.setTag("gtfs:stop_id", stopArea.getPlatform().getTag("gtfs:stop_id"));
-            nearestNodeOnWay.setTag(routeConflator.routeType, OSMEntity.TAG_YES); //TODO need proper key mapping (e.g. for subway, light_rail, etc)
-
             //and add the stop position to the stop area
             stopArea.setStopPosition(nearestNodeOnWay);
+            nearestNodeOnWay.setTag(routeConflator.routeType, OSMEntity.TAG_YES); //TODO need proper key mapping (e.g. for subway, light_rail, etc)
 
             //warn if no decent match is found
             /*if(stopArea.bestWayMatch.line. == null) {
@@ -230,6 +247,7 @@ public class StopConflator {
                     final String[] queryComponents = {
                             String.format("node[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
                             String.format("node[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("node[\"public_transport\"=\"stop_position\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
                             String.format("way[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
                             String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude)
                     };
@@ -268,9 +286,9 @@ public class StopConflator {
         }
 
         //and compare them to the existing OSM data
-        final String gtfsIdTag = "gtfs:stop_id";
         for(final StopArea stop : allStops) {
-            final String importGtfsId = stop.getPlatform().getTag("gtfs:stop_id");
+            final String importGtfsId = stop.getPlatform().getTag(StopArea.KEY_GTFS_STOP_ID);
+            assert importGtfsId != null;
             final String importRefTag = stop.getPlatform().getTag(OSMEntity.KEY_REF);
             double importRefTagNumeric;
             try {
@@ -280,45 +298,69 @@ public class StopConflator {
                 importRefTagNumeric = Double.MAX_VALUE;
             }
 
-            for(final OSMEntity existingStopPlatform : importedExistingStops) {
-                final String existingGtfsId = existingStopPlatform.getTag(gtfsIdTag);
+            final ListIterator<OSMEntity> importedExistingStopsIterator = importedExistingStops.listIterator();
+            int stopPos = 0;
+            while (importedExistingStopsIterator.hasNext()) {
+                final OSMEntity existingEntity = importedExistingStopsIterator.next();
+                final String existingGtfsId = existingEntity.getTag(StopArea.KEY_GTFS_STOP_ID);
 
-                assert importGtfsId != null;
+                //if the GTFS id or ref match, merge the existing stop entity with the import stop's data
+                final boolean idMatchFound = checkMatchingTags(existingGtfsId, importGtfsId, importRefTag, importRefTagNumeric, existingEntity);
+                if(!idMatchFound) { //if no matching entities found, check that the import data doesn't conflict with existing stops
+                    //check whether the entity is a platform or a stop_position
+                    final String entityType = existingEntity.getTag(OSMEntity.KEY_PUBLIC_TRANSPORT);
 
-                //if the GTFS id or ref match, merge the existing stop with the import stop's data
-                boolean idMatchFound = false;
-                if(importGtfsId.equals(existingGtfsId)) {
-                    idMatchFound = true;
-                   // System.out.println("GTFS id match! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(gtfsIdTag) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME));
-                } else if(existingStopPlatform.hasTag(OSMEntity.KEY_REF)) { //try matching by ref if no importer id
-                    final String existingRefTag = existingStopPlatform.getTag(OSMEntity.KEY_REF);
-                    assert existingRefTag != null;
-                    if(existingRefTag.trim().equals(importRefTag)) { //string match
-                        idMatchFound = true;
-                    } else if(importRefTagNumeric != Double.MAX_VALUE) { //try doing a basic numeric match if strings don't match (special case for already-imported King County metro data)
-                        try {
-                            final double existingRefTagNumeric = Double.parseDouble(existingRefTag);
-                            idMatchFound = existingRefTagNumeric == importRefTagNumeric;
-                        } catch(NumberFormatException ignored) {}
-                    }
-                }
-
-                if(!idMatchFound) { //if no matching stops found, check that the import data doesn't conflict with existing stops
-                    final double stopDistance = Point.distance(stop.getPlatform().getCentroid(), existingStopPlatform.getCentroid());
-                    if(stopDistance < StopArea.maxDistanceBetweenDuplicateStops) {
-                        //System.out.println("Within distance of " + stop + "! " + existingStopPlatform.osm_id + ": " + existingStopPlatform.getTag(OSMEntity.KEY_REF) + "/" + existingStopPlatform.getTag(OSMEntity.KEY_NAME) + ", dist " + stopDistance);
-                        stop.getPlatform().setTag("gtfs:conflict", "yes");
+                    if(entityType == null || OSMEntity.TAG_PLATFORM.equals(entityType)) { //if a platform, mark as a conflict
+                        final double stopDistance = Point.distance(stop.getPlatform().getCentroid(), existingEntity.getCentroid());
+                        if (stopDistance < StopArea.maxDistanceBetweenDuplicateStops) {
+                            //System.out.println("Within distance of " + stop + "! " + existingEntity.osm_id + ": " + existingEntity.getTag(OSMEntity.KEY_REF) + "/" + existingEntity.getTag(OSMEntity.KEY_NAME) + ", dist " + stopDistance);
+                            stop.getPlatform().setTag(StopArea.KEY_GTFS_CONFLICT, "yes");
+                        }
+                    } else if(OSMEntity.TAG_STOP_POSITION.equals(entityType)) { //no action taken on existing stop positions
+                        //System.out.println("No GTFS/REF MATCH FOR " + existingEntity.getTags().toString());
                     }
                 } else {
-                    //copy the tags from the GTFS stop into the existing stop (we keep the existing platform's location, since these are usually better-positioned than the GTFS data's)
-                    existingStopPlatform.copyTagsFrom(stop.getPlatform(), OSMEntity.TagMergeStrategy.copyTags);
-                    destinationEntitySpace.deleteEntity(stop.getPlatform()); //delete the GTFS entity from the working space - no longer needed
-                    stop.setPlatform(existingStopPlatform); //and point the StopArea's platform to the existing platform entity
+                    //check whether the entity is a platform or a stop_position (may be null if simply a highway=bus_stop)
+                    final String entityType = existingEntity.getTag(OSMEntity.KEY_PUBLIC_TRANSPORT);
 
-                    stop.getPlatform().removeTag("gtfs:conflict"); //in case previously marked as a conflict
-                    break; //bail since we've matched this stop
+                    if(entityType == null || OSMEntity.TAG_PLATFORM.equals(entityType)) {
+                        //copy the tags from the GTFS stop into the existing stop (we keep the existing platform's location, since these are usually better-positioned than the GTFS data's)
+                        existingEntity.copyTagsFrom(stop.getPlatform(), OSMEntity.TagMergeStrategy.copyTags);
+                        destinationEntitySpace.deleteEntity(stop.getPlatform()); //delete the GTFS entity from the working space - no longer needed
+                        stop.setPlatform(existingEntity); //and point the StopArea's platform to the existing platform entity
+
+                        stop.getPlatform().removeTag(StopArea.KEY_GTFS_CONFLICT); //in case previously marked as a conflict
+
+                        //remove from the imported entity list since we've matched it
+                        importedExistingStopsIterator.remove();
+                    } else if(OSMEntity.TAG_STOP_POSITION.equals(entityType)) {
+                        stop.setStopPosition((OSMNode) existingEntity);
+
+                        //remove from the imported entity list since we've matched it
+                        importedExistingStopsIterator.remove();
+                    }
                 }
             }
         }
+    }
+    private static boolean checkMatchingTags(final String existingGtfsId, final String importGtfsId, final String importRefTag, final double importRefTagNumeric, final OSMEntity existingEntity) {
+        //if the GTFS id or ref match, merge the existing stop with the import stop's data
+        boolean idMatchFound = false;
+        if(importGtfsId.equals(existingGtfsId)) {
+            idMatchFound = true;
+            // System.out.println("GTFS id match! " + existingEntity.osm_id + ": " + existingEntity.getTag(gtfsIdTag) + "/" + existingEntity.getTag(OSMEntity.KEY_NAME));
+        } else if(existingEntity.hasTag(OSMEntity.KEY_REF)) { //try matching by ref if no importer id
+            final String existingRefTag = existingEntity.getTag(OSMEntity.KEY_REF);
+            assert existingRefTag != null;
+            if(existingRefTag.trim().equals(importRefTag)) { //string match
+                idMatchFound = true;
+            } else if(importRefTagNumeric != Double.MAX_VALUE) { //try doing a basic numeric match if strings don't match (special case for already-imported King County metro data)
+                try {
+                    final double existingRefTagNumeric = Double.parseDouble(existingRefTag);
+                    idMatchFound = existingRefTagNumeric == importRefTagNumeric;
+                } catch(NumberFormatException ignored) {}
+            }
+        }
+        return idMatchFound;
     }
 }
