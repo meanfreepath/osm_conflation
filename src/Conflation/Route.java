@@ -27,9 +27,15 @@ public class Route {
         this.wayMatchingOptions = wayMatchingOptions;
         routeType = routeRelation.getTag(OSMEntity.KEY_TYPE);
 
+        //get a handle on the provided route path, and remove any duplicated nodes from it (can screw up segmenting/matching)
         final List<OSMRelation.OSMRelationMember> members = routeRelation.getMembers("");
         final OSMWay routePath = (OSMWay) members.get(0).member;
         routePath.setTag("gtfs:ignore", "yes");
+        final OSMNode[] duplicateNodes = routePath.identifyDuplicateNodesByPosition(0.1);
+        for(final OSMNode dupeNode : duplicateNodes) {
+            routePath.removeNode(dupeNode);
+        }
+
         routeLine = new RouteLineWaySegments(routePath, wayMatchingOptions.maxSegmentLength);
 
         final List<OSMRelation.OSMRelationMember> routeStops = routeRelation.getMembers(OSMEntity.TAG_PLATFORM);
@@ -178,7 +184,7 @@ public class Route {
             final RouteLineSegment routeLineSegment = (RouteLineSegment) lineSegment;
 
             //get the LineMatches associated with the routeLineSegment (i.e. segment->OSMWay matches)
-            final List<LineMatch> lineMatchesForRouteLineSegment = routeLine.lineMatchesBySegmentId.get(routeLineSegment.id);
+            final List<LineMatch> lineMatchesForRouteLineSegment = routeLine.lineMatchesByRouteLineSegmentId.get(routeLineSegment.id);
             if (lineMatchesForRouteLineSegment == null) {
                 continue;
             }
@@ -278,7 +284,7 @@ public class Route {
         int routeLineSegmentMatchCount = 0, overallLineMatchCounts = 0, lineMatchByRouteLineCounts = 0, lineMatchByOSMLineCounts = 0;
 
         //check by LineMatch objects
-        for(final LineMatch lineMatch : routeLine.lineMatches.values()) {
+        for(final LineMatch lineMatch : routeLine.lineMatchesByOSMSegmentId.values()) {
             overallLineMatchCounts += lineMatch.matchingSegments.size();
 
             //check if the matches based on the RouteLineSegments match up

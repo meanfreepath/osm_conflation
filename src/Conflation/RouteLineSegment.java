@@ -39,10 +39,12 @@ public class RouteLineSegment extends LineSegment {
         super(segmentToCopy, destination, destinationNode);
         this.parentSegments = segmentToCopy.parentSegments;
 
-        //also copy the matches
+        //also copy over some dependent data
         candidateWaySegments = new ArrayList<>(segmentToCopy.candidateWaySegments);
+
+        //NOTE: these matches are re-run in post-split observer functions in RouteLineWaySegments
         matchingSegments = new HashMap<>(segmentToCopy.matchingSegments.size());
-        bestMatchForLine = new HashMap<>(segmentToCopy.bestMatchForLine);
+        bestMatchForLine = new HashMap<>(segmentToCopy.bestMatchForLine.size());
     }
     public void addCandidateLine(final OSMWaySegments candidate) {
         candidateWaySegments.add(candidate);
