@@ -110,21 +110,22 @@ public class StopConflator {
         for(final Route route : routeConflator.getExportRoutes()) {
             for(final StopArea routeStop : route.stops) {
                 final Point platformCentroid = routeStop.getPlatform().getCentroid();
+                final Region osmSegmentSearchRegion = routeStop.getNearbyWaySearchRegion();
                 for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
                     if(cell.containedStops.contains(routeStop)) {
                         for(final OSMWaySegments osmLine : cell.containedWays) {
                             //check the segment's bounding box intersects
-                            if (!Region.intersects(osmLine.boundingBoxForStopMatching, routeStop.getNearbyWaySearchRegion())) {
+                            if(!Region.intersects(osmLine.boundingBoxForStopMatching, osmSegmentSearchRegion)) {
                                 continue;
                             }
 
-                            //find the nearest segment to the platform on the way
-                            final OSMLineSegment nearestSegment = (OSMLineSegment) osmLine.closestSegmentToPoint(platformCentroid, StopArea.maxDistanceFromPlatformToWay);
-
-                            //skip this line if not within the maximum distance to the stop
-                            if (nearestSegment != null) {
-                                //System.out.println("OSMLINE MATCH for platform " + routeStop);
-                                routeStop.addProximityMatch(route.routeLine, nearestSegment, Point.distance(nearestSegment.closestPointToPoint(platformCentroid), platformCentroid), StopArea.SegmentMatchType.proximityToOSMWay);
+                            //find the way's segments that are within the platform's search region
+                            for(final LineSegment lineSegment : osmLine.segments) {
+                                //skip this line if not within the maximum distance to the stop
+                                if (Region.intersects(lineSegment.boundingBox, routeStop.getNearbyWaySearchRegion())) {
+                                    //System.out.println("OSMLINE MATCH for platform " + routeStop);
+                                    routeStop.addProximityMatch(route.routeLine, (OSMLineSegment) lineSegment, Point.distance(lineSegment.closestPointToPoint(platformCentroid), platformCentroid), StopArea.SegmentMatchType.proximityToOSMWay);
+                                }
                             }
                         }
                     }
@@ -166,10 +167,7 @@ public class StopConflator {
 
             //check if there's an existing stop_position node that can be associated with the StopArea, and if so there's no need to set now
             if(stopArea.getStopPosition() != null) {
-                System.out.println(stopArea.getStopPosition() + " already set");
                 continue;
-            } else {
-                System.out.println("Create stop position for " + stopArea);
             }
 
             //Create (or update an existing node) to serve as the stop position node for the platform

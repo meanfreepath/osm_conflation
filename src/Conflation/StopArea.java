@@ -90,8 +90,8 @@ public class StopArea implements WaySegmentsObserver {
             SegmentProximityMatch proximityMatch = proximityMatches.get(osmLineSegment.id);
             if(proximityMatch == null) {
                 proximityMatch = new SegmentProximityMatch(routeLine, osmLineSegment, distance, matchType);
+                proximityMatches.put(osmLineSegment.id, proximityMatch);
             }
-            proximityMatches.put(osmLineSegment.id, proximityMatch);
         }
         private void setNameMatch(final SegmentMatchType matchType) {
             nameMatch = new NameMatch(matchType);
@@ -108,7 +108,6 @@ public class StopArea implements WaySegmentsObserver {
             }
 
             //check the oneway direction of the line, and whether it goes with or against
-            final boolean wayIsOneWay = line.oneWayDirection != WaySegments.OneWayDirection.none;
             final boolean debugIds = line.way.osm_id == 158265862L || line.way.osm_id == 158265857L;
 
             //and the proximity matches
@@ -149,6 +148,10 @@ public class StopArea implements WaySegmentsObserver {
         }
         public double getScore() {
             return nameScore + dpScore + distanceScore;
+        }
+        @Override
+        public String toString() {
+            return String.format("StopWayMatch for platform %s: way %s, %d proximityMatches: %.01f/%.01f/%.01f/%.01f name/dotProduct/distance/total scores", StopArea.this.getPlatform(), line.way, proximityMatches.size(), nameScore, dpScore, distanceScore, getScore());
         }
     }
 
@@ -194,12 +197,12 @@ public class StopArea implements WaySegmentsObserver {
         if(wayMatch == null) { //init a match object for the line, if not yet present
             wayMatch = new StopWayMatch((OSMWaySegments) segment.getParent());
             wayMatches.put(segment.getParent().way.osm_id, wayMatch);
+
+            //watch for changes on the RouteLine and any matching OSMLineSegments
+            segment.getParent().addObserver(this);
+            toRouteLine.addObserver(this);
         }
         wayMatch.addStopSegmentMatch(toRouteLine, segment, distance, matchType);
-
-        //watch for changes on the RouteLine and any matching OSMLineSegments
-        segment.getParent().addObserver(this);
-        toRouteLine.addObserver(this);
     }
 
     public void chooseBestWayMatch() {
