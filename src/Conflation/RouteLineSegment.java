@@ -142,7 +142,7 @@ public class RouteLineSegment extends LineSegment {
     }
     /*@Override
     public void finalize() throws Throwable {
-        System.out.println("DELETE " + this);
+        System.out.println("RLSEGDELETE " + this);
         super.finalize();
     }*/
 }

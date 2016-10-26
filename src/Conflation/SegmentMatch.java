@@ -128,6 +128,11 @@ public class SegmentMatch {
     }
     @Override
     public String toString() {
-        return String.format("SegMatch %s/%s::: O/M: %.03f/%.03f, DP %.03f", mainSegment, matchingSegment, orthogonalDistance, midPointDistance, dotProduct);
+        return String.format("SegMatch %s/%s::: O/M: %.01f/%.03f, DP %.03f, matchType: %d", mainSegment, matchingSegment, orthogonalDistance, midPointDistance, dotProduct, type);
     }
+    /*@Override
+    public void finalize() throws Throwable {
+        System.out.println("SMATCHDELETE " + this);
+        super.finalize();
+    }*/
 }

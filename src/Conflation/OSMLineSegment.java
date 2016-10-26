@@ -28,6 +28,6 @@ public class OSMLineSegment extends LineSegment {
         this.parentSegments = segmentToCopy.getParent();
     }
     public String toString() {
-        return String.format("OSMSeg %d #%d/%d [%.01f, %.01f], nd[%d/%d]", parentSegments.way.osm_id, nodeIndex, segmentIndex, midPoint.y, midPoint.x, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
+        return String.format("OSMSeg #%d (way %d) #%d/%d [%.01f, %.01f], nd[%d/%d]",  id, parentSegments.way.osm_id, segmentIndex, nodeIndex, midPoint.x, midPoint.y, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
 }
