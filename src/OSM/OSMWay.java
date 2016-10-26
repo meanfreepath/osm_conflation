@@ -314,7 +314,6 @@ public class OSMWay extends OSMEntity {
                 insideNode = insideIterator.next();
                 if(insideNode != outsideNode && Point.distance(outsideNode.getCentroid(), insideNode.getCentroid()) <= tolerance) {
                     duplicateNodes.add(insideNode);
-                    System.out.println("DUPE::" + insideNode + SphericalMercator.mercatorToLatLon(insideNode.getCentroid()));
                 }
             }
         }
