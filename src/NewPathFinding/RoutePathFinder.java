@@ -1,13 +1,19 @@
 package NewPathFinding;
 
-import Conflation.*;
+import Conflation.Route;
+import Conflation.RouteConflator;
+import Conflation.RouteLineSegment;
+import Conflation.StopArea;
 import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMWay;
 import OSM.Point;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 
 /**
  * Contains all the stop-to-stop paths for a route
@@ -54,9 +60,10 @@ public class RoutePathFinder {
         System.out.println("Route " + route.routeLine.way.osm_id + ": " + route.stops.size() + " stops");
         //Find the closest segment and point on the routeLineSegment to the stops' positions
         NewPathFinding.PathTree lastLeg = null;
+        int pathTreeIndex = 0;
         for(final StopArea curStop : route.stops) {
             //create the PathTree starting at the current stop, and cap the previous PathTree, if any
-            final NewPathFinding.PathTree curLeg = new NewPathFinding.PathTree(route.routeLine, curStop, lastLeg, this);
+            final NewPathFinding.PathTree curLeg = new NewPathFinding.PathTree(route.routeLine, curStop, lastLeg, pathTreeIndex++, this);
             routePathTrees.add(curLeg);
             if(lastLeg != null) {
                 lastLeg.setDestinationStop(curStop);
