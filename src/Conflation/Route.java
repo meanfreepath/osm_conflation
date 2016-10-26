@@ -184,14 +184,14 @@ public class Route {
             final RouteLineSegment routeLineSegment = (RouteLineSegment) lineSegment;
 
             //get the LineMatches associated with the routeLineSegment (i.e. segment->OSMWay matches)
-            final List<LineMatch> lineMatchesForRouteLineSegment = routeLine.lineMatchesByRouteLineSegmentId.get(routeLineSegment.id);
+            final Map<Long,LineMatch> lineMatchesForRouteLineSegment = routeLine.lineMatchesByRouteLineSegmentId.get(routeLineSegment.id);
             if (lineMatchesForRouteLineSegment == null) {
                 continue;
             }
 
             //and iterate over them
             //System.out.println(lineMatchesForRouteLineSegment.size() + " matches for " + routeLineSegment);
-            for (final LineMatch segmentLineMatch : lineMatchesForRouteLineSegment) {
+            for (final LineMatch segmentLineMatch : lineMatchesForRouteLineSegment.values()) {
                 //now get the matching OSMLineSegments for the given LineMatch and the current routeLineSegment
                 final List<SegmentMatch> routeLineSegmentMatches = segmentLineMatch.getOSMLineMatchesForSegment(routeLineSegment, matchMask);
                 //System.out.println(routeLineSegmentMatches.size() + " matches for linematch + " + routeLineSegment);
@@ -280,11 +280,26 @@ public class Route {
      * Checks if the total match counts in the various match indexes are identical
      */
     public void debugCheckMatchIndexIntegrity() {
+        //garbage collect to get better SegmentMatch total count
+        System.gc();
+
         //debug: check total match counts
-        int routeLineSegmentMatchCount = 0, overallLineMatchCounts = 0, lineMatchByRouteLineCounts = 0, lineMatchByOSMLineCounts = 0;
+        int routeLineSegmentMatchCount = 0, overallLineMatchCounts = 0, lineMatchByRouteLineCounts = 0, lineMatchByOSMLineCounts = 0, lineMatchCountByOSM = 0, lineMatchCountByRLSeg = 0;
+
+        //check the routeLine's LineMatch index integrity
+        lineMatchCountByOSM = routeLine.lineMatchesByOSMWayId.size();
+        final List<LineMatch> rlLineMatchIndex = new ArrayList<>(lineMatchCountByOSM);
+        for(final Map<Long, LineMatch> rlLineMatches : routeLine.lineMatchesByRouteLineSegmentId.values()) {
+            for(final LineMatch lineMatch : rlLineMatches.values()) {
+                if (!rlLineMatchIndex.contains(lineMatch)) {
+                    lineMatchCountByRLSeg ++;
+                    rlLineMatchIndex.add(lineMatch);
+                }
+            }
+        }
 
         //check by LineMatch objects
-        for(final LineMatch lineMatch : routeLine.lineMatchesByOSMSegmentId.values()) {
+        for(final LineMatch lineMatch : routeLine.lineMatchesByOSMWayId.values()) {
             overallLineMatchCounts += lineMatch.matchingSegments.size();
 
             //check if the matches based on the RouteLineSegments match up
@@ -307,6 +322,6 @@ public class Route {
             }
         }
 
-        System.out.format("%d global, %d RouteLineSegment, %d/%d/%d LineMatch-based SegmentMatch objects", SegmentMatch.totalCount, routeLineSegmentMatchCount, overallLineMatchCounts, lineMatchByRouteLineCounts, lineMatchByOSMLineCounts);
+        System.out.format("INDEX COUNTS:\n\tSegmentMatch: %d global, %d in RouteLineSegments, %d/%d/%d Total/RL/OSM in LineMatches.\n\tLineMatch: %d/%d OSM/RLSeg-based objects\n", SegmentMatch.totalCount, routeLineSegmentMatchCount, overallLineMatchCounts, lineMatchByRouteLineCounts, lineMatchByOSMLineCounts, lineMatchCountByOSM, lineMatchCountByRLSeg);
     }
 }

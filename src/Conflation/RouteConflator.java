@@ -535,6 +535,8 @@ public class RouteConflator implements WaySegmentsObserver {
 
             //get a handle on the WaySegments that geographically match the route's routeLineSegment
             route.routeLine.findMatchingLineSegments(this);
+
+            route.debugCheckMatchIndexIntegrity();
         }
 
         //update the route's stop proximity matches to include the match info on the OSM ways
@@ -543,10 +545,13 @@ public class RouteConflator implements WaySegmentsObserver {
         stopConflator.createStopPositionsForPlatforms(workingEntitySpace);
         System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
 
+        for(final Route route : exportRoutes) {
+            route.debugCheckMatchIndexIntegrity();
+        }
 
         //TODO: debug bail
-       /* if(Math.random() < 2)
-            return;*/
+        /*if(Math.random() < 2)
+            return;//*/
 
         //with the candidate lines determined, begin the pathfinding stage to lock down the path between the route's stops
         for(final Route route : exportRoutes) {
@@ -558,6 +563,8 @@ public class RouteConflator implements WaySegmentsObserver {
 
             //run the pathfinding algorithm for each route
             route.findRoutePaths(this);
+
+            route.debugCheckMatchIndexIntegrity();
 
             //and add the stops data to the OSMRelation for the route
             route.syncStopsWithRelation();

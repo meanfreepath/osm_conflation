@@ -1,13 +1,10 @@
 package Conflation;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
- * Class for tracking the match status between two WaySegmentsObjects, including
- * match scores for the specific LineSegments
+ * Class for tracking the match status between OSMWays and RouteLineSegments, including
+ * match scores for the specific LineSegments.  Only one LineMatch should exist per OSM way
  */
 public class LineMatch {
     public final List<SegmentMatch> matchingSegments, bestMatchingSegments;
@@ -38,10 +35,16 @@ public class LineMatch {
         if(match.matchingSegment.getParent() != osmLine) {
             throw new RuntimeException("Tried to add match for different line: " + this.toString());
         }
+
+        if(matchingSegments.contains(match)) { //shouldn't happen
+            System.out.println("ALREADY CONTAINS " + match);
+            return;
+        }
+
         matchingSegments.add(match);
         //System.out.println("ADD SM " + match);
 
-        //also group the segments by the matchingSegment's Id property
+        //update the index keyed by the mainSegment's Id property
         List<SegmentMatch> routeLineBySegment = matchedSegmentsByRouteLineSegmentId.get(match.mainSegment.id);
         if(routeLineBySegment == null) {
             routeLineBySegment = new ArrayList<>(16);
@@ -58,21 +61,30 @@ public class LineMatch {
         osmLineBySegment.add(match);
     }
     protected void removeMatch(final SegmentMatch oldMatch) {
+        if(!matchingSegments.contains(oldMatch)) {
+            System.out.println("MATCH DOESN'T EXIST " + oldMatch);
+            return;
+        }
         matchingSegments.remove(oldMatch);
-        matchedSegmentsByRouteLineSegmentId.remove(oldMatch.mainSegment.id);
-        List<SegmentMatch> osmLineBySegment = matchedSegmentsByOSMLineSegmentId.get(oldMatch.matchingSegment.id);
-        osmLineBySegment.remove(oldMatch);
+        bestMatchingSegments.remove(oldMatch);
 
-        /*boolean removedMain = matchingSegments.remove(oldMatch);
-        List<SegmentMatch> removedRL = matchedSegmentsByRouteLineSegmentId.remove(oldMatch.mainSegment.id);
+        //remove from the RouteLineSegment index
+        final List<SegmentMatch> routeLineMatches = matchedSegmentsByRouteLineSegmentId.get(oldMatch.mainSegment.id);
+        if(routeLineMatches != null) {
+            routeLineMatches.remove(oldMatch);
+            if(routeLineMatches.size() == 0) {
+                matchedSegmentsByRouteLineSegmentId.remove(oldMatch.mainSegment.id);
+            }
+        }
 
-        List<SegmentMatch> osmLineBySegment = matchedSegmentsByOSMLineSegmentId.get(oldMatch.matchingSegment.id);
-        int osmCount = osmLineBySegment.size();
-        boolean removedOSM = osmLineBySegment.remove(oldMatch);
-        System.out.format("REMOVED %s: %s/%s/%s (%d OSM present)\n", oldMatch, Boolean.toString(removedMain), Boolean.toString(removedRL != null), Boolean.toString(removedOSM), osmCount);
-        /*for(final SegmentMatch match : osmLineBySegment) {
-            System.out.println("\t" + match);
-        }*/
+        //and from the OSMLineSegmentIndex
+        final List<SegmentMatch> osmLineMatches = matchedSegmentsByOSMLineSegmentId.get(oldMatch.matchingSegment.id);
+        if(osmLineMatches != null) {
+            osmLineMatches.remove(oldMatch);
+            if(osmLineMatches.size() == 0) {
+                matchedSegmentsByOSMLineSegmentId.remove(oldMatch.matchingSegment.id);
+            }
+        }
     }
 
     private static List<SegmentMatch> applyMask(final List<SegmentMatch> segmentMatches, final short matchMask) {
@@ -114,16 +126,6 @@ public class LineMatch {
         }
         return applyMask(bySegment, matchMask);
     }
-    /*private void resyncMatchesForSegments(final List<LineSegment> segments) {
-        final List<SegmentMatch> matchesToRemove = new ArrayList<>(matchingSegments.size());
-        for(final SegmentMatch match : matchingSegments) {
-            if(!segments.contains(match.matchingSegment)) {
-                matchesToRemove.add(match);
-            }
-        }
-        //System.out.println("Removed " + matchesToRemove.size() + " segment matches: " + matchingSegments.size() + " left");
-        matchingSegments.removeAll(matchesToRemove);
-    }*/
 
     /**
      * Consolidates all the segment matches and calculates the various totals

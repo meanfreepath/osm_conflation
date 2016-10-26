@@ -3,14 +3,19 @@ package Conflation;
 import OSM.Point;
 import OSM.Region;
 
+import java.nio.charset.Charset;
+import java.util.zip.CRC32;
+
 /**
  * Created by nick on 11/9/15.
  */
 public class SegmentMatch {
+    private final static CRC32 idGenerator = new CRC32();
     private final static double DOT_PRODUCT_FOR_PARALLEL_LINE = 0.999; //segments with a dot product > than this are considered "parallel" for some calculations
     public final static short matchTypeNone = 0, matchTypeBoundingBox = 1, matchTypeDotProduct = 2, matchTypeDistance = 4, matchTypeTravelDirection = 8;
     public final static short matchMaskAll = matchTypeBoundingBox | matchTypeDistance | matchTypeDotProduct | matchTypeTravelDirection;
 
+    public final long id;
     public final double orthogonalDistance, midPointDistance, dotProduct;
     public final RouteLineSegment mainSegment;
     public final OSMLineSegment matchingSegment;
@@ -18,9 +23,15 @@ public class SegmentMatch {
 
     public static int totalCount = 0;
 
-    public SegmentMatch(final RouteLineSegment segment1, final OSMLineSegment segment2, final double orthDistance, final double midDistance, final double dotProduct, final RouteConflator.LineComparisonOptions options) {
-        mainSegment = segment1;
-        matchingSegment = segment2;
+    public static long idForParameters(final RouteLineSegment routeLineSegment, final OSMLineSegment osmLineSegment) {
+        idGenerator.reset();
+        idGenerator.update(String.format("SM:%d:%d", routeLineSegment.id, osmLineSegment.id).getBytes(Charset.forName("ascii")));
+        return idGenerator.getValue();
+    }
+    public SegmentMatch(final RouteLineSegment routeLineSegment, final OSMLineSegment osmLineSegment, final double orthDistance, final double midDistance, final double dotProduct, final RouteConflator.LineComparisonOptions options) {
+        id = idForParameters(routeLineSegment, osmLineSegment);
+        mainSegment = routeLineSegment;
+        matchingSegment = osmLineSegment;
         orthogonalDistance = orthDistance;
         midPointDistance = midDistance;
         this.dotProduct = dotProduct;
@@ -130,9 +141,10 @@ public class SegmentMatch {
     public String toString() {
         return String.format("SegMatch %s/%s::: O/M: %.01f/%.03f, DP %.03f, matchType: %d", mainSegment, matchingSegment, orthogonalDistance, midPointDistance, dotProduct, type);
     }
-    /*@Override
+    @Override
     public void finalize() throws Throwable {
-        System.out.println("SMATCHDELETE " + this);
+        totalCount--;
+      //  System.out.println("SMATCHDELETE " + this);
         super.finalize();
-    }*/
+    }
 }

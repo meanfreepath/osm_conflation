@@ -13,6 +13,10 @@ public class OSMLineSegment extends LineSegment {
         super(parentSegments.way.osm_id, origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
         this.parentSegments = parentSegments;
     }
+    protected OSMLineSegment(OSMLineSegment segmentToCopy, Point destination, OSMNode destinationNode) {
+        super(segmentToCopy, destination, destinationNode);
+        this.parentSegments = segmentToCopy.getParent();
+    }
 
     @Override
     public WaySegments getParent() {
@@ -23,11 +27,13 @@ public class OSMLineSegment extends LineSegment {
         parentSegments = newParent;
     }
 
-    public OSMLineSegment(OSMLineSegment segmentToCopy, Point destination, OSMNode destinationNode) {
-        super(segmentToCopy, destination, destinationNode);
-        this.parentSegments = segmentToCopy.getParent();
-    }
+    @Override
     public String toString() {
         return String.format("OSMSeg #%d (way %d) #%d/%d [%.01f, %.01f], nd[%d/%d]",  id, parentSegments.way.osm_id, segmentIndex, nodeIndex, midPoint.x, midPoint.y, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
+    /*@Override
+    public void finalize() throws Throwable {
+        System.out.println("OSMSEGDELETE " + this);
+        super.finalize();
+    }*/
 }

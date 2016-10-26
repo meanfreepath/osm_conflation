@@ -2,6 +2,7 @@ package Conflation;
 
 import OSM.OSMNode;
 import OSM.Point;
+import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,7 +46,7 @@ public class RouteLineSegment extends LineSegment {
         bestMatchForLine = new HashMap<>(segmentToCopy.bestMatchForLine.size());
     }
     /**
-     * Add the given SegmentMatch to this object.
+     * Add the given SegmentMatch to this object's match indexes.
      * @param match
      * @return true if added, false if a duplicate or other error
      */
@@ -57,6 +58,7 @@ public class RouteLineSegment extends LineSegment {
         }
         matchingSegmentsById.put(match.id, match);
 
+        //add to the index keyed by the OSM ways' ids
         final long osmWayId = match.matchingSegment.getParent().way.osm_id;
         List<SegmentMatch> matchesForLine = matchingSegments.get(osmWayId);
         if(matchesForLine == null) {
@@ -64,6 +66,23 @@ public class RouteLineSegment extends LineSegment {
             matchingSegments.put(osmWayId, matchesForLine);
         }
         matchesForLine.add(match);
+        return true;
+    }
+
+    /**
+     * Remove the given match from this object's indexes
+     * @param match the match to remove
+     * @return true if removed, false if not
+     */
+    public boolean removeMatch(final SegmentMatch match) {
+        if(!matchingSegmentsById.containsKey(match.id)) {
+            return false;
+        }
+        matchingSegmentsById.remove(match.id);
+
+        final OSMWaySegments matchingLine = (OSMWaySegments) match.matchingSegment.getParent();
+        List<SegmentMatch> matchesForLine = matchingSegments.get(matchingLine.way.osm_id);
+        matchesForLine.remove(match);
         return true;
     }
     public void summarize() {
@@ -77,9 +96,6 @@ public class RouteLineSegment extends LineSegment {
             }
             bestMatchForLine.put(matchesForLine.getKey(), bestMatch);
         }
-
-        //also clean up any unneeded memory
-        //matchingSegments.clear(); uncomment once not needed
     }
     private SegmentMatch chooseBestMatchForMatchType(final List<SegmentMatch> matches, final short matchMask) {
         double minScore = Double.MAX_VALUE, matchScore, nextBestMinScore = Double.MAX_VALUE, nextBestMatchScore;
@@ -146,9 +162,9 @@ public class RouteLineSegment extends LineSegment {
     public String toString() {
         return String.format("RLSeg #%d [%d/%d] [%.01f, %.01f], nd[%d/%d]", id, segmentIndex, nodeIndex, midPoint.x, midPoint.y, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
-    @Override
+    /*@Override
     public void finalize() throws Throwable {
         System.out.println("RLSEGDELETE " + this);
         super.finalize();
-    }
+    }*/
 }
