@@ -2,7 +2,6 @@ package Conflation;
 
 import OSM.OSMNode;
 import OSM.Point;
-import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 
 import java.util.ArrayList;
 import java.util.HashMap;

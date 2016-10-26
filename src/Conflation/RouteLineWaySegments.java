@@ -38,7 +38,7 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
     /**
      * OSM way matches, keyed by their osm_id
      */
-    public final HashMap<Long,LineMatch> lineMatchesByOSMWayId = new HashMap<>(512);
+    public final HashMap<Long,LineMatch> lineMatchesByOSMWayId = new HashMap<>(1024);
 
     /**
      * OSM way matches, keyed by RouteLineSegments' ids, then OSM way id
