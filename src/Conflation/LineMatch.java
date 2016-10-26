@@ -160,6 +160,6 @@ public class LineMatch {
     }
     @Override
     public String toString() {
-        return "LineMatch: " + routeLine + ":" + osmLine + " (" + matchingSegments.size() + " matching segments)";
+        return String.format("LineMatch %s:%s(%d matching, %.02f Avg DP, %.02f Avg Dist, %ssummarized)", routeLine, osmLine, matchingSegments.size(), avgDotProduct, avgDistance, summarized ? "" : "NOT ");
     }
 }
