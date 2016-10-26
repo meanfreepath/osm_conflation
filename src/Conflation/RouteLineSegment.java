@@ -13,19 +13,19 @@ import java.util.Map;
  */
 public class RouteLineSegment extends LineSegment {
     public final RouteLineWaySegments parentSegments;
-    private final List<OSMWaySegments> candidateWaySegments; //TODO: may not be needed
 
     /**
      * The OSMLineSegment matches, keyed by their way's OSM id
      */
     private final Map<Long, List<SegmentMatch>> matchingSegments;
+    private final Map<Long, SegmentMatch> matchingSegmentsById;
     public final Map<Long, SegmentMatch> bestMatchForLine;
     public RouteLineSegment(RouteLineWaySegments parentSegments, Point origin, Point destination, OSMNode originNode, OSMNode destinationNode, int segmentIndex, int nodeIndex) {
         super(parentSegments.way.osm_id, origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
         this.parentSegments = parentSegments;
 
-        candidateWaySegments = new ArrayList<>(16);
         matchingSegments = new HashMap<>(8);
+        matchingSegmentsById = new HashMap<>(8);
         bestMatchForLine = new HashMap<>(8);
     }
 
@@ -39,20 +39,24 @@ public class RouteLineSegment extends LineSegment {
         super(segmentToCopy, destination, destinationNode);
         this.parentSegments = segmentToCopy.parentSegments;
 
-        //also copy over some dependent data
-        candidateWaySegments = new ArrayList<>(segmentToCopy.candidateWaySegments);
-
         //NOTE: these matches are re-run in post-split observer functions in RouteLineWaySegments
         matchingSegments = new HashMap<>(segmentToCopy.matchingSegments.size());
+        matchingSegmentsById = new HashMap<>(segmentToCopy.matchingSegmentsById.size());
         bestMatchForLine = new HashMap<>(segmentToCopy.bestMatchForLine.size());
     }
-    public void addCandidateLine(final OSMWaySegments candidate) {
-        candidateWaySegments.add(candidate);
-    }
-    public List<OSMWaySegments> getCandidateLines() {
-        return candidateWaySegments;
-    }
-    public void addMatch(final SegmentMatch match) {
+    /**
+     * Add the given SegmentMatch to this object.
+     * @param match
+     * @return true if added, false if a duplicate or other error
+     */
+    public boolean addMatch(final SegmentMatch match) {
+        //prevent duplicate matches from being added (happens on RouteLineSegments located near Cell boundaries)
+        if(matchingSegmentsById.containsKey(match.id)) {
+           // System.out.println("DUPLICATE MATCH FOR " + match.mainSegment + "::" + SphericalMercator.mercatorToLatLon(match.mainSegment.midPoint));
+            return false;
+        }
+        matchingSegmentsById.put(match.id, match);
+
         final long osmWayId = match.matchingSegment.getParent().way.osm_id;
         List<SegmentMatch> matchesForLine = matchingSegments.get(osmWayId);
         if(matchesForLine == null) {
@@ -60,6 +64,7 @@ public class RouteLineSegment extends LineSegment {
             matchingSegments.put(osmWayId, matchesForLine);
         }
         matchesForLine.add(match);
+        return true;
     }
     public void summarize() {
         //look up the matching segments we have for the given OSM way
@@ -74,7 +79,6 @@ public class RouteLineSegment extends LineSegment {
         }
 
         //also clean up any unneeded memory
-        candidateWaySegments.clear();
         //matchingSegments.clear(); uncomment once not needed
     }
     private SegmentMatch chooseBestMatchForMatchType(final List<SegmentMatch> matches, final short matchMask) {
@@ -142,9 +146,9 @@ public class RouteLineSegment extends LineSegment {
     public String toString() {
         return String.format("RLSeg #%d [%d/%d] [%.01f, %.01f], nd[%d/%d]", id, segmentIndex, nodeIndex, midPoint.x, midPoint.y, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
-    /*@Override
+    @Override
     public void finalize() throws Throwable {
         System.out.println("RLSEGDELETE " + this);
         super.finalize();
-    }*/
+    }
 }
