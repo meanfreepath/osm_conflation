@@ -11,4 +11,8 @@ public class LatLon {
         this.latitude = latitude;
         this.longitude = longitude;
     }
+    @Override
+    public String toString() {
+        return String.format("LatLon [%.06f, %.06f]", latitude, longitude);
+    }
 }

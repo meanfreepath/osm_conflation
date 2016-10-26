@@ -2,10 +2,7 @@ package OSM;
 
 import com.sun.istack.internal.NotNull;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 /**
  * Created by nick on 10/15/15.
@@ -297,6 +294,31 @@ public class OSMWay extends OSMEntity {
             return nodes.get(0) == nodes.get(nodeCount - 1);
         }
         return false;
+    }
+    /**
+     * Check for nodes that occupy the same position on this way
+     * @param tolerance
+     * @return
+     */
+    public OSMNode[] identifyDuplicateNodesByPosition(final double tolerance) {
+        if(nodes.size() < 2) {
+            return null;
+        }
+        ListIterator<OSMNode> outsideIterator = nodes.listIterator(), insideIterator;
+        OSMNode outsideNode, insideNode;
+        final List<OSMNode> duplicateNodes = new ArrayList<>(nodes.size());
+        while (outsideIterator.hasNext()) {
+            outsideNode = outsideIterator.next();
+            insideIterator = nodes.listIterator(outsideIterator.nextIndex());
+            while (insideIterator.hasNext()) {
+                insideNode = insideIterator.next();
+                if(insideNode != outsideNode && Point.distance(outsideNode.getCentroid(), insideNode.getCentroid()) <= tolerance) {
+                    duplicateNodes.add(insideNode);
+                    System.out.println("DUPE::" + insideNode + SphericalMercator.mercatorToLatLon(insideNode.getCentroid()));
+                }
+            }
+        }
+        return duplicateNodes.toArray(new OSMNode[duplicateNodes.size()]);
     }
     @Override
     public String toString() {
