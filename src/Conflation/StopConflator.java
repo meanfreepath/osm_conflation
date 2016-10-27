@@ -26,7 +26,7 @@ public class StopConflator {
      * Match the routeConflator's stops to the best possible OSM way, based on its name, position,
      * way's proximity to routeLineSegment, etc
      */
-    public void matchStopsToWays() {
+    protected void matchStopsToWays() {
         final int stopCount = routeConflator.getAllRouteStops().size();
         if(stopCount == 0) { //TODO add warning
             System.out.println("No stops found for route " + routeConflator.importRouteMaster.getTag(OSMEntity.KEY_NAME));
@@ -42,10 +42,47 @@ public class StopConflator {
             }
         }
 
-        final StreetNameMatcher matcher = new StreetNameMatcher(Locale.US);
 
-        //loop through the route's stops, determining the best-matching way for each one
+        //run a comparison based on proximity to the nearest OSM line for each subroute
+        for(final Route route : routeConflator.getExportRoutes()) {
+            for(final StopArea routeStop : route.stops) {
+                //skip stops that already have a stop position assigned (the stop's way(s) are associated with the stop position)
+                if(routeStop.getStopPosition() != null) {
+                    continue;
+                }
+
+                final Point platformCentroid = routeStop.getPlatform().getCentroid();
+                final Region osmSegmentSearchRegion = routeStop.getNearbyWaySearchRegion();
+                for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
+                    if(cell.containedStops.contains(routeStop)) {
+                        for(final OSMWaySegments osmLine : cell.containedWays) {
+                            //check the OSM line's bounding box intersects
+                            if(!Region.intersects(osmLine.boundingBoxForStopMatching, osmSegmentSearchRegion)) {
+                                continue;
+                            }
+
+                            //find the way's segments that are within the platform's search region
+                            for(final LineSegment lineSegment : osmLine.segments) {
+                                //skip this line if not within the maximum distance to the stop
+                                if (Region.intersects(lineSegment.boundingBox, osmSegmentSearchRegion)) {
+                                    //System.out.println("OSMLINE MATCH for platform " + routeStop);
+                                    routeStop.addProximityMatch(route.routeLine, (OSMLineSegment) lineSegment, Point.distance(lineSegment.closestPointToPoint(platformCentroid), platformCentroid));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        //loop through all of the route's stops, assigning name matches as needed
+        final StreetNameMatcher matcher = new StreetNameMatcher(Locale.US);
         for(final StopArea stop : routeConflator.getAllRouteStops()) {
+            //skip stops that already have a stop position assigned (the stop's way(s) are associated with the stop position)
+            if(stop.getStopPosition() != null) {
+                continue;
+            }
+
             //get the stop's name components, to see if we can use the name to match to a nearby way
             final String stopName = stop.getPlatform().getTag(OSMEntity.KEY_NAME);
             final List<StreetNameMatcher.StreetNameComponents> nameComponents;
@@ -59,91 +96,40 @@ public class StopConflator {
                 nameComponents = null;
             }
 
-            //find the nearest OSM ways to the stop platforms, checking all lines whose bounding boxes intersect the stop's search area
-            final Point platformCentroid = stop.getPlatform().getCentroid();
-            for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
-                if(Region.intersects(cell.expandedBoundingBox, stop.getNearbyWaySearchRegion())) {
-                    for(final OSMWaySegments line : cell.containedWays) {
-                        //check the line's bounding box intersects
-                        if(!Region.intersects(line.boundingBoxForStopMatching, stop.getNearbyWaySearchRegion())) {
-                            continue;
+            //update the way matches to include matches based on the street and platform names
+            for(final Map<Long, StopArea.StopWayMatch> wayMatchesForRoute: stop.wayMatches.values()) { //list of all OSM way matches for a routeLine
+                for (final StopArea.StopWayMatch stopWayMatch : wayMatchesForRoute.values()) { //and the individual OSM way matches
+                    //Check if the way can be matched by name
+                    final String wayName = stopWayMatch.osmLine.way.getTag(OSMEntity.KEY_NAME);
+                    if (nameComponents != null && wayName != null) {
+                        final StreetNameMatcher.StreetNameComponents wayNameComponents = matcher.createComponents(wayName);
+                        final String wayBaseName = String.join(" ", wayNameComponents.baseComponents);
+                        final StreetNameMatcher.StreetNameComponents primaryStreetComponents = nameComponents.get(0);
+                        final StreetNameMatcher.StreetNameComponents secondaryStreetComponents = nameComponents.size() > 1 ? nameComponents.get(1) : null;
+
+                        final String primaryStreetBaseName = String.join(" ", primaryStreetComponents.baseComponents);
+                        final double primaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(primaryStreetBaseName, wayBaseName, 128);
+                        if (debugEnabled) {
+                            System.out.println("CHECK PLATFORM PRINAME: " + stop + ": vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + primaryStringDistance + "/" + primaryStreetBaseName.length() + ", ratio " + (primaryStringDistance / primaryStreetBaseName.length()));
                         }
-
-                        //skip this line if the nearest segment is not within the maximum distance to the stop
-                        if(line.closestSegmentToPoint(platformCentroid, StopArea.maxDistanceFromPlatformToWay) == null) {
-                            //System.out.println("NO MATCH for platform " + stopPlatform.osm_id + "(ref " + stopPlatform.getTag("ref") + "/" + stopPlatform.getTag("name") + ")");
-                            continue;
-                        }
-
-                        //Check if the way can be matched by name
-                        final String wayName = line.way.getTag(OSMEntity.KEY_NAME);
-                        if(nameComponents != null && wayName != null) {
-                            final StreetNameMatcher.StreetNameComponents wayNameComponents = matcher.createComponents(wayName);
-                            final String wayBaseName = String.join(" ", wayNameComponents.baseComponents);
-                            final StreetNameMatcher.StreetNameComponents primaryStreetComponents = nameComponents.get(0);
-                            final StreetNameMatcher.StreetNameComponents secondaryStreetComponents = nameComponents.size() > 1 ?  nameComponents.get(1) : null;
-
-                            final String primaryStreetBaseName = String.join(" ", primaryStreetComponents.baseComponents);
-                            final double primaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(primaryStreetBaseName, wayBaseName, 128);
-                            if(debugEnabled) {
-                                System.out.println("CHECK PLATFORM PRINAME: " + stop + ": vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + primaryStringDistance + "/" + primaryStreetBaseName.length() + ", ratio " + (primaryStringDistance / primaryStreetBaseName.length()));
+                        if (primaryStringDistance / primaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
+                            stopWayMatch.setNameMatch(StopArea.WayMatchType.primaryStreet);
+                        } else if (secondaryStreetComponents != null) {
+                            final String secondaryStreetBaseName = String.join(" ", secondaryStreetComponents.baseComponents);
+                            final double secondaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(secondaryStreetBaseName, wayBaseName, 128);
+                            if (debugEnabled) {
+                                System.out.println("CHECK PLATFORM SECNAME: " + stop + ": vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + secondaryStringDistance + "/" + secondaryStreetBaseName.length() + ", ratio " + (secondaryStringDistance / secondaryStreetBaseName.length()));
                             }
-                            if (primaryStringDistance / primaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
-                                stop.addNameMatch(line, StopArea.SegmentMatchType.primaryStreet);
-                            } else if (secondaryStreetComponents != null) {
-                                final String secondaryStreetBaseName = String.join(" ", secondaryStreetComponents.baseComponents);
-                                final double secondaryStringDistance = StreetNameMatcher.damerauLevenshteinDistance(secondaryStreetBaseName, wayBaseName, 128);
-                                if(debugEnabled) {
-                                    System.out.println("CHECK PLATFORM SECNAME: " + stop + ": vs " + wayName + "(" + primaryStreetBaseName + "/" + wayBaseName + "): " + secondaryStringDistance + "/" + secondaryStreetBaseName.length() + ", ratio " + (secondaryStringDistance / secondaryStreetBaseName.length()));
-                                }
-                                if(secondaryStringDistance / secondaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
-                                    stop.addNameMatch(line, StopArea.SegmentMatchType.crossStreet);
-                                }
+                            if (secondaryStringDistance / secondaryStreetBaseName.length() < MAX_LEVENSHTEIN_DISTANCE_RATIO) {
+                                stopWayMatch.setNameMatch(StopArea.WayMatchType.crossStreet);
                             }
                         }
                     }
                 }
             }
-        }
 
-        //now do a comparison based on proximity to the nearest OSM line
-        for(final Route route : routeConflator.getExportRoutes()) {
-            for(final StopArea routeStop : route.stops) {
-                final Point platformCentroid = routeStop.getPlatform().getCentroid();
-                final Region osmSegmentSearchRegion = routeStop.getNearbyWaySearchRegion();
-                for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
-                    if(cell.containedStops.contains(routeStop)) {
-                        for(final OSMWaySegments osmLine : cell.containedWays) {
-                            //check the segment's bounding box intersects
-                            if(!Region.intersects(osmLine.boundingBoxForStopMatching, osmSegmentSearchRegion)) {
-                                continue;
-                            }
-
-                            //find the way's segments that are within the platform's search region
-                            for(final LineSegment lineSegment : osmLine.segments) {
-                                //skip this line if not within the maximum distance to the stop
-                                if (Region.intersects(lineSegment.boundingBox, routeStop.getNearbyWaySearchRegion())) {
-                                    //System.out.println("OSMLINE MATCH for platform " + routeStop);
-                                    routeStop.addProximityMatch(route.routeLine, (OSMLineSegment) lineSegment, Point.distance(lineSegment.closestPointToPoint(platformCentroid), platformCentroid), StopArea.SegmentMatchType.proximityToOSMWay);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        //now pick the best matches for each platform
-        for(final StopArea stop : routeConflator.getAllRouteStops()) {
+            //with all the matches checked, choose the best one
             stop.chooseBestWayMatch();
-
-            if(debugEnabled) {
-                if (stop.bestWayMatch != null) {
-                    System.out.println("Best match for " + stop + ": " + stop.bestWayMatch.line.way.getTag("name") + "(" + stop.bestWayMatch.line.way.osm_id + ")");
-                } else {
-                    System.out.println("NO MATCH for " + stop);
-                }
-            }
         }
     }
 
@@ -151,24 +137,24 @@ public class StopConflator {
      * Adds the best match for each stop platform to their best-matched nearby way
      * @param entitySpace
      */
-    public void createStopPositionsForPlatforms(final OSMEntitySpace entitySpace) {
+    protected void createStopPositionsForPlatforms(final OSMEntitySpace entitySpace) {
         for(final StopArea stopArea : routeConflator.getAllRouteStops()) {
             if(stopArea.bestWayMatch == null) {
                 continue;
             }
 
+            //check if there's an existing stop_position node that can be associated with the StopArea, and if so there's no need to set now
+            if(stopArea.getStopPosition() != null) {
+                continue;
+            }
+
             //get a handle on the best-matching way to the StopArea, and the nearest point to it
-            final LineSegment bestSegment = stopArea.bestWayMatch.closestSegmentToStop;
+            final LineSegment bestSegment = stopArea.bestWayMatch.getClosestSegmentToStopPlatform();
             if(bestSegment == null) {
                 System.out.println("WARNING: " + stopArea + " has no nearby matching segment");
                 continue;
             }
             final Point nearestPointOnSegment = bestSegment.closestPointToPoint(stopArea.getPlatform().getCentroid());
-
-            //check if there's an existing stop_position node that can be associated with the StopArea, and if so there's no need to set now
-            if(stopArea.getStopPosition() != null) {
-                continue;
-            }
 
             //Create (or update an existing node) to serve as the stop position node for the platform
             OSMNode nearestNodeOnWay = bestSegment.getParent().way.nearestNodeAtPoint(nearestPointOnSegment, StopArea.stopNodeTolerance);
@@ -191,12 +177,16 @@ public class StopConflator {
             //and create a new node if a good candidate can't be found on the way
             if(nearestNodeOnWay == null) {
                 nearestNodeOnWay = bestSegment.getParent().insertNode(entitySpace.createNode(nearestPointOnSegment.x, nearestPointOnSegment.y, null), bestSegment);
-                stopArea.chooseBestWayMatch();
             }
 
             //and add the stop position to the stop area
             stopArea.setStopPosition(nearestNodeOnWay);
             nearestNodeOnWay.setTag(routeConflator.routeType, OSMEntity.TAG_YES); //TODO need proper key mapping (e.g. for subway, light_rail, etc)
+
+            //clear the way matches for the stop, since they're no longer needed once the stop position is set
+            if(stopArea.getStopPosition() != null) {
+                stopArea.clearAllWayMatches();
+            }
 
             //warn if no decent match is found
             /*if(stopArea.bestWayMatch.line. == null) {
@@ -297,7 +287,6 @@ public class StopConflator {
             }
 
             final ListIterator<OSMEntity> importedExistingStopsIterator = importedExistingStops.listIterator();
-            int stopPos = 0;
             while (importedExistingStopsIterator.hasNext()) {
                 final OSMEntity existingEntity = importedExistingStopsIterator.next();
                 final String existingGtfsId = existingEntity.getTag(StopArea.KEY_GTFS_STOP_ID);

@@ -276,8 +276,8 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
         //final List<SegmentMatch> matches = matchingOSMSegments.get(segment.id);
         return null; //TODO 222
     }
-    public LineMatch getMatchForLine(final WaySegments otherLine) {
-        return lineMatchesByOSMWayId.get(otherLine.way.osm_id);
+    public LineMatch getMatchForWay(final long wayOsmId) {
+        return lineMatchesByOSMWayId.get(wayOsmId);
     }
 
     @Override

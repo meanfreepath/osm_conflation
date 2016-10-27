@@ -5,10 +5,7 @@ import OSM.OSMEntity;
 import OSM.OSMNode;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ListIterator;
+import java.util.*;
 
 /**
  * Created by nick on 10/20/16.
@@ -80,25 +77,22 @@ public class PathSegment implements WaySegmentsObserver {
 
         originJunction.junctionPathSegments.add(this);
     }
-    public void advance(final List<RouteLineSegment> routeLineSegmentsToConsider, final boolean debug) {
+    public boolean advance(final List<RouteLineSegment> routeLineSegmentsToConsider, final boolean debug) {
         //get a handle on the LineSegments involved in this step
         final RouteLineSegment targetSegment = routeLineSegmentsToConsider.get(0);
         final OSMLineSegment firstTraveledSegment = findFirstTraveledSegment();
         ProcessingStatus segmentStatus;
         if(firstTraveledSegment == null) { //Shouldn't happen
             System.out.println("ERROR: no firstTraveledSegment found for " + originJunction.junctionNode + " traveling " + travelDirection.toString());
-            processingStatus = ProcessingStatus.noFirstTraveledSegment;
-            return;
+            return false;
         }
 
         //check if the candidate segment is a match for the targetSegment
-        //TODO: add fallback/scoring instead of requiring full match?
         final RouteLineWaySegments routeLine = (RouteLineWaySegments) targetSegment.getParent();
-        final LineMatch lineMatches = routeLine.lineMatches.get(line.way.osm_id);
-        //final List<SegmentMatch> rlSegmentMatchesForLine = targetSegment.getMatchingSegmentsForLine(line.way.osm_id, (short)(SegmentMatch.matchTypeDotProduct | SegmentMatch.matchTypeTravelDirection));
+        final LineMatch lineMatches = routeLine.lineMatchesByOSMWayId.get(line.way.osm_id);
         if(lineMatches == null) { //ERROR
             processingStatus = ProcessingStatus.zeroSegmentMatches;
-            return;
+            return false;
         }
 
         /**
@@ -108,15 +102,16 @@ public class PathSegment implements WaySegmentsObserver {
         final double futureVector[] = {0.0, 0.0};
         calculateFutureVector(routeLineSegmentsToConsider, futureVector);
         double futureVectorMagnitude = Math.sqrt(futureVector[0] * futureVector[0] + futureVector[1]* futureVector[1]), futureVectorDotProduct = (futureVector[0] * firstTraveledSegment.vectorX + futureVector[1] * firstTraveledSegment.vectorY) / (firstTraveledSegment.vectorMagnitude * futureVectorMagnitude);
-        if(debug) {
-            System.out.format("Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", futureVectorDotProduct, firstTraveledSegment.vectorX, firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
-        }
         if(travelDirection == TravelDirection.backward) {
             futureVectorDotProduct *= -1.0;
         }
+        if(debug) {
+            System.out.format(travelDirection.toString() + ": Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", futureVectorDotProduct, firstTraveledSegment.vectorX, firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
+        }
+
         if(futureVectorDotProduct < 0.0) {
             processingStatus = ProcessingStatus.pendingAdvance;
-            return;
+            return false;
         }
 
         /**
@@ -166,13 +161,33 @@ public class PathSegment implements WaySegmentsObserver {
                 }
             }
         }
+        return true;
     }
     private ProcessingStatus checkSegment(final LineMatch lineMatches, final OSMLineSegment segment, final OSMNode nodeToCheck, final OSMNode destinationStopPosition, final OSMNode endingWayNode) {
         boolean segmentMatched = false;
-        for(final SegmentMatch segmentMatch : lineMatches.matchingSegments) {
-            if(segmentMatch.type == SegmentMatch.matchMaskAll && segmentMatch.matchingSegment == segment) {
+        final long debugWayId = 438355310L;
+        final List<SegmentMatch> osmSegmentMatches = lineMatches.getRouteLineMatchesForSegment(segment, SegmentMatch.matchMaskAll); //TODO: add fallback/scoring instead of requiring full match?
+        for(final SegmentMatch segmentMatch : osmSegmentMatches) {
+            if(segment.getParent().way.osm_id == debugWayId) {
+                System.out.println("\tSEGMATCH: " + segmentMatch);
+            }
+            if(segmentMatch.type == SegmentMatch.matchMaskAll) {
                 segmentMatched = true;
                 break;
+            }
+        }
+        if(osmSegmentMatches.size() == 0 && segment.getParent().way.osm_id == debugWayId) {
+            System.out.println("FAILED SEGMATCH FOR:" + segment + ":: " + lineMatches);
+            for(final LineSegment inSegment : segment.getParent().segments) {
+                System.out.println("\tSEGMENT: " + inSegment);
+            }
+            for(final SegmentMatch segmentMatch : lineMatches.matchingSegments) {
+                System.out.println("\tSEGMATCH: " + segmentMatch);
+            }
+            try {
+                Thread.sleep(10000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         }
         if(!segmentMatched) {

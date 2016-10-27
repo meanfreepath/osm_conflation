@@ -1,7 +1,11 @@
 package NewPathFinding;
 
-import Conflation.*;
-import OSM.*;
+import Conflation.OSMWaySegments;
+import Conflation.RouteConflator;
+import Conflation.RouteLineSegment;
+import OSM.OSMEntitySpace;
+import OSM.OSMNode;
+import OSM.OSMWay;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.util.ArrayList;
@@ -30,7 +34,7 @@ public class Path {
     protected double totalSegmentLength = 0.0, detourSegmentLength = 0.0;
     //public double scoreSegments = 0.0, scoreStops = 0.0, scoreAdjust = 0.0, scoreTotal = 0.0;
 
-    public Path(final PathTree parentPathTree, final PathSegment initialSegment) {
+    protected Path(final PathTree parentPathTree, final PathSegment initialSegment) {
         this.parentPathTree = parentPathTree;
         pathSegments = new ArrayList<>(INITIAL_PATH_SEGMENT_CAPACITY);
         detourPathSegments = new ArrayList<>(INITIAL_DETOUR_PATH_SEGMENT_CAPACITY);
@@ -41,7 +45,7 @@ public class Path {
             addPathSegment(initialSegment);
         }
     }
-    public Path(final Path pathToClone, final PathSegment segmentToAdd) {
+    protected Path(final Path pathToClone, final PathSegment segmentToAdd) {
         parentPathTree = pathToClone.parentPathTree;
         pathSegments = new ArrayList<>(pathToClone.pathSegments.size() + INITIAL_PATH_SEGMENT_CAPACITY);
         detourPathSegments = new ArrayList<>(pathToClone.detourPathSegments.size() + INITIAL_DETOUR_PATH_SEGMENT_CAPACITY);
@@ -86,7 +90,7 @@ public class Path {
         }
 
         //advance the last segment on this Path
-        lastPathSegment.advance(routeLineSegmentsToConsider, debug);
+        final boolean advancedPathSegment = lastPathSegment.advance(routeLineSegmentsToConsider, debug);
 
         if(debug) {
             System.out.println("For RL#" + routeLineSegmentsToConsider.get(0) + ": Advanced segment: " + lastPathSegment);
@@ -163,6 +167,7 @@ public class Path {
         return true;
     }
     private static void checkCreateNewPathSegment(final OSMWaySegments line, final Junction originJunction, final PathSegment.TravelDirection travelDirection, final PathTree parentPathTree, final List<PathSegment> divergingPathSegments) {
+        //TODO implement filtering?
         //if the line has a decent SegmentMatch
 
         //and if we travel it we're OK with the future Vector
@@ -170,7 +175,7 @@ public class Path {
         //then add it to the list
         divergingPathSegments.add(PathSegment.createNewPathSegment(line, originJunction, travelDirection, parentPathTree));
     }
-    public void addPathSegment(final PathSegment pathSegment) {
+    private void addPathSegment(final PathSegment pathSegment) {
         if(pathSegments.contains(pathSegment)) { //track segments that are contained multiple times in the path
             loopedPathSegments.add(pathSegment);
         }
@@ -189,6 +194,9 @@ public class Path {
             detourSegmentLength += pathSegment.detourSegmentLength;
         }
         //System.out.println("Added PathSegment " + pathSegment);
+
+        //also need our parent PathTree to watch for any changes (splits etc) to the PathSegment's way
+        pathSegment.getLine().addObserver(parentPathTree);
     }
     protected void addJunction(final Junction junction) {
         junctions.add(junction);
@@ -199,7 +207,7 @@ public class Path {
      * @param originalSegment
      * @param splitPathSegments
      */
-    public void replaceSplitPathSegment(final PathSegment originalSegment, final List<PathSegment> splitPathSegments) {
+    protected void replaceSplitPathSegment(final PathSegment originalSegment, final List<PathSegment> splitPathSegments) {
        /* final int originalSegmentIndex = pathSegments.indexOf(originalSegment);
         pathSegments.remove(originalSegmentIndex);
         originalSegment.removeContainingPath(this);
@@ -222,7 +230,7 @@ public class Path {
     public List<PathSegment> getPathSegments() {
         return pathSegments;
     }
-    public void markAsSuccessful(final PathSegment lastPathSegment) {
+    protected void markAsSuccessful(final PathSegment lastPathSegment) {
         addPathSegment(lastPathSegment);
         outcome = PathOutcome.waypointReached;
     }

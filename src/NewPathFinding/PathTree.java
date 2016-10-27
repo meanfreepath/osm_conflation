@@ -1,10 +1,7 @@
 package NewPathFinding;
 
 import Conflation.*;
-import OSM.OSMEntity;
-import OSM.OSMEntitySpace;
-import OSM.OSMNode;
-import OSM.Point;
+import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.nio.charset.Charset;
@@ -20,7 +17,7 @@ public class PathTree implements WaySegmentsObserver {
     public final static short matchMaskAll = matchStatusFromStop | matchStatusToStop | matchStatusFromRouteLineNode | getMatchStatusToRouteLineNode;
     public final static int MAX_PATHS_TO_CONSIDER = 320;
     private final static short NUMBER_OF_FUTURE_SEGMENTS = 5;
-    private final static long debugPathTreeId = 2244235452L;
+    private final static long debugPathTreeId = 2132140928L;
 
     public final long id;
     public final int pathTreeIndex;
@@ -59,9 +56,6 @@ public class PathTree implements WaySegmentsObserver {
 
         //the maximum path length is a multiple of the as-the-crow-flies distance between the from/to nodes, to cut down on huge path detours
         //maxPathLength = Point.distance(fromNode.getCentroid(), toNode.getCentroid()) * MAX_PATH_LENGTH_FACTOR;
-
-        //fromLine.addObserver(this);
-        //toLine.addObserver(this);
     }
     public void findPaths(final RouteConflator routeConflator) {
         boolean debug = id == debugPathTreeId;
@@ -80,20 +74,24 @@ public class PathTree implements WaySegmentsObserver {
             System.out.println("running now…");
         }
 
-        //set up the initial Junction
+        //set up the initial Junction at the stop position of the originStop
         final Junction originJunction = createJunction(originStop.getStopPosition());
 
-        //then determine the relative travel direction on the StopArea's stopPosition's way
-        final LineMatch lineMatchForBestStopWayMatch = routeLine.getMatchForLine(originStop.bestWayMatch.line);
-        final PathSegment.TravelDirection travelDirection = lineMatchForBestStopWayMatch.getAvgDotProduct() > 0.0 ? PathSegment.TravelDirection.forward : PathSegment.TravelDirection.backward;
-        if(debug) {
-            System.out.format("First segment traveling %s (match %s) on way %s",travelDirection.toString(), lineMatchForBestStopWayMatch, originStop.bestWayMatch.line.way);
-        }
+        //Create a new Path object for every way that originates from the stop position
+        for(final OSMWay stopPositionWay : originJunction.junctionNode.containingWays.values()) {
+            //then determine the relative travel direction on the StopArea's stopPosition's way
+            final LineMatch matchForWay = routeLine.getMatchForWay(stopPositionWay.osm_id);
+            final PathSegment.TravelDirection travelDirection = matchForWay.getAvgDotProduct() > 0.0 ? PathSegment.TravelDirection.forward : PathSegment.TravelDirection.backward;
+            if (debug) {
+                System.out.format("First segment traveling %s (match %s) on way %s", travelDirection.toString(), matchForWay, stopPositionWay);
+            }
 
-        //and init the first PathSegment and containing Path for the segment
-        final PathSegment originPathSegment = PathSegment.createNewPathSegment(originStop.bestWayMatch.line, originJunction, travelDirection, this);
-        final Path initialPath = new Path(this, originPathSegment);
-        candidatePaths.add(initialPath);
+            //and init the first PathSegment and containing Path for the current way
+            final PathSegment originPathSegment = PathSegment.createNewPathSegment(matchForWay.osmLine, originJunction, travelDirection, this);
+            final Path initialPath = new Path(this, originPathSegment);
+            candidatePaths.add(initialPath);
+        }
+        System.out.println("Starting with " + candidatePaths.size() + " paths");
 
         //prepopulate the future segments to use in the futureVector calculation
         final ArrayList<RouteLineSegment> routeLineSegmentsToConsider = new ArrayList<>(NUMBER_OF_FUTURE_SEGMENTS);
@@ -125,7 +123,7 @@ public class PathTree implements WaySegmentsObserver {
             curRouteLineSegment = rlIterator.next();
 
             //now advance the active paths
-            debug = id == debugPathTreeId;// || debugRlSegIds.contains(curRouteLineSegment.id);
+            debug = false;//id == debugPathTreeId;// || debugRlSegIds.contains(curRouteLineSegment.id);
             if(debug) {
                 System.out.format("\n\n*******PROCESS RL SEGMENT[%.01f,%.01f] %s\n", curRouteLineSegment.vectorX, curRouteLineSegment.vectorY, curRouteLineSegment);
             }
@@ -136,7 +134,7 @@ public class PathTree implements WaySegmentsObserver {
 
                 //advance the Path (which may also create new Path forks) in the direction of the RouteLineSegment's position
                 boolean didAdvance = candidatePath.advance(routeLineSegmentsToConsider, pathListIterator, this, routeConflator, debug);
-                if(id == debugPathTreeId) {
+                if(debug) {
                     System.out.println((didAdvance ? "ADVANCED " : "NOADVANCE") + ": outcome is " + candidatePath.outcome.toString() + ", last PathSeg is " + candidatePath.lastPathSegment.processingStatus.toString());
                 }
 
@@ -147,17 +145,17 @@ public class PathTree implements WaySegmentsObserver {
 
             //System.out.println("IT: " + curRouteLineSegment + " S0/1: " + segmentIndex + "/" + futureSegmentIndex);
         }
-        if(debug) {
-            System.out.println(candidatePaths.size() + " possible paths found (" + successfulPaths.size() + " successful)");
+        if(debug||true) {
+            System.out.println(this + ": " + candidatePaths.size() + " possible paths found (" + successfulPaths.size() + " successful)");
 
-            for(final Path path : successfulPaths) {
+            /*for(final Path path : successfulPaths) {
                 System.out.println("\t" + path);
-            }
-            /*if(successfulPaths.size() == 0) {
+            }//*/
+            if(successfulPaths.size() == 0) {
                 for (final Path path : candidatePaths) {
                     System.out.println("\t" + path);
                 }
-            }*/
+            }
         }
 
 

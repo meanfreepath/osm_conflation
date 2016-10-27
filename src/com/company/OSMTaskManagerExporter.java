@@ -82,7 +82,7 @@ public class OSMTaskManagerExporter {
         //include all GTFS stops, and any existing stops that conflict with them
         final List<OSMEntity> filteredEntities = new ArrayList<>(8192);
         for(final OSMEntity entity: entitySpace.allEntities.values()) {
-            if(entity.hasTag("gtfs:conflict") || entity.hasTag("gtfs:stop_id")) {
+            if(entity.hasTag(StopArea.KEY_GTFS_CONFLICT) || entity.hasTag(StopArea.KEY_GTFS_STOP_ID)) {
                 filteredEntities.add(entity);
             }
         }
@@ -172,7 +172,7 @@ public class OSMTaskManagerExporter {
 
         final OSMEntitySpace debugEntitySpace = new OSMEntitySpace(filteredEntities.size());
         for(final OSMEntity entity : filteredEntities) {
-            if(entity.hasTag("gtfs:conflict")) {
+            if(entity.hasTag(StopArea.KEY_GTFS_CONFLICT)) {
                 debugEntitySpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null);
             }
         }
