@@ -18,8 +18,27 @@ public class RouteLineSegment extends LineSegment {
      * The OSMLineSegment matches, keyed by their way's OSM id
      */
     private final Map<Long, List<SegmentMatch>> matchingSegments;
+
+    /**
+     * The OSMLineSegment matches, keyed by the match's id
+     */
     private final Map<Long, SegmentMatch> matchingSegmentsById;
+
+    /**
+     * A list of the best matches, keyed by their way's OSM id
+     */
     public final Map<Long, SegmentMatch> bestMatchForLine;
+
+    /**
+     * Default constructor
+     * @param parentSegments the segmented way that this segment belongs to
+     * @param origin the origin coordinate of this segment
+     * @param destination the destination coordinate of this segment
+     * @param originNode the node at the origin coordinate, if any
+     * @param destinationNode the node at the destination coordinate, if any
+     * @param segmentIndex the index of this segment within its parent
+     * @param nodeIndex the index of this segment's originNode within its parent's way (will be same as previous segment if no origin node present)
+     */
     public RouteLineSegment(RouteLineWaySegments parentSegments, Point origin, Point destination, OSMNode originNode, OSMNode destinationNode, int segmentIndex, int nodeIndex) {
         super(parentSegments.way.osm_id, origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
         this.parentSegments = parentSegments;
@@ -31,9 +50,9 @@ public class RouteLineSegment extends LineSegment {
 
     /**
      * Copy constructor used when splitting segments
-     * @param segmentToCopy
-     * @param destination
-     * @param destinationNode
+     * @param segmentToCopy the original segment
+     * @param destination the new destination coordinate to use
+     * @param destinationNode the new destination node to use, if any
      */
     protected RouteLineSegment(final RouteLineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
         super(segmentToCopy, destination, destinationNode);
@@ -84,6 +103,10 @@ public class RouteLineSegment extends LineSegment {
         matchesForLine.remove(match);
         return true;
     }
+    public SegmentMatch getMatchForOSMSegment(final OSMLineSegment segment) {
+        final long matchId = SegmentMatch.idForParameters(this, segment);
+        return matchingSegmentsById.get(matchId);
+    }
     public void summarize() {
         //look up the matching segments we have for the given OSM way
         bestMatchForLine.clear();
@@ -97,12 +120,13 @@ public class RouteLineSegment extends LineSegment {
         }
     }
     private SegmentMatch chooseBestMatchForMatchType(final List<SegmentMatch> matches, final short matchMask) {
-        double minScore = Double.MAX_VALUE, matchScore, nextBestMinScore = Double.MAX_VALUE, nextBestMatchScore;
+        double minScore = Double.MAX_VALUE, matchScore, absDotProduct;
         SegmentMatch bestMatch = null;
         for(final SegmentMatch match : matches) {
             //choose the best match based on the product of their dot product and distance score
             if((match.type & matchMask) == matchMask) {
-                matchScore = (match.orthogonalDistance * match.orthogonalDistance + match.midPointDistance * match.midPointDistance) / Math.max(0.000001, Math.abs(match.dotProduct));
+                absDotProduct = Math.abs(match.dotProduct);
+                matchScore = (match.orthogonalDistance * match.orthogonalDistance + match.midPointDistance * match.midPointDistance) * (absDotProduct > Double.MIN_VALUE ?  Math.abs(Math.log10(absDotProduct)) : 1.0);
                 if (bestMatch == null || matchScore < minScore) {
                     bestMatch = match;
                     minScore = matchScore;
@@ -153,9 +177,6 @@ public class RouteLineSegment extends LineSegment {
         } else {
             return null;
         }
-    }
-    public Map<Long, SegmentMatch> getBestMatchingSegments() {
-        return bestMatchForLine;
     }
     @Override
     public String toString() {
