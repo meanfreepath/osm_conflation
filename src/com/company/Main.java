@@ -48,7 +48,8 @@ public class Main {
         //selectedRoutes.add("100062"); //errors splitting
         //selectedRoutes.add("102581"); //D-Line: not preferring matching trunk_link near NB stop "15th Ave NW & NW Leary Way"
         //selectedRoutes.add("102615"); // E-Line
-        selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
+        //selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
+        selectedRoutes.add("102623"); //894: Mercer Island loopy route
 
         try {
             importSpace.loadFromXML(importFileName);
@@ -116,7 +117,7 @@ public class Main {
                     }
                 }
                 relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null);
-                relationSpace.outputXml("relation.osm");
+                relationSpace.outputXml("relation_" + routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_REF) + ".osm");
             }
             //importSpace.outputXml("newresult.osm");
         } catch (FileNotFoundException e) {
