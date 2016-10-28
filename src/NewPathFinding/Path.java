@@ -110,39 +110,7 @@ public class Path {
             }
 
             //get the ways that contain this junction's node:
-            final List<PathSegment> divergingPathSegments = new ArrayList<>(lastPathSegmentEndJunction.junctionNode.containingWayCount - 1);
-            for(final OSMWay containingWay : lastPathSegmentEndJunction.junctionNode.containingWays.values()) {
-                //lookup the related WaySegments for the way
-                final OSMWaySegments line = routeConflator.getCandidateLines().get(containingWay.osm_id);
-                if(line == null) {
-                    if(debug) {
-                        System.out.println("ERROR: no WaySegments found for " + containingWay);
-                    }
-                    continue;
-                }
-
-                //determine the travel direction (relative to the way) that will take us AWAY from the previous endJunction
-                if(line.way.osm_id == lastPathSegment.getLine().way.osm_id) {
-                    //if the junction is in the middle of the lastPathSegment's containing way, create a new one beginning at the junction and continuing in the same direction
-                    if(lastPathSegmentEndJunction.junctionNode != containingWay.getFirstNode() && lastPathSegmentEndJunction.junctionNode != containingWay.getLastNode()) {
-                        checkCreateNewPathSegment(line, lastPathSegmentEndJunction, lastPathSegment.travelDirection, parentPathTree, divergingPathSegments);
-                    }
-                } else {
-                    //if the junction is an ending point for the way, create a single diverging PathSegments, traveling away from the junction
-                    if(lastPathSegmentEndJunction.junctionNode == containingWay.getFirstNode()) {
-                        checkCreateNewPathSegment(line, lastPathSegmentEndJunction, PathSegment.TravelDirection.forward, parentPathTree, divergingPathSegments);
-                    } else if(lastPathSegmentEndJunction.junctionNode == containingWay.getLastNode()) {
-                        checkCreateNewPathSegment(line, lastPathSegmentEndJunction, PathSegment.TravelDirection.backward, parentPathTree, divergingPathSegments);
-                    } else { //if the junction is a midpoint for the intersecting way, create 2 PathSegments, one for each possible direction
-                        checkCreateNewPathSegment(line, lastPathSegmentEndJunction, PathSegment.TravelDirection.forward, parentPathTree, divergingPathSegments);
-                        checkCreateNewPathSegment(line, lastPathSegmentEndJunction, PathSegment.TravelDirection.backward, parentPathTree, divergingPathSegments);
-                    }
-                }
-            }
-
-            if(debug) {
-                System.out.println("Junction " + lastPathSegmentEndJunction.junctionNode + ": " + divergingPathSegments.size() + " diverging segments");
-            }
+            final List<PathSegment> divergingPathSegments = lastPathSegmentEndJunction.determineOutgoingPathSegments(routeConflator, lastPathSegment, parentPathTree);
             if(divergingPathSegments.size() == 0) { //no diverging paths - dead end
                 outcome = PathOutcome.deadEnded;
             } else {

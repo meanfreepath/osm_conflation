@@ -18,7 +18,7 @@ public class PathSegment implements WaySegmentsObserver {
     private final static HashMap<String, PathSegment> allPathSegments = new HashMap<>(1024);
     private final static double SCORE_FOR_STOP_ON_WAY = 10000.0, SCORE_FOR_ALIGNMENT = 100.0, SCORE_FOR_DETOUR = 10.0, SCORE_FACTOR_FOR_CORRECT_ONEWAY_TRAVEL = 200.0, SCORE_FACTOR_FOR_INCORRECT_ONEWAY_TRAVEL = -200.0, SCORE_FACTOR_FOR_NON_ONEWAY_TRAVEL = 100.0;
 
-    private final static long debugWayId = 370819942L*0;
+    private final static long debugWayId = 0L;
 
     /**
      * Whether this PathSegment is traveling with (0->N) or against(N->0) its line's segments' node direction
@@ -75,7 +75,7 @@ public class PathSegment implements WaySegmentsObserver {
         //generate a unique ID for this PathSegment
         id = idForParameters(line, originJunction.junctionNode, null);
 
-        originJunction.junctionPathSegments.add(this);
+        //originJunction.junctionPathSegments.add(this);
     }
     public boolean advance(final List<RouteLineSegment> routeLineSegmentsToConsider, final boolean debug) {
         //get a handle on the LineSegments involved in this step
@@ -114,6 +114,12 @@ public class PathSegment implements WaySegmentsObserver {
             return false;
         }
 
+        if(line.way.osm_id == debugWayId) {
+            for(final SegmentMatch segmentMatch : lineMatches.matchingSegments) {
+                System.out.println("PDB " + travelDirection.toString() + " SEGMATCHES: " + segmentMatch);
+            }
+        }
+
         /**
          * Check if the lastTraveledSegment contains a possible Path Junction point
          * If the candidate segment is part of the middle of the OSM way, then we're OK for now.
@@ -125,12 +131,6 @@ public class PathSegment implements WaySegmentsObserver {
         final int firstTraveledSegmentIndex = line.segments.indexOf(firstTraveledSegment);
         if (travelDirection == TravelDirection.forward) {
             lastNode = line.way.getLastNode();
-
-            if(line.way.osm_id == debugWayId) {
-                for(final SegmentMatch segmentMatch : lineMatches.matchingSegments) {
-                    System.out.println("PDB SEGMATCHES: " + segmentMatch);
-                }
-            }
 
             final ListIterator<LineSegment> iterator = line.segments.listIterator(firstTraveledSegmentIndex);
             while (iterator.hasNext()) { //starting at the firstTraveledSegment, iterate over the way's LineSegments
@@ -165,7 +165,6 @@ public class PathSegment implements WaySegmentsObserver {
     }
     private ProcessingStatus checkSegment(final LineMatch lineMatches, final OSMLineSegment segment, final OSMNode nodeToCheck, final OSMNode destinationStopPosition, final OSMNode endingWayNode) {
         boolean segmentMatched = false;
-        final long debugWayId = 438355310L;
         final List<SegmentMatch> osmSegmentMatches = lineMatches.getRouteLineMatchesForSegment(segment, SegmentMatch.matchMaskAll); //TODO: add fallback/scoring instead of requiring full match?
         for(final SegmentMatch segmentMatch : osmSegmentMatches) {
             if(segment.getParent().way.osm_id == debugWayId) {
@@ -294,7 +293,7 @@ public class PathSegment implements WaySegmentsObserver {
     }
     public void setEndJunction(final Junction endJunction) {
         this.endJunction = endJunction;
-        endJunction.junctionPathSegments.add(this);
+        //endJunction.junctionPathSegments.add(this);
 
         //update the PathSegment cache
         allPathSegments.remove(id);

@@ -13,6 +13,13 @@ import java.util.zip.CRC32;
  */
 public class PathTree implements WaySegmentsObserver {
     private final static CRC32 idGenerator = new CRC32();
+    private final static Comparator<Path> pathScoreComparator = new Comparator<Path>() {
+        @Override
+        public int compare(final Path o1, final Path o2) {
+            return o1.getTotalScore() > o2.getTotalScore() ? -1 : 1;
+        }
+    };
+
     public final static short matchStatusNone = 0, matchStatusFromStop = 1, matchStatusToStop = 2, matchStatusFromRouteLineNode = 4, getMatchStatusToRouteLineNode = 8;
     public final static short matchMaskAll = matchStatusFromStop | matchStatusToStop | matchStatusFromRouteLineNode | getMatchStatusToRouteLineNode;
     public final static int MAX_PATHS_TO_CONSIDER = 320;
@@ -78,17 +85,9 @@ public class PathTree implements WaySegmentsObserver {
         final Junction originJunction = createJunction(originStop.getStopPosition());
 
         //Create a new Path object for every way that originates from the stop position
-        for(final OSMWay stopPositionWay : originJunction.junctionNode.containingWays.values()) {
-            //then determine the relative travel direction on the StopArea's stopPosition's way
-            final LineMatch matchForWay = routeLine.getMatchForWay(stopPositionWay.osm_id);
-            final PathSegment.TravelDirection travelDirection = matchForWay.getAvgDotProduct() > 0.0 ? PathSegment.TravelDirection.forward : PathSegment.TravelDirection.backward;
-            if (debug) {
-                System.out.format("First segment traveling %s (match %s) on way %s", travelDirection.toString(), matchForWay, stopPositionWay);
-            }
-
-            //and init the first PathSegment and containing Path for the current way
-            final PathSegment originPathSegment = PathSegment.createNewPathSegment(matchForWay.osmLine, originJunction, travelDirection, this);
-            final Path initialPath = new Path(this, originPathSegment);
+        final List<PathSegment> initialPathSegments = originJunction.determineOutgoingPathSegments(routeConflator, null, this);
+        for(final PathSegment initialPathSegment : initialPathSegments) {
+            final Path initialPath = new Path(this, initialPathSegment);
             candidatePaths.add(initialPath);
         }
         System.out.println("Starting with " + candidatePaths.size() + " paths");
@@ -109,6 +108,7 @@ public class PathTree implements WaySegmentsObserver {
             debugRlSegIds.add(rlId);
         }
 
+        //now iterate the RouteLine's segments, advancing candidatePaths toward the current segment
         int segmentIndex = 1, futureSegmentIndex = NUMBER_OF_FUTURE_SEGMENTS;
         final int segmentCount = routeLineSegments.size();
         final Iterator<RouteLineSegment> rlIterator = routeLineSegments.listIterator(segmentIndex);
@@ -127,7 +127,7 @@ public class PathTree implements WaySegmentsObserver {
             if(debug) {
                 System.out.format("\n\n*******PROCESS RL SEGMENT[%.01f,%.01f] %s\n", curRouteLineSegment.vectorX, curRouteLineSegment.vectorY, curRouteLineSegment);
             }
-            //final List<Path> addedPaths = new ArrayList<>(candidatePaths.size());
+
             final ListIterator<Path> pathListIterator = candidatePaths.listIterator();
             while (pathListIterator.hasNext()) {
                 final Path candidatePath = pathListIterator.next();
@@ -138,13 +138,14 @@ public class PathTree implements WaySegmentsObserver {
                     System.out.println((didAdvance ? "ADVANCED " : "NOADVANCE") + ": outcome is " + candidatePath.outcome.toString() + ", last PathSeg is " + candidatePath.lastPathSegment.processingStatus.toString());
                 }
 
+                //compile a list of the paths that successfully reached their destination
                 if(didAdvance && candidatePath.outcome == Path.PathOutcome.waypointReached) {
                     successfulPaths.add(candidatePath);
                 }
             }
-
-            //System.out.println("IT: " + curRouteLineSegment + " S0/1: " + segmentIndex + "/" + futureSegmentIndex);
         }
+
+        //debug output
         if(debug||true) {
             System.out.println(this + ": " + candidatePaths.size() + " possible paths found (" + successfulPaths.size() + " successful)");
 
@@ -152,29 +153,40 @@ public class PathTree implements WaySegmentsObserver {
                 System.out.println("\t" + path);
             }//*/
             if(successfulPaths.size() == 0) {
-                for (final Path path : candidatePaths) {
-                    System.out.println("\t" + path);
+                int longestPathSize = 0, pathSize;
+                for(final Path path : candidatePaths) {
+                    pathSize = path.getPathSegments().size();
+                    if(pathSize > longestPathSize) {
+                        longestPathSize = pathSize;
+                    }
+                }
+
+                for(final Path path : candidatePaths) {
+                    pathSize = path.getPathSegments().size();
+                    if(pathSize >= longestPathSize - 2) {
+                        System.out.println("\t" + path);
+                    }
                 }
             }
         }
 
 
-        if(debug && successfulPaths.size() == 0) {
-            int longestPathSize = 0, pathSize;
-            for(final Path path : candidatePaths) {
-                pathSize = path.getPathSegments().size();
-                if(pathSize > longestPathSize) {
-                    longestPathSize = pathSize;
-                }
-            }
+        //now determine the best path, based on its score
+        successfulPaths.sort(pathScoreComparator);
+        bestPath = successfulPaths.size() > 0 ? successfulPaths.get(0) : null;
 
-            for(final Path path : candidatePaths) {
-                pathSize = path.getPathSegments().size();
-                if(pathSize >= longestPathSize - 2) {
-                    System.out.println(path);
-                }
+        if(bestPath != null) {
+            System.out.println("\tSUCCESS: ");
+            for (final Path path : successfulPaths) {
+                System.out.println(path + ": " + path.getTotalScore());
+            }
+        } else {
+            System.out.println("\tFAILED: ");
+            for (final Path path : candidatePaths) {
+                System.out.println(path + ": " + path.getTotalScore());
             }
         }
+
     }
     public void compileRouteLineSegments() {
         if(matchStatus != matchMaskAll) {
