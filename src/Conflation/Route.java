@@ -145,6 +145,7 @@ public class Route {
             final HashMap<String, String> relTags = new HashMap<>(2);
             relTags.put(OSMEntity.KEY_NAME, pathTree.originStop.getPlatform().getTag(OSMEntity.KEY_NAME) + " -> " + pathTree.destinationStop.getPlatform().getTag(OSMEntity.KEY_NAME));
             relTags.put(OSMEntity.KEY_TYPE, OSMEntity.TAG_ROUTE);
+            relTags.put("path_id", Long.toString(pathTree.id));
             final OSMRelation pathRelation = segmentSpace.createRelation(relTags, null);
 
             //add the platform nodes
