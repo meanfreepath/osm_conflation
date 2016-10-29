@@ -80,6 +80,15 @@ public class PathSegment implements WaySegmentsObserver {
     public boolean advance(final List<RouteLineSegment> routeLineSegmentsToConsider, final boolean debug) {
         //get a handle on the LineSegments involved in this step
         final RouteLineSegment targetSegment = routeLineSegmentsToConsider.get(0);
+
+        /*check that this PathSegment's origin Junction is within the RouteLineSegment's search area.  If not,
+          we've just got ahead of ourselves - bail for now
+         */
+        if(!targetSegment.searchAreaForMatchingOtherSegments.containsPoint(originJunction.junctionNode.getCentroid())) {
+            processingStatus = ProcessingStatus.pendingAdvance;
+            return false;
+        }
+
         final OSMLineSegment firstTraveledSegment = findFirstTraveledSegment();
         ProcessingStatus segmentStatus;
         if(firstTraveledSegment == null) { //Shouldn't happen
@@ -101,15 +110,22 @@ public class PathSegment implements WaySegmentsObserver {
          */
         final double futureVector[] = {0.0, 0.0};
         calculateFutureVector(routeLineSegmentsToConsider, futureVector);
-        double futureVectorMagnitude = Math.sqrt(futureVector[0] * futureVector[0] + futureVector[1]* futureVector[1]), futureVectorDotProduct = (futureVector[0] * firstTraveledSegment.vectorX + futureVector[1] * firstTraveledSegment.vectorY) / (firstTraveledSegment.vectorMagnitude * futureVectorMagnitude);
-        if(travelDirection == TravelDirection.backward) {
-            futureVectorDotProduct *= -1.0;
+        final double futureVectorMagnitude = Math.sqrt(futureVector[0] * futureVector[0] + futureVector[1] * futureVector[1]), futureVectorDotProduct;
+        if(travelDirection == TravelDirection.forward) {
+            futureVectorDotProduct = (futureVector[0] * firstTraveledSegment.vectorX + futureVector[1] * firstTraveledSegment.vectorY) / (firstTraveledSegment.vectorMagnitude * futureVectorMagnitude);
+        } else {
+            futureVectorDotProduct = (-futureVector[0] * firstTraveledSegment.vectorX - futureVector[1] * firstTraveledSegment.vectorY) / (firstTraveledSegment.vectorMagnitude * futureVectorMagnitude);
         }
+
         if(debug) {
-            System.out.format(travelDirection.toString() + ": Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", futureVectorDotProduct, firstTraveledSegment.vectorX, firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
+            System.out.format("\t\tPS way %d origin %d travel %s: Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", line.way.osm_id, originJunction.junctionNode.osm_id, travelDirection.toString(), futureVectorDotProduct, -firstTraveledSegment.vectorX, -firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
         }
 
         if(futureVectorDotProduct < 0.0) {
+            /*if(originJunction.junctionNode.osm_id == 53015856L) {
+                System.out.format("\t\tOrigin " + originJunction.junctionNode.osm_id + "(way " + line.way.osm_id + " traveling " + travelDirection.toString() + "): Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", futureVectorDotProduct, -firstTraveledSegment.vectorX, -firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
+                System.out.println("\t\tFirst OSM segment is " + firstTraveledSegment);
+            }*/
             processingStatus = ProcessingStatus.pendingAdvance;
             return false;
         }

@@ -92,25 +92,13 @@ public class Path {
         //advance the last segment on this Path
         final boolean advancedPathSegment = lastPathSegment.advance(routeLineSegmentsToConsider, debug);
 
-        if(debug) {
-            System.out.println("For RL#" + routeLineSegmentsToConsider.get(0) + ": Advanced segment: " + lastPathSegment);
-        }
-
         /**
          * If the last PathSegment was successfully processed, check its ending junction for ways sharing that node), we need to
          * check whether to fork this path or continue on
          */
         if(lastPathSegment.processingStatus == PathSegment.ProcessingStatus.complete) {
-            final Junction lastPathSegmentEndJunction = lastPathSegment.getEndJunction();
-            final RouteLineSegment curRouteLineSegment = routeLineSegmentsToConsider.get(0);
-
-            //check that the lastPathSegment's ending Junction is within the RouteLineSegment's search area - if not bail
-            if(!curRouteLineSegment.searchAreaForMatchingOtherSegments.containsPoint(lastPathSegmentEndJunction.junctionNode.getCentroid())) {
-                return false;
-            }
-
-            //get the ways that contain this junction's node:
-            final List<PathSegment> divergingPathSegments = lastPathSegmentEndJunction.determineOutgoingPathSegments(routeConflator, lastPathSegment, parentPathTree);
+            //get a list of PathSegments that originate from the lastPathSegment's ending junction node:
+            final List<PathSegment> divergingPathSegments = lastPathSegment.getEndJunction().determineOutgoingPathSegments(routeConflator, lastPathSegment, parentPathTree);
             if(divergingPathSegments.size() == 0) { //no diverging paths - dead end
                 outcome = PathOutcome.deadEnded;
             } else {
@@ -121,8 +109,12 @@ public class Path {
                 //and create (divergingPathCount - 1) new Paths to handle the possible branches
                 final ListIterator<PathSegment> divergingPathIterator = divergingPathSegments.listIterator(1);
                 while (divergingPathIterator.hasNext()) {
-                    final Path newPath = new Path(this, divergingPathIterator.next());
+                    final PathSegment divergingPathSegment = divergingPathIterator.next();
+                    final Path newPath = new Path(this, divergingPathSegment);
                     pathIterator.add(newPath);
+                    if(debug) {
+                        System.out.println("\tAdded new path beginning at " + divergingPathSegment.getOriginJunction().junctionNode + ", way " + divergingPathSegment.getLine().way.osm_id);
+                    }
                 }
             }
         } else if(lastPathSegment.processingStatus == PathSegment.ProcessingStatus.reachedDestination) {
