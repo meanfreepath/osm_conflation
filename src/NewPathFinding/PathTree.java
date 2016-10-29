@@ -24,7 +24,7 @@ public class PathTree implements WaySegmentsObserver {
     public final static short matchMaskAll = matchStatusFromStop | matchStatusToStop | matchStatusFromRouteLineNode | getMatchStatusToRouteLineNode;
     public final static int MAX_PATHS_TO_CONSIDER = 320;
     private final static short NUMBER_OF_FUTURE_SEGMENTS = 5;
-    private final static long debugPathTreeId = 2132140928L;
+    private final static long debugPathTreeId = 0L;//2654540744L;
 
     public final long id;
     public final int pathTreeIndex;
@@ -39,6 +39,7 @@ public class PathTree implements WaySegmentsObserver {
     public final RoutePathFinder parentPathFinder;
     public final List<Path> candidatePaths = new ArrayList<>(MAX_PATHS_TO_CONSIDER);
     public final List<Path> successfulPaths = new ArrayList<>(MAX_PATHS_TO_CONSIDER);
+    public final List<Path> failedPaths = new ArrayList<>(MAX_PATHS_TO_CONSIDER);
     private final Map<Long, Junction> junctions = new HashMap<>(MAX_PATHS_TO_CONSIDER * 8);
     public Path bestPath = null;
     public static boolean debugEnabled = false;
@@ -131,42 +132,54 @@ public class PathTree implements WaySegmentsObserver {
             final ListIterator<Path> pathListIterator = candidatePaths.listIterator();
             while (pathListIterator.hasNext()) {
                 final Path candidatePath = pathListIterator.next();
+                if(candidatePath.outcome != Path.PathOutcome.unknown) {
+                    pathListIterator.remove();
+                    continue;
+                }
+
+                if(debug) {
+                    System.out.println("\tCheck path ending with: " + candidatePath.lastPathSegment);
+                }
 
                 //advance the Path (which may also create new Path forks) in the direction of the RouteLineSegment's position
                 boolean didAdvance = candidatePath.advance(routeLineSegmentsToConsider, pathListIterator, this, routeConflator, debug);
                 if(debug) {
-                    System.out.println((didAdvance ? "ADVANCED " : "NOADVANCE") + ": outcome is " + candidatePath.outcome.toString() + ", last PathSeg is " + candidatePath.lastPathSegment.processingStatus.toString());
+                    System.out.println("\t" + (didAdvance ? "ADVANCED " : "NOADVANCE") + ": outcome is " + candidatePath.outcome.toString() + ", last PathSeg is " + candidatePath.lastPathSegment.processingStatus.toString());
                 }
 
                 //compile a list of the paths that successfully reached their destination
-                if(didAdvance && candidatePath.outcome == Path.PathOutcome.waypointReached) {
-                    successfulPaths.add(candidatePath);
+                if(didAdvance) {
+                    if(candidatePath.outcome == Path.PathOutcome.waypointReached) {
+                        successfulPaths.add(candidatePath);
+                    } else if(candidatePath.outcome != Path.PathOutcome.unknown) {
+                        failedPaths.add(candidatePath);
+                    }
                 }
             }
         }
 
         //debug output
         if(debug||true) {
-            System.out.println(this + ": " + candidatePaths.size() + " possible paths found (" + successfulPaths.size() + " successful)");
+            System.out.format("%s: %d possible paths found, (%d successful, %d failed, %d skipped)", this, candidatePaths.size() + successfulPaths.size() + failedPaths.size(), successfulPaths.size(), failedPaths.size(), candidatePaths.size());
 
             /*for(final Path path : successfulPaths) {
                 System.out.println("\t" + path);
             }//*/
             if(successfulPaths.size() == 0) {
                 int longestPathSize = 0, pathSize;
-                for(final Path path : candidatePaths) {
+                for(final Path path : failedPaths) {
                     pathSize = path.getPathSegments().size();
                     if(pathSize > longestPathSize) {
                         longestPathSize = pathSize;
                     }
                 }
 
-                for(final Path path : candidatePaths) {
+                /*for(final Path path : candidatePaths) {
                     pathSize = path.getPathSegments().size();
                     if(pathSize >= longestPathSize - 2) {
                         System.out.println("\t" + path);
                     }
-                }
+                }*/
             }
         }
 
@@ -248,7 +261,7 @@ public class PathTree implements WaySegmentsObserver {
     }
     @Override
     public String toString() {
-        return String.format("Path #%d (idx %d) from %s to %s: status %d, %s segments", id, pathTreeIndex, originStop, destinationStop, matchStatus, routeLineSegments != null ? Integer.toString(routeLineSegments.size()) : "N/A");
+        return String.format("PathTree #%d (idx %d) from %d/%d (%s) to %d/%d (%s): status %d, %s segments", id, pathTreeIndex, originStop.getPlatform().osm_id, originStop.getStopPosition().osm_id, originStop.getPlatform().getTag(OSMEntity.KEY_NAME), destinationStop.getPlatform().osm_id, destinationStop.getStopPosition().osm_id, destinationStop.getPlatform().getTag(OSMEntity.KEY_NAME), matchStatus, routeLineSegments != null ? Integer.toString(routeLineSegments.size()) : "N/A");
     }
 
     @Override
