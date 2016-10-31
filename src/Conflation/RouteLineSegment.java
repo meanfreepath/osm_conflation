@@ -3,15 +3,28 @@ package Conflation;
 import OSM.OSMNode;
 import OSM.Point;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by nick on 9/30/16.
  */
 public class RouteLineSegment extends LineSegment {
+    private final static Comparator<SegmentMatch> matchComparatorDistance = new Comparator<SegmentMatch>() {
+        @Override
+        public int compare(SegmentMatch o1, SegmentMatch o2) {
+            return o1.midPointDistance > o2.midPointDistance ? 1 : -1;
+        }
+    };
+    private final static Comparator<SegmentMatch> matchComparatorDotProduct = new Comparator<SegmentMatch>() {
+        @Override
+        public int compare(SegmentMatch o1, SegmentMatch o2) {
+            return Math.abs(o1.dotProduct) < Math.abs(o2.dotProduct) ? 1 : -1;
+        }
+    };
+
+    /**
+     * The parent line of this segment
+     */
     public final RouteLineWaySegments parentSegments;
 
     /**
@@ -28,6 +41,13 @@ public class RouteLineSegment extends LineSegment {
      * A list of the best matches, keyed by their way's OSM id
      */
     public final Map<Long, SegmentMatch> bestMatchForLine;
+
+    /**
+     * The best overall match for this segment, based on distance and dot product
+     */
+    public SegmentMatch bestMatchOverall = null;
+
+    public boolean summarized = false;
 
     /**
      * Default constructor
@@ -110,27 +130,54 @@ public class RouteLineSegment extends LineSegment {
     public void summarize() {
         //look up the matching segments we have for the given OSM way
         bestMatchForLine.clear();
+        final List<SegmentMatch> filteredMatches = new ArrayList<>(matchingSegments.size());
         for(final Map.Entry<Long, List<SegmentMatch>> matchesForLine : matchingSegments.entrySet() ) {
             //and loop through them, picking the one with the best score as the best match
             SegmentMatch bestMatch = chooseBestMatchForMatchType(matchesForLine.getValue(), SegmentMatch.matchMaskAll);
             if (bestMatch == null) {
                 bestMatch = chooseBestMatchForMatchType(matchesForLine.getValue(), SegmentMatch.matchTypeBoundingBox);
             }
-            bestMatchForLine.put(matchesForLine.getKey(), bestMatch);
+
+            if(bestMatch != null) {
+                bestMatchForLine.put(matchesForLine.getKey(), bestMatch);
+                filteredMatches.add(bestMatch);
+            }
         }
+
+        //and using the filtered match list choose a best overall match
+        bestMatchOverall = chooseBestMatchForMatchType(filteredMatches, SegmentMatch.matchMaskAll);
+
+        summarized = true;
     }
     private SegmentMatch chooseBestMatchForMatchType(final List<SegmentMatch> matches, final short matchMask) {
         double minScore = Double.MAX_VALUE, matchScore, absDotProduct;
         SegmentMatch bestMatch = null;
+        final List<SegmentMatch> matchList = new ArrayList<>(matches.size());
         for(final SegmentMatch match : matches) {
             //choose the best match based on the product of their dot product and distance score
             if((match.type & matchMask) == matchMask) {
-                absDotProduct = Math.abs(match.dotProduct);
+                matchList.add(match);
+              /*  absDotProduct = Math.abs(match.dotProduct);
                 matchScore = (match.orthogonalDistance * match.orthogonalDistance + match.midPointDistance * match.midPointDistance) * (absDotProduct > Double.MIN_VALUE ?  Math.abs(Math.log10(absDotProduct)) : 1.0);
                 if (bestMatch == null || matchScore < minScore) {
                     bestMatch = match;
                     minScore = matchScore;
+                }*/
+            }
+        }
+        matchList.sort(matchComparatorDistance);
+        final List<SegmentMatch> distanceCandidates = new ArrayList<>(matchList.size());
+        for (double maxDistance = RouteConflator.wayMatchingOptions.maxSegmentLength * 0.25;maxDistance<=RouteConflator.wayMatchingOptions.maxSegmentMidPointDistance; maxDistance*=2.0) {
+            distanceCandidates.clear();
+            for (final SegmentMatch match : matchList) {
+                if (match.midPointDistance < maxDistance) {
+                    distanceCandidates.add(match);
                 }
+            }
+
+            if(distanceCandidates.size() > 0) {
+                distanceCandidates.sort(matchComparatorDotProduct);
+                return distanceCandidates.get(0);
             }
         }
         return bestMatch;
