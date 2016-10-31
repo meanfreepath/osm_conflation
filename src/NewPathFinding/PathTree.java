@@ -30,9 +30,11 @@ public class PathTree implements WaySegmentsObserver {
     public final int pathTreeIndex;
     public final RouteLineWaySegments routeLine;
     public final PathTree previousPathTree;
+    public PathTree nextPathTree = null;
     public final StopArea originStop;
     public StopArea destinationStop = null;
-    public Point fromRouteLinePoint = null, toRouteLinePoint = null;
+    public final Point fromRouteLinePoint;
+    public Point toRouteLinePoint = null;
     public short matchStatus;
     public List<RouteLineSegment> routeLineSegments = null;
 
@@ -49,11 +51,15 @@ public class PathTree implements WaySegmentsObserver {
         idGenerator.update(String.format("PT:%d:%d:%d", index, fromStop != null ? fromStop.getPlatform().osm_id : 0, toStop != null ? toStop.getPlatform().osm_id : 0).getBytes(Charset.forName("ascii")));
         return idGenerator.getValue();
     }
-    public PathTree(final RouteLineWaySegments routeLine, final StopArea originStop, final PathTree previousPath, final int pathTreeIndex, final RoutePathFinder parentPathFinder) {
+    public PathTree(final RouteLineWaySegments routeLine, final StopArea originStop, final Point originRouteLinePoint, final PathTree previousPath, final int pathTreeIndex, final RoutePathFinder parentPathFinder) {
         this.routeLine = routeLine;
         this.originStop = originStop;
+        fromRouteLinePoint = originRouteLinePoint;
         this.previousPathTree = previousPath;
         matchStatus = matchStatusFromStop;
+        if(fromRouteLinePoint != null) {
+            matchStatus |= matchStatusFromRouteLineNode;
+        }
         this.pathTreeIndex = pathTreeIndex;
         this.parentPathFinder = parentPathFinder;
 
@@ -73,9 +79,7 @@ public class PathTree implements WaySegmentsObserver {
         }
         //make sure we have enough of the required information to match this path
         if(matchStatus != matchMaskAll) {
-            if(debug) {
-                System.out.println("FAILED: insufficient match (mask is " + matchStatus + ")");
-            }
+            System.out.println("FAILED: insufficient match (mask is " + matchStatus + ")");
             return;
         }
         if(debug) {
@@ -235,13 +239,6 @@ public class PathTree implements WaySegmentsObserver {
         }
         matchStatus |= matchStatusToStop;
         this.destinationStop = stop;
-    }
-    public void setRouteLineStart(final Point start) {
-        if((matchStatus & matchStatusFromRouteLineNode) != 0) {
-            throw new IllegalStateException("From node is already set");
-        }
-        matchStatus |= matchStatusFromRouteLineNode;
-        this.fromRouteLinePoint = start;
     }
     public void setRouteLineEnd(final Point end) {
         if((matchStatus & getMatchStatusToRouteLineNode) != 0) {

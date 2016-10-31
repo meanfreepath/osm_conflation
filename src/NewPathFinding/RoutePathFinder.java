@@ -8,12 +8,10 @@ import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMWay;
 import OSM.Point;
+import javafx.scene.paint.Stop;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 /**
  * Contains all the stop-to-stop paths for a route
@@ -59,55 +57,68 @@ public class RoutePathFinder {
 
         System.out.println("Route " + route.routeLine.way.osm_id + ": " + route.stops.size() + " stops");
         //Find the closest segment and point on the routeLineSegment to the stops' positions
+        int pathTreeIndex = 0, endIndex = route.stops.size() - 1;
+        Point closestPointOnRouteLine;
         NewPathFinding.PathTree lastLeg = null;
-        int pathTreeIndex = 0;
-        for(final StopArea curStop : route.stops) {
-            //create the PathTree starting at the current stop, and cap the previous PathTree, if any
-            final NewPathFinding.PathTree curLeg = new NewPathFinding.PathTree(route.routeLine, curStop, lastLeg, pathTreeIndex++, this);
-            routePathTrees.add(curLeg);
+        for(final StopArea curStop: route.stops) {
+            //get the closest point on the routeLine to the stop
+            closestPointOnRouteLine = determineRouteLinePoints(curStop, route);
+
+            //cap off the previous PathTree, if any
             if(lastLeg != null) {
                 lastLeg.setDestinationStop(curStop);
+                lastLeg.setRouteLineEnd(closestPointOnRouteLine);
             }
 
-            //try to match the position of the stop's platform to a segment on the RouteLine
-            if(curStop.getStopPosition() != null) {
-                final Point stopPoint = curStop.getStopPosition().getCentroid();
-                final RouteLineSegment closestSegment = (RouteLineSegment) route.routeLine.closestSegmentToPoint(stopPoint, StopArea.maxDistanceFromPlatformToWay);
-
-                if(closestSegment != null) {
-                    //get the closest point on the closest segment, and use it to split the it at that point
-                    final Point closestPointOnRouteLine = closestSegment.closestPointToPoint(stopPoint);
-                    final Point closestPointToPlatform;
-                    final double nodeTolerance = closestSegment.length / 5.0;
-
-                    //do a quick tolerance check on the LineSegment's existing points (no need to split segment if close enough to an existing point)
-                    if(Point.distance(closestPointOnRouteLine, closestSegment.destinationPoint) < nodeTolerance) {
-                        closestPointToPlatform = closestSegment.destinationPoint;
-                    } else if(Point.distance(closestPointOnRouteLine, closestSegment.originPoint) < nodeTolerance) {
-                        closestPointToPlatform = closestSegment.originPoint;
-                    } else {
-                        closestPointToPlatform = new Point(closestPointOnRouteLine.x, closestPointOnRouteLine.y);
-                        route.routeLine.insertPoint(closestPointToPlatform, closestSegment, 0.0);
-                    }
-
-                    //set the newly-added node as the start/end point of the current/last leg
-                    curLeg.setRouteLineStart(closestPointToPlatform);
-                    if(lastLeg != null) {
-                        lastLeg.setRouteLineEnd(closestPointToPlatform);
-                    }
-                }
+            //don't create a new path originating at the last stop on the route
+            if(pathTreeIndex >= endIndex) {
+                break;
             }
+
+            //create the PathTree starting at the current stop
+            final NewPathFinding.PathTree curLeg = new NewPathFinding.PathTree(route.routeLine, curStop, closestPointOnRouteLine, lastLeg, pathTreeIndex++, this);
+            routePathTrees.add(curLeg);
+            if(lastLeg != null) {
+                lastLeg.nextPathTree = curLeg;
+            }
+
             lastLeg = curLeg;
-        }
-        //remove the last leg, since it "starts" at the last stop
-        if(routePathTrees.size() > 0) {
-            routePathTrees.remove(routePathTrees.size() - 1);
         }
 
         //and do some final processing on the PathTrees to get them ready for the path matching stage
         for(final NewPathFinding.PathTree routeLeg : routePathTrees) {
             routeLeg.compileRouteLineSegments();
         }
+    }
+    private static Point determineRouteLinePoints(final StopArea curStop, final Route route) {
+        if(curStop.getStopPosition() != null) {
+            final Point stopPoint = curStop.getStopPosition().getCentroid();
+            final RouteLineSegment closestSegment = (RouteLineSegment) route.routeLine.closestSegmentToPoint(stopPoint, StopArea.maxDistanceFromPlatformToWay);
+            System.out.println("CLOSEST FOR " + curStop + " IS " + closestSegment);
+
+            if(closestSegment != null) {
+                //get the closest point on the closest segment, and use it to split the it at that point
+                final Point closestPointOnRouteLine = closestSegment.closestPointToPoint(stopPoint);
+                final Point closestPointToPlatform;
+                final double nodeTolerance = closestSegment.length / 5.0;
+
+                //do a quick tolerance check on the LineSegment's existing points (no need to split segment if close enough to an existing point)
+                if(Point.distance(closestPointOnRouteLine, closestSegment.destinationPoint) < nodeTolerance) {
+                    closestPointToPlatform = closestSegment.destinationPoint;
+                } else if(Point.distance(closestPointOnRouteLine, closestSegment.originPoint) < nodeTolerance) {
+                    closestPointToPlatform = closestSegment.originPoint;
+                } else {
+                    closestPointToPlatform = new Point(closestPointOnRouteLine.x, closestPointOnRouteLine.y);
+                    route.routeLine.insertPoint(closestPointToPlatform, closestSegment, 0.0);
+                }
+                return closestPointToPlatform;
+            } else {
+                System.out.println("LOLCAN't MATCH " + curStop);
+            }
+        } else {
+            System.out.println("NO POS FOR " + curStop);
+        }
+        return null;
     }
 
     public void findPaths(final RouteConflator routeConflator) {
