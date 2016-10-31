@@ -1,5 +1,6 @@
 package Conflation;
 
+import NewPathFinding.PathSegment;
 import OSM.Point;
 import OSM.Region;
 
@@ -20,6 +21,7 @@ public class SegmentMatch {
     public final RouteLineSegment mainSegment;
     public final OSMLineSegment matchingSegment;
     public final short type;
+    public final PathSegment.TravelDirection travelDirection;
 
     public static int totalCount = 0;
 
@@ -35,6 +37,7 @@ public class SegmentMatch {
         orthogonalDistance = orthDistance;
         midPointDistance = midDistance;
         this.dotProduct = dotProduct;
+        travelDirection = dotProduct >= 0.0 ? PathSegment.TravelDirection.forward : PathSegment.TravelDirection.backward;
 
         short matchType = matchTypeBoundingBox; //assume we've already matched the bounding box
         if(Math.abs(dotProduct) >= options.getMinSegmentDotProduct()) {

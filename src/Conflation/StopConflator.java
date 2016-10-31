@@ -51,25 +51,13 @@ public class StopConflator {
                     continue;
                 }
 
-                final Point platformCentroid = routeStop.getPlatform().getCentroid();
+                //check the routeLine's SegmentMatches for the best matching way for this platform
                 final Region osmSegmentSearchRegion = routeStop.getNearbyWaySearchRegion();
-                for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
-                    if(cell.containedStops.contains(routeStop)) {
-                        for(final OSMWaySegments osmLine : cell.containedWays) {
-                            //check the OSM line's bounding box intersects
-                            if(!Region.intersects(osmLine.boundingBoxForStopMatching, osmSegmentSearchRegion)) {
-                                continue;
-                            }
-
-                            //find the way's segments that are within the platform's search region
-                            for(final LineSegment lineSegment : osmLine.segments) {
-                                //skip this line if not within the maximum distance to the stop
-                                if (Region.intersects(lineSegment.boundingBox, osmSegmentSearchRegion)) {
-                                    //System.out.println("OSMLINE MATCH for platform " + routeStop);
-                                    routeStop.addProximityMatch(route.routeLine, (OSMLineSegment) lineSegment, Point.distance(lineSegment.closestPointToPoint(platformCentroid), platformCentroid));
-                                }
-                            }
-                        }
+                RouteLineSegment routeLineSegment;
+                for(final LineSegment lineSegment : route.routeLine.segments) {
+                    routeLineSegment = (RouteLineSegment) lineSegment;
+                    if(routeLineSegment.bestMatchOverall != null && Region.intersects(lineSegment.boundingBox, osmSegmentSearchRegion)) {
+                        routeStop.addProximityMatch(routeLineSegment.bestMatchOverall);
                     }
                 }
             }
@@ -152,6 +140,14 @@ public class StopConflator {
             final LineSegment bestSegment = stopArea.bestWayMatch.getClosestSegmentToStopPlatform();
             if(bestSegment == null) {
                 System.out.println("WARNING: " + stopArea + " has no nearby matching segment");
+                for (final StopArea.SummarizedMatch otherMatch : stopArea.bestWayMatches) {
+                    if (otherMatch == stopArea.bestWayMatch) {
+                        System.out.println("\tBEST MATCH: " + otherMatch);
+                    } else {
+                        System.out.println("\t\tALTMATCH: " + otherMatch);
+                    }
+                }
+
                 continue;
             }
             final Point nearestPointOnSegment = bestSegment.closestPointToPoint(stopArea.getPlatform().getCentroid());
