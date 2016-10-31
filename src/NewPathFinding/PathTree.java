@@ -24,7 +24,7 @@ public class PathTree implements WaySegmentsObserver {
     public final static short matchMaskAll = matchStatusFromStop | matchStatusToStop | matchStatusFromRouteLineNode | getMatchStatusToRouteLineNode;
     public final static int MAX_PATHS_TO_CONSIDER = 320;
     private final static short NUMBER_OF_FUTURE_SEGMENTS = 5;
-    private final static long debugPathTreeId = 0L;//2654540744L;
+    private final static long debugPathTreeId = 2861464131L;
 
     public final long id;
     public final int pathTreeIndex;
@@ -110,21 +110,15 @@ public class PathTree implements WaySegmentsObserver {
         }
 
         //now iterate the RouteLine's segments, advancing candidatePaths toward the current segment
-        int segmentIndex = 1, futureSegmentIndex = NUMBER_OF_FUTURE_SEGMENTS;
+        int futureSegmentIndex = NUMBER_OF_FUTURE_SEGMENTS;
         final int segmentCount = routeLineSegments.size();
-        final Iterator<RouteLineSegment> rlIterator = routeLineSegments.listIterator(segmentIndex);
+        final Iterator<RouteLineSegment> rlIterator = routeLineSegments.listIterator();
         RouteLineSegment curRouteLineSegment;
         while (rlIterator.hasNext()){
-            //update the routeLineSegmentsToConsider, removing the last segment and adding the next
-            routeLineSegmentsToConsider.remove(0);
-            if(futureSegmentIndex < segmentCount) {
-                routeLineSegmentsToConsider.add(routeLineSegments.get(futureSegmentIndex++));
-            }
-            segmentIndex++;
             curRouteLineSegment = rlIterator.next();
 
             //now advance the active paths
-            debug = false;//id == debugPathTreeId;// || debugRlSegIds.contains(curRouteLineSegment.id);
+            debug = id == debugPathTreeId;// || debugRlSegIds.contains(curRouteLineSegment.id);
             if(debug) {
                 System.out.format("\n\n*******PROCESS RL SEGMENT[%.01f,%.01f] %s\n", curRouteLineSegment.vectorX, curRouteLineSegment.vectorY, curRouteLineSegment);
             }
@@ -155,6 +149,12 @@ public class PathTree implements WaySegmentsObserver {
                         failedPaths.add(candidatePath);
                     }
                 }
+            }
+
+            //update the routeLineSegmentsToConsider, removing the last segment and adding the next
+            routeLineSegmentsToConsider.remove(0);
+            if(futureSegmentIndex < segmentCount) {
+                routeLineSegmentsToConsider.add(routeLineSegments.get(futureSegmentIndex++));
             }
         }
 
