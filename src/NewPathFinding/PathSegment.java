@@ -3,6 +3,7 @@ package NewPathFinding;
 import Conflation.*;
 import OSM.OSMEntity;
 import OSM.OSMNode;
+import OSM.Point;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.util.*;
@@ -18,7 +19,8 @@ public class PathSegment implements WaySegmentsObserver {
     private final static HashMap<String, PathSegment> allPathSegments = new HashMap<>(1024);
     private final static double SCORE_FOR_STOP_ON_WAY = 10000.0, SCORE_FOR_ALIGNMENT = 100.0, SCORE_FOR_DETOUR = 10.0, SCORE_FACTOR_FOR_CORRECT_ONEWAY_TRAVEL = 200.0, SCORE_FACTOR_FOR_INCORRECT_ONEWAY_TRAVEL = -200.0, SCORE_FACTOR_FOR_NON_ONEWAY_TRAVEL = 100.0;
 
-    private final static long debugWayId = 10425972L;
+    private final static long debugWayId = 243738308L;
+    public final double maxFutureVectorDeviation = 0.25;
 
     /**
      * Whether this PathSegment is traveling with (0->N) or against(N->0) its line's segments' node direction
@@ -27,10 +29,10 @@ public class PathSegment implements WaySegmentsObserver {
         forward, backward
     }
     public enum ProcessingStatus {
-        inprocess, pendingAdvance, noFirstTraveledSegment, zeroSegmentMatches, failedSegmentMatch, complete, reachedDestination
+        inprocess, pendingActivation, pendingAdvance, noFirstTraveledSegment, zeroSegmentMatches, failedSegmentMatch, complete, reachedDestination
     }
 
-    private final Junction originJunction;
+    protected final Junction originJunction;
     private Junction endJunction = null;
 
     private OSMWaySegments line;
@@ -85,7 +87,10 @@ public class PathSegment implements WaySegmentsObserver {
           we've just got ahead of ourselves - bail for now
          */
         if(!targetSegment.searchAreaForMatchingOtherSegments.containsPoint(originJunction.junctionNode.getCentroid())) {
-            processingStatus = ProcessingStatus.pendingAdvance;
+            processingStatus = ProcessingStatus.pendingActivation;
+            if(line.way.osm_id == debugWayId) {
+                System.out.format("\t\tSTILL WAITING FOR ACTIVATION: %.01f: %s\n",Point.distance(originJunction.junctionNode.getCentroid(), targetSegment.midPoint), targetSegment.searchAreaForMatchingOtherSegments);
+            }
             return false;
         }
 
@@ -105,7 +110,7 @@ public class PathSegment implements WaySegmentsObserver {
         }
 
         /**
-         * Check the future vector to see if it has a positive component with the first-traveled segment.
+         * Check the future vector to see if it has a good component with the first-traveled segment.
          * if not, mark as pending advance and wait for the RouteLine to pass it (which isn't guaranteed)
          */
         final double futureVector[] = {0.0, 0.0};
@@ -121,7 +126,7 @@ public class PathSegment implements WaySegmentsObserver {
             System.out.format("\t\tPS way %d origin %d travel %s: Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", line.way.osm_id, originJunction.junctionNode.osm_id, travelDirection.toString(), futureVectorDotProduct, -firstTraveledSegment.vectorX, -firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
         }
 
-        if(futureVectorDotProduct < 0.0) {
+        if(futureVectorDotProduct < maxFutureVectorDeviation) {
             /*if(originJunction.junctionNode.osm_id == 53015856L) {
                 System.out.format("\t\tOrigin " + originJunction.junctionNode.osm_id + "(way " + line.way.osm_id + " traveling " + travelDirection.toString() + "): Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", futureVectorDotProduct, -firstTraveledSegment.vectorX, -firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
                 System.out.println("\t\tFirst OSM segment is " + firstTraveledSegment);
@@ -139,7 +144,7 @@ public class PathSegment implements WaySegmentsObserver {
         final OSMNode lastNode; //the last node reachable on the line, depending on direction of travel
         final OSMNode destinationStopPosition = parentPathTree.destinationStop.getStopPosition();
         final int firstTraveledSegmentIndex = line.segments.indexOf(firstTraveledSegment);
-        final short matchMask = SegmentMatch.matchTypeBoundingBox;// SegmentMatch.matchTypeNone;
+        final short matchMask = SegmentMatch.matchTypeBoundingBox | SegmentMatch.matchTypeTravelDirection | SegmentMatch.matchTypeDotProduct;// SegmentMatch.matchTypeNone;
         if (travelDirection == TravelDirection.forward) {
             lastNode = line.way.getLastNode();
 
@@ -318,9 +323,9 @@ public class PathSegment implements WaySegmentsObserver {
     @Override
     public String toString() {
         if(processingStatus == ProcessingStatus.inprocess) {
-            return String.format("%s (%d): from %d [status “%s”]", line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originJunction.junctionNode.osm_id, processingStatus.toString());
+            return String.format("%s (%d): from %d going %s [status “%s”]", line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originJunction.junctionNode.osm_id, travelDirection.toString(), processingStatus.toString());
         } else {
-            return String.format("%s (%d): %d to %s [status “%s”]", line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originJunction.junctionNode.osm_id, endJunction != null ? Long.toString(endJunction.junctionNode.osm_id) : "NONE", processingStatus.toString());
+            return String.format("%s (%d): %d to %s going %s [status “%s”]", line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originJunction.junctionNode.osm_id, endJunction != null ? Long.toString(endJunction.junctionNode.osm_id) : "NONE", travelDirection.toString(), processingStatus.toString());
         }
     }
 

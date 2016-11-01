@@ -119,7 +119,7 @@ public class Path {
             }
         } else if(lastPathSegment.processingStatus == PathSegment.ProcessingStatus.reachedDestination) {
             outcome = PathOutcome.waypointReached;
-        } else if(lastPathSegment.processingStatus == PathSegment.ProcessingStatus.pendingAdvance) {
+        } else if(lastPathSegment.processingStatus == PathSegment.ProcessingStatus.pendingAdvance || lastPathSegment.processingStatus == PathSegment.ProcessingStatus.pendingActivation) {
             //do nothing - waiting until the RouteLineSegment passes nearby again (if ever)
         } else {
             outcome = PathOutcome.deadEnded;
@@ -236,7 +236,7 @@ public class Path {
      * Only needs to be called on the "best" path
      */
     public void splitWaysAtIntersections(final OSMEntitySpace entitySpace, final Path previousPath) throws InvalidArgumentException {
-       /* int segmentIndex = 0;
+        /*int segmentIndex = 0;
         PathSegment previousSegment = null;
         final List<OSMNode> splitNodes = new ArrayList<>(2);
 
@@ -298,7 +298,7 @@ public class Path {
             }
 
             //and add the end node (will be removed on the next iteration if the PathSegment after this uses the same way)
-            splitNodes.add(pathSegment.endJunction.junctionNode);
+            splitNodes.add(pathSegment.getEndJunction().junctionNode);
             previousSegment = pathSegment;
             segmentIndex++;
         }
@@ -341,7 +341,7 @@ public class Path {
             }
             pathSegmentToSplit.getLine().split(splitNodes.toArray(new OSMNode[splitNodes.size()]), entitySpace);
             if(debugEnabled) {
-                System.out.println("SPLIT with " + splitNodes.size() + " nodes at " + String.join(",", splitNodeIds) + ", was matched? " + Boolean.toString(pathSegmentToSplit.isLineMatchedWithRoutePath()));
+               // System.out.println("SPLIT with " + splitNodes.size() + " nodes at " + String.join(",", splitNodeIds) + ", was matched? " + Boolean.toString(pathSegmentToSplit.isLineMatchedWithRoutePath()));
             }
             splitNodes.clear();
         } else {
