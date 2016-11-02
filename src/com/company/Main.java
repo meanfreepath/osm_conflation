@@ -22,11 +22,11 @@ public class Main {
             return;
         }
 
-        OSMEntitySpace importSpace = new OSMEntitySpace(1024);
+        OSMEntitySpace importSpace = new OSMEntitySpace(262144);
 
         //define the options for the comparison routines
         final RouteConflator.LineComparisonOptions options = RouteConflator.wayMatchingOptions;
-        options.segmentSearchBoxSize = 30.0;
+        options.segmentSearchBoxSize = 65.0;
         options.maxSegmentLength = 10.0;
         options.setMaxSegmentAngle(50.0);
         options.maxSegmentOrthogonalDistance = 15.0;
@@ -49,7 +49,8 @@ public class Main {
         //selectedRoutes.add("102581"); //D-Line: not preferring matching trunk_link near NB stop "15th Ave NW & NW Leary Way"
         //selectedRoutes.add("102615"); // E-Line
         //selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
-        selectedRoutes.add("102623"); //894: Mercer Island loopy route
+        //selectedRoutes.add("102623"); //894: Mercer Island loopy route
+        selectedRoutes.add("100184"); //31
 
         try {
             importSpace.loadFromXML(importFileName);
@@ -70,6 +71,7 @@ public class Main {
                     importRouteMasterRelations.add(relation);
                 }
             }
+            importSpace = null; //data no longer needed
 
             //loop through the route masters, processing their subroutes in one entity space
             for(final OSMRelation importRouteMaster : importRouteMasterRelations) {
@@ -87,6 +89,7 @@ public class Main {
                 }
 
                 final OSMEntitySpace workingEntitySpace = new OSMEntitySpace(65536); //the entity space that all processing will occur on
+                workingEntitySpace.name = "Working space";
 
                 //create an object to handle the processing of the data for this route master
                 final RouteConflator routeConflator = new RouteConflator(importRouteMaster);
