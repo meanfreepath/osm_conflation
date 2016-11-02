@@ -72,10 +72,12 @@ public class OSMEntitySpace {
      */
     public OSMEntitySpace(final int capacity) {
         initDebug();
+        final int nodeCapacity = (int) (0.8 * capacity), wayCapacity = (int) (0.1 * capacity), relationCapacity = (int) (0.1 * capacity);
+
         allEntities = new HashMap<>(capacity);
-        allNodes = new HashMap<>(capacity);
-        allWays = new HashMap<>(capacity);
-        allRelations = new HashMap<>(capacity);
+        allNodes = new HashMap<>(nodeCapacity);
+        allWays = new HashMap<>(wayCapacity);
+        allRelations = new HashMap<>(relationCapacity);
         deletedEntities = new HashMap<>(capacity / 10);
 
         name = String.valueOf(Math.round(1000 * Math.random()));
@@ -933,5 +935,9 @@ public class OSMEntitySpace {
         for(final OSMEntity entity : allEntities.values()) {
             entity.action = action;
         }
+    }
+    @Override
+    public String toString() {
+        return String.format("OSMEntitySpace @%d (“%s”): %d nodes, %d ways, %d relations, %d total", hashCode(), name, allNodes.size(), allWays.size(), allRelations.size(), allEntities.size());
     }
 }
