@@ -26,7 +26,7 @@ public class RouteConflator implements WaySegmentsObserver {
             minSegmentDotProduct = 0.866; //default to 30 degrees
         }
     }
-    public final static String GTFS_AGENCY_ID = "gtfs:agency_id", GTFS_ROUTE_ID = "gtfs:route_id", GTFS_TRIP_MARKER = "gtfs:trip_marker", GTFS_IGNORE = "gtfs:ignore";
+    public final static String GTFS_AGENCY_ID = "gtfs:agency_id", GTFS_ROUTE_ID = "gtfs:route_id", GTFS_TRIP_ID = "gtfs:trip_id", GTFS_TRIP_MARKER = "gtfs:trip_marker", GTFS_IGNORE = "gtfs:ignore";
 
     /**
      * Class used for indexing OSMWays in the downloaded region into subregions, for more efficient

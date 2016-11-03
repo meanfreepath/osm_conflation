@@ -16,7 +16,7 @@ import java.util.*;
 public class Route {
     public final static int INITIAL_STOPS_CAPACITY = 32;
     public final RouteConflator.LineComparisonOptions wayMatchingOptions;
-    public final String name, ref, tripMarker;
+    public final String name, ref, tripMarker, tripId;
     public final OSMRelation routeRelation;
     public final String routeType;
     public final List<StopArea> stops;
@@ -30,6 +30,7 @@ public class Route {
         name = routeRelation.getTag(OSMEntity.KEY_NAME);
         ref = routeRelation.getTag(OSMEntity.KEY_REF);
         tripMarker = routeRelation.getTag(RouteConflator.GTFS_TRIP_MARKER);
+        tripId = routeRelation.getTag(RouteConflator.GTFS_TRIP_ID);
 
         //get a handle on the provided route path, and remove any duplicated nodes from it (can screw up segmenting/matching)
         routePath.setTag(RouteConflator.GTFS_IGNORE, "yes");
@@ -53,6 +54,7 @@ public class Route {
         this.name = oldRoute.name;
         this.ref = oldRoute.ref;
         this.tripMarker = oldRoute.tripMarker;
+        this.tripId = oldRoute.tripId;
         this.routeType = oldRoute.routeType;
         routeRelation = newEntitySpace.createRelation(oldRoute.routeRelation.getTags(), null);
         routeLine = new RouteLineWaySegments(oldRoute.routeLine.way, wayMatchingOptions.maxSegmentLength);
@@ -123,9 +125,9 @@ public class Route {
             segmentWay.appendNode(originNode);
             segmentWay.appendNode(lastNode);
             segmentWay.setTag("segid", Long.toString(mainSegment.id));
-            segmentWay.setTag(OSMEntity.KEY_REF, routeLine.way.getTag(OSMEntity.KEY_NAME));
+            segmentWay.setTag(OSMEntity.KEY_REF, tripId + ":" + tripMarker + ": " + routeLine.way.getTag(OSMEntity.KEY_NAME));
             segmentWay.setTag(OSMEntity.KEY_NAME, String.format("#%d/%d", mainSegment.segmentIndex, mainSegment.nodeIndex));
-            segmentWay.setTag(OSMEntity.KEY_DESCRIPTION, String.format("[%.04f, %.04f], nd[%d/%d]: %d matches", mainSegment.midPoint.y, mainSegment.midPoint.x, mainSegment.originNode != null ? mainSegment.originNode.osm_id : 0, mainSegment.destinationNode != null ? mainSegment.destinationNode.osm_id : 0, mainSegment.bestMatchForLine.size()));
+            segmentWay.setTag(OSMEntity.KEY_DESCRIPTION, String.format("[%.01f, %.01f], nd[%d/%d]: %d matches", mainSegment.midPoint.y, mainSegment.midPoint.x, mainSegment.originNode != null ? mainSegment.originNode.osm_id : 0, mainSegment.destinationNode != null ? mainSegment.destinationNode.osm_id : 0, mainSegment.bestMatchForLine.size()));
             OSMEntity.copyTag(routeLine.way, segmentWay, "highway");
             OSMEntity.copyTag(routeLine.way, segmentWay, "railway");
             segmentWay.setTag("oneway", OSMEntity.TAG_YES);
