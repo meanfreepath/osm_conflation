@@ -29,7 +29,7 @@ public class StopConflator {
     protected void matchStopsToWays() {
         final int stopCount = routeConflator.getAllRouteStops().size();
         if(stopCount == 0) { //TODO add warning
-            System.out.println("No stops found for route " + routeConflator.importRouteMaster.getTag(OSMEntity.KEY_NAME));
+            System.out.println("No stops found for route " + routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_NAME));
             return;
         }
 
@@ -225,23 +225,30 @@ public class StopConflator {
         final OverpassConverter converter = new OverpassConverter();
         try {
             final String query;
+            final LatLonRegion stopDownloadRegionLL = SphericalMercator.mercatorToLatLon(stopDownloadRegion);
             switch (routeType) {
                 case OSMEntity.TAG_BUS: //bus stops are typically nodes, but may also be ways
-                    final LatLonRegion stopDownloadRegionLL = SphericalMercator.mercatorToLatLon(stopDownloadRegion);
-                    final String[] queryComponents = {
+                    final String[] queryComponentsBus = {
                             String.format("node[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
                             String.format("node[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
                             String.format("node[\"public_transport\"=\"stop_position\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
                             String.format("way[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
                             String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude)
                     };
-                    query = "(" + String.join(";", queryComponents) + ");(._;>;);";
+                    query = "(" + String.join(";", queryComponentsBus) + ");(._;>;);";
                     break;
                 case OSMEntity.TAG_LIGHT_RAIL:
                 case OSMEntity.TAG_TRAIN:
                 case OSMEntity.TAG_SUBWAY:
                 case OSMEntity.TAG_TRAM:
-                    query = converter.queryForBoundingBox("[\"railway\"=\"platform\"]", stopDownloadRegion, 0.0, null);
+                    final String[] queryComponentsRail = {
+                            String.format("node[\"railway\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("node[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("node[\"public_transport\"=\"stop_position\"][(%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("way[\"railway\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude)
+                    };
+                    query = "(" + String.join(";", queryComponentsRail) + ");(._;>;);";
                     break;
                 default:
                     return;
