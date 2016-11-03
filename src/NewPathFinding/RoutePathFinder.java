@@ -1,9 +1,6 @@
 package NewPathFinding;
 
-import Conflation.Route;
-import Conflation.RouteConflator;
-import Conflation.RouteLineSegment;
-import Conflation.StopArea;
+import Conflation.*;
 import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMWay;
@@ -58,16 +55,20 @@ public class RoutePathFinder {
         System.out.println("Route " + route.routeLine.way.osm_id + ": " + route.stops.size() + " stops");
         //Find the closest segment and point on the routeLineSegment to the stops' positions
         int pathTreeIndex = 0, endIndex = route.stops.size() - 1;
-        Point closestPointOnRouteLine;
+        Point closestPointOnRouteLineToPlatform, lastFoundPoint = null;
         NewPathFinding.PathTree lastLeg = null;
+        Point relevantPoints[] = {null, null};
         for(final StopArea curStop: route.stops) {
             //get the closest point on the routeLine to the stop
-            closestPointOnRouteLine = determineRouteLinePoints(curStop, route);
+            relevantPoints[0] = null; //reset the closest point
+            determineRouteLinePoints(curStop, lastFoundPoint, route, relevantPoints);
+            closestPointOnRouteLineToPlatform = relevantPoints[0];
+            lastFoundPoint = relevantPoints[1];
 
             //cap off the previous PathTree, if any
             if(lastLeg != null) {
+                lastLeg.setRouteLineEnd(closestPointOnRouteLineToPlatform);
                 lastLeg.setDestinationStop(curStop);
-                lastLeg.setRouteLineEnd(closestPointOnRouteLine);
             }
 
             //don't create a new path originating at the last stop on the route
@@ -76,7 +77,7 @@ public class RoutePathFinder {
             }
 
             //create the PathTree starting at the current stop
-            final NewPathFinding.PathTree curLeg = new NewPathFinding.PathTree(route.routeLine, curStop, closestPointOnRouteLine, lastLeg, pathTreeIndex++, this);
+            final NewPathFinding.PathTree curLeg = new NewPathFinding.PathTree(route.routeLine, curStop, closestPointOnRouteLineToPlatform, lastLeg, pathTreeIndex++, this);
             routePathTrees.add(curLeg);
             if(lastLeg != null) {
                 lastLeg.nextPathTree = curLeg;
@@ -90,44 +91,70 @@ public class RoutePathFinder {
             routeLeg.compileRouteLineSegments();
         }
     }
-    private static Point determineRouteLinePoints(final StopArea curStop, final Route route) {
-        if(curStop.getStopPosition() != null) {
-            final Point stopPoint = curStop.getStopPosition().getCentroid();
-            RouteLineSegment closestSegment = (RouteLineSegment) route.routeLine.closestSegmentToPoint(stopPoint, StopArea.maxDistanceFromPlatformToWay);
+    private static void determineRouteLinePoints(final StopArea curStop, final Point searchBeginPoint, final Route route, final Point[] returnPoints) {
+        if(curStop.getStopPosition() == null) {
+            return;
+        }
 
-            //no closest segment found (may happen if provided GTFS route line doesn't extend all the way to first/last stops)
-            if(closestSegment == null) {
-                if(route.stops.indexOf(curStop) == 0) {
-                    closestSegment = (RouteLineSegment) route.routeLine.segments.get(0);
-                } else if(route.stops.indexOf(curStop) == route.stops.size() - 1) {
-                    closestSegment = (RouteLineSegment) route.routeLine.segments.get(route.routeLine.segments.size() - 1);
-                } else {
-                    System.out.println("WARNING: no close by routeLineSegment found for stop " + curStop);
-                    return null;
+        //for the first/last stops, automatically set to the first/last segment on the routeLine (prevents issues if provided GTFS route line doesn't extend all the way to first/last stops)
+        final Point stopPoint = curStop.getStopPosition().getCentroid();
+        RouteLineSegment closestSegment = null;
+        if(route.stops.indexOf(curStop) == 0) {
+            closestSegment = (RouteLineSegment) route.routeLine.segments.get(0);
+        } else if(route.stops.indexOf(curStop) == route.stops.size() - 1) {
+            closestSegment = (RouteLineSegment) route.routeLine.segments.get(route.routeLine.segments.size() - 1);
+        } else { //otherwise, scan the routeLine, finding the closest segment to the stop platform
+            double minDistance = StopArea.maxDistanceFromPlatformToWay, curDistance;
+            Point closestPointOnSegment;
+            boolean inSearchZone = searchBeginPoint == null;
+            for(final LineSegment segment : route.routeLine.segments) {
+                //start checking from the last-found point; prevents issues when routeLine passes a stop multiple times
+                if(!inSearchZone && segment.originPoint == searchBeginPoint) {
+                    inSearchZone = true;
+                }
+
+                if(inSearchZone) {
+                    closestPointOnSegment = segment.closestPointToPoint(stopPoint);
+                    curDistance = Point.distance(stopPoint, closestPointOnSegment);
+                    if (curDistance < minDistance) {
+                        minDistance = curDistance;
+                        closestSegment = (RouteLineSegment) segment;
+                    }
                 }
             }
 
-            //get the closest point on the closest segment, and use it to split the it at that point
-            final Point closestPointOnRouteLine = closestSegment.closestPointToPoint(stopPoint);
-            final Point closestPointToPlatform;
-            final double nodeTolerance = closestSegment.length / 5.0;
-
-            //do a quick tolerance check on the LineSegment's existing points (no need to split segment if close enough to an existing point)
-            if(Point.distance(closestPointOnRouteLine, closestSegment.destinationPoint) < nodeTolerance) {
-                closestPointToPlatform = closestSegment.destinationPoint;
-            } else if(Point.distance(closestPointOnRouteLine, closestSegment.originPoint) < nodeTolerance) {
-                closestPointToPlatform = closestSegment.originPoint;
-            } else {
-                closestPointToPlatform = new Point(closestPointOnRouteLine.x, closestPointOnRouteLine.y);
-                route.routeLine.insertPoint(closestPointToPlatform, closestSegment, 0.0);
+            //if still not found, bail here
+            if(closestSegment == null) {
+                System.out.println("WARNING: no close by routeLineSegment found for stop " + curStop);
+                return;
             }
-            return closestPointToPlatform;
         }
-        return null;
+
+
+        //get the closest point on the closest segment, and use it to split the it at that point
+        final Point closestPointOnRouteLine = closestSegment.closestPointToPoint(stopPoint);
+        final Point closestPointToPlatform;
+        final double nodeTolerance = closestSegment.length / 5.0;
+        //System.out.format("DEBUG: Closest point to stop %s on routeline is %s (segment %s)", curStop.getPlatform().getTag(OSMEntity.KEY_REF), closestPointOnRouteLine, closestSegment);
+
+        //do a quick tolerance check on the LineSegment's existing points (no need to split segment if close enough to an existing point)
+        if(Point.distance(closestPointOnRouteLine, closestSegment.destinationPoint) < nodeTolerance) {
+            closestPointToPlatform = closestSegment.destinationPoint;
+        } else if(Point.distance(closestPointOnRouteLine, closestSegment.originPoint) < nodeTolerance) {
+            closestPointToPlatform = closestSegment.originPoint;
+        } else {
+            closestPointToPlatform = new Point(closestPointOnRouteLine.x, closestPointOnRouteLine.y);
+            route.routeLine.insertPoint(closestPointToPlatform, closestSegment, 0.0);
+        }
+
+        //and set up the return values
+        returnPoints[0] = closestPointToPlatform;
+        returnPoints[1] = closestSegment.destinationPoint;
     }
 
     public void findPaths(final RouteConflator routeConflator) {
         for(final PathTree pathTree : routePathTrees) {
+            System.out.println("FIND " + pathTree);
             pathTree.findPaths(routeConflator);
         }
 
@@ -180,14 +207,16 @@ public class RoutePathFinder {
         //split ways as needed
         /*Path previousPath = null;
         for (final PathTree pathTree : routePathTrees) {
-            if (pathTree.bestPath == null) {
-                previousPath = null;
+            if(pathTree.bestPath == null) {
+                System.out.println(this + " has no bestPath, skipping splits");
                 continue;
             }
             try {
-                previousPath = pathTree.splitWaysAtIntersections(entitySpace, previousPath, this);
+                pathTree.splitWaysAtIntersections(entitySpace, previousPath, this);
+                previousPath = pathTree.bestPath;
             } catch (InvalidArgumentException e) {
                 e.printStackTrace();
+                break;
             }
         }*/
     }
