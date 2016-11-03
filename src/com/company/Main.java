@@ -47,10 +47,10 @@ public class Main {
         //selectedRoutes.add("100221");
         //selectedRoutes.add("100062"); //errors splitting
         //selectedRoutes.add("102581"); //D-Line: not preferring matching trunk_link near NB stop "15th Ave NW & NW Leary Way"
-        //selectedRoutes.add("102615"); // E-Line
+        selectedRoutes.add("102615"); // E-Line
         //selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
         //selectedRoutes.add("102623"); //894: Mercer Island loopy route
-        selectedRoutes.add("100184"); //31
+        //selectedRoutes.add("100184"); //31
 
         try {
             importSpace.loadFromXML(importFileName);
@@ -75,16 +75,16 @@ public class Main {
 
             //loop through the route masters, processing their subroutes in one entity space
             for(final OSMRelation importRouteMaster : importRouteMasterRelations) {
-                if(!selectedRoutes.contains(importRouteMaster.getTag("gtfs:route_id"))) {
+                if(!selectedRoutes.contains(importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID))) {
                     continue;
                 }
 
                 //output an OSM XML file with only the current route data
-                System.out.println("ROUTE HAS " + importRouteMaster.getMembers().size() + " MEMBERS");
+                System.out.format("Processing route %s (ref %s, GTFS id %s), %d trips…\n", importRouteMaster.getTag(OSMEntity.KEY_NAME), importRouteMaster.getTag(OSMEntity.KEY_REF), importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID), importRouteMaster.getMembers().size());
                 if(debugEnabled) {
                     OSMEntitySpace originalRouteSpace = new OSMEntitySpace(2048);
                     originalRouteSpace.addEntity(importRouteMaster, OSMEntity.TagMergeStrategy.keepTags, null);
-                    originalRouteSpace.outputXml("gtfsroute_" + importRouteMaster.getTag("gtfs:route_id") + ".osm");
+                    originalRouteSpace.outputXml("gtfsroute_" + importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID) + ".osm");
                     originalRouteSpace = null;
                 }
 

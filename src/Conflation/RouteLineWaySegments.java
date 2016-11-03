@@ -136,7 +136,7 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
                     }
 
                     //don't match against any lines that have been marked as "ignore", such as other gtfs shape lines
-                    if (!isValidWay || candidateLine.way.hasTag("gtfs:ignore")) {
+                    if (!isValidWay || candidateLine.way.hasTag(RouteConflator.GTFS_IGNORE)) {
                         continue;
                     }
 

@@ -14,36 +14,32 @@ import java.util.*;
  * Created by nick on 1/27/16.
  */
 public class Route {
+    public final static int INITIAL_STOPS_CAPACITY = 32;
     public final RouteConflator.LineComparisonOptions wayMatchingOptions;
-    public String name, ref;
+    public final String name, ref, tripMarker;
     public final OSMRelation routeRelation;
     public final String routeType;
     public final List<StopArea> stops;
     public final RouteLineWaySegments routeLine;
     public final RoutePathFinder routePathFinder;
 
-    public Route(final OSMRelation routeRelation, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
+    protected Route(final OSMRelation routeRelation, final OSMWay routePath, List<StopArea> stops, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
         this.routeRelation = routeRelation;
         this.wayMatchingOptions = wayMatchingOptions;
         routeType = routeRelation.getTag(OSMEntity.KEY_TYPE);
+        name = routeRelation.getTag(OSMEntity.KEY_NAME);
+        ref = routeRelation.getTag(OSMEntity.KEY_REF);
+        tripMarker = routeRelation.getTag(RouteConflator.GTFS_TRIP_MARKER);
 
         //get a handle on the provided route path, and remove any duplicated nodes from it (can screw up segmenting/matching)
-        final List<OSMRelation.OSMRelationMember> members = routeRelation.getMembers("");
-        final OSMWay routePath = (OSMWay) members.get(0).member;
-        routePath.setTag("gtfs:ignore", "yes");
+        routePath.setTag(RouteConflator.GTFS_IGNORE, "yes");
         final OSMNode[] duplicateNodes = routePath.identifyDuplicateNodesByPosition(0.1);
         for(final OSMNode dupeNode : duplicateNodes) {
             routePath.removeNode(dupeNode);
         }
 
+        this.stops = new ArrayList<>(stops);
         routeLine = new RouteLineWaySegments(routePath, wayMatchingOptions.maxSegmentLength);
-
-        final List<OSMRelation.OSMRelationMember> routeStops = routeRelation.getMembers(OSMEntity.TAG_PLATFORM);
-        stops = new ArrayList<>(routeStops.size());
-        for(final OSMRelation.OSMRelationMember stopMember : routeStops) {
-            stops.add(new StopArea(stopMember.member, null));
-        }
-
         routePathFinder = new RoutePathFinder(this);
     }
 
@@ -51,20 +47,21 @@ public class Route {
      * Copy contructor used for transferring routes between entity spaces
      * @param oldRoute
      * @param newEntitySpace
-     * @param stops
      */
-    protected Route(final Route oldRoute, final OSMEntitySpace newEntitySpace, final List<StopArea> stops) {
+    protected Route(final Route oldRoute, final List<StopArea> stops, final OSMEntitySpace newEntitySpace) {
         this.wayMatchingOptions = oldRoute.wayMatchingOptions;
+        this.name = oldRoute.name;
+        this.ref = oldRoute.ref;
+        this.tripMarker = oldRoute.tripMarker;
+        this.routeType = oldRoute.routeType;
         routeRelation = newEntitySpace.createRelation(oldRoute.routeRelation.getTags(), null);
-        routeType = routeRelation.getTag(OSMEntity.KEY_TYPE);
         routeLine = new RouteLineWaySegments(oldRoute.routeLine.way, wayMatchingOptions.maxSegmentLength);
 
-        //add the imported route's stops to the new entity space
-        this.stops = new ArrayList<>(stops); //TODO - add to entity space?
+        this.stops = new ArrayList<>(stops);
 
         routePathFinder = new RoutePathFinder(this); //TODO - any special cases?
     }
-    public void syncStopsWithRelation() {
+    protected void syncStopsWithRelation() {
         for(final StopArea stop : stops) {
             if(!routeRelation.containsMember(stop.getPlatform())) {
                 routeRelation.addMember(stop.getPlatform(), OSMEntity.MEMBERSHIP_PLATFORM);
@@ -102,8 +99,8 @@ public class Route {
         final OSMEntitySpace segmentSpace = new OSMEntitySpace(entitySpace.allWays.size() + entitySpace.allNodes.size());
         final DecimalFormat format = new DecimalFormat("#.###");
 
-        final short matchMask = SegmentMatch.matchMaskAll;//SegmentMatch.matchTypeDotProduct | SegmentMatch.matchTypeDistance;//0*SegmentMatch.matchMaskAll;
-        final boolean showBestMatchesOnly = true;
+        final short matchMask = SegmentMatch.matchTypeBoundingBox;//SegmentMatch.matchTypeDotProduct | SegmentMatch.matchTypeDistance;//0*SegmentMatch.matchMaskAll;
+        final boolean showBestMatchesOnly = false;
 
         //output the route's shape segments
         OSMNode originNode = null, lastNode;
