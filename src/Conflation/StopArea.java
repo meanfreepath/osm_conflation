@@ -294,7 +294,7 @@ public class StopArea implements WaySegmentsObserver {
     }
 
     @Override
-    public void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
+    public void waySegmentsWasSplit(final WaySegments originalWaySegments, OSMNode[] splitNodes, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
         if(originalWaySegments instanceof OSMWaySegments) {
             //TODO need to implement
             /*//first find the match to the original way

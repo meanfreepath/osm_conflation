@@ -91,7 +91,7 @@ public class RouteConflator implements WaySegmentsObserver {
     private List<Route> exportRoutes;
     private HashMap<Long, StopArea> allRouteStops;
     public static boolean debugEnabled = false;
-    public final long debugRouteId = -261383L*0L;
+    public final long debugRouteId = -261382L;
     private OSMEntitySpace workingEntitySpace = null;
     public final static LineComparisonOptions wayMatchingOptions = new LineComparisonOptions();
     protected HashMap<Long, OSMWaySegments> candidateLines = null;
@@ -657,6 +657,8 @@ public class RouteConflator implements WaySegmentsObserver {
             //split any ways that aren't fully contained by the route path
             route.routePathFinder.splitWaysAtIntersections(workingEntitySpace);
 
+            route.debugCheckMatchIndexIntegrity();
+
             //debug paths
             if(debugEnabled) {
                 System.out.println("--------------------------------------------------------\nFinal Paths for " + route.routePathFinder.route.routeRelation.osm_id + ":");
@@ -696,7 +698,7 @@ public class RouteConflator implements WaySegmentsObserver {
     }
 
     @Override
-    public void waySegmentsWasSplit(final WaySegments originalWaySegments, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
+    public void waySegmentsWasSplit(final WaySegments originalWaySegments, OSMNode[] splitNodes, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
         for(final WaySegments ws : splitWaySegments) {
             if(ws != originalWaySegments) {
                 candidateLines.put(ws.way.osm_id, (OSMWaySegments) ws);

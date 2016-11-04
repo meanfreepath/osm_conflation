@@ -3,6 +3,7 @@ package Conflation;
 import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -27,7 +28,7 @@ public abstract class WaySegments {
     public final ArrayList<LineSegment> segments;
     public final OneWayDirection oneWayDirection;
     public final double maxSegmentLength;
-    protected List<WaySegmentsObserver> observers = null;
+    protected List<WeakReference<WaySegmentsObserver>> observers = null;
 
     /**
      * Create a new object, split into segments with the given maximum length
@@ -140,9 +141,12 @@ public abstract class WaySegments {
         //and notify any observers
         if(observers != null) {
             final LineSegment[] newSegments = {newOnSegment, insertedSegment};
-            final List<WaySegmentsObserver> observersToNotify = new ArrayList<>(observers);
-            for (final WaySegmentsObserver observer : observersToNotify) {
-                observer.waySegmentsAddedSegment(this, onSegment, newSegments);
+            final List<WeakReference<WaySegmentsObserver>> observersToNotify = new ArrayList<>(observers);
+            for (final WeakReference<WaySegmentsObserver> observerReference : observersToNotify) {
+                final WaySegmentsObserver observer = observerReference.get();
+                if(observer != null) {
+                    observer.waySegmentsAddedSegment(this, onSegment, newSegments);
+                }
             }
         }
 
@@ -189,14 +193,21 @@ public abstract class WaySegments {
         if(observers == null) {
             observers = new ArrayList<>(32);
         }
-        if(!observers.contains(observer)) {
-            return observers.add(observer);
+
+        for(final WeakReference<WaySegmentsObserver> observerReference : observers) {
+            if(observerReference.get() == observer) {
+                return false;
+            }
         }
-        return false;
+        return observers.add(new WeakReference<>(observer));
     }
     public boolean removeObserver(final WaySegmentsObserver observer) {
-        if(observers != null && observers.contains(observer)) {
-            return observers.remove(observer);
+        if(observers != null) {
+            for(final WeakReference<WaySegmentsObserver> observerReference : observers) {
+                if(observerReference.get() == observer) {
+                    return observers.remove(observerReference);
+                }
+            }
         }
         return false;
     }
@@ -246,7 +257,7 @@ public abstract class WaySegments {
             return new WaySegments[]{this};
         }
 
-        final List<Point> preSplitPoints = new ArrayList<>(segments.size() + 1);
+        /*final List<Point> preSplitPoints = new ArrayList<>(segments.size() + 1);
         if(segments.size() > 0) {
             preSplitPoints.add(segments.get(0).originPoint);
             for (final LineSegment segment : segments) {
@@ -254,11 +265,11 @@ public abstract class WaySegments {
             }
         }
 
-        final List<String> nodeIds = new ArrayList<>(actualSplitNodes.size());
+        /*final List<String> nodeIds = new ArrayList<>(actualSplitNodes.size());
         for(final OSMNode node : actualSplitNodes) {
             nodeIds.add(Long.toString(node.osm_id));
         }
-        //System.out.println("Line " + way.getTag("name") + "(" + way.debugOutput() + "), " + segments.size() + " segments, split at " + String.join(",", nodeIds) + ": ");
+        System.out.println("Line " + way.getTag("name") + "(" + way.debugOutput() + "), " + segments.size() + " segments, split at " + String.join(",", nodeIds) + ": ");//*/
 
         //run the split on the underlying way
         final OSMWay[] splitWays = entitySpace.splitWay(way, actualSplitNodes.toArray(new OSMNode[actualSplitNodes.size()]));
@@ -321,9 +332,12 @@ public abstract class WaySegments {
 
         //notify the observers of the split
         if(observers != null) {
-            final List<WaySegmentsObserver> observersToNotify = new ArrayList<>(observers);
-            for (final WaySegmentsObserver observer : observersToNotify) {
-                observer.waySegmentsWasSplit(this, splitWaySegments);
+            final List<WeakReference<WaySegmentsObserver>> observersToNotify = new ArrayList<>(observers);
+            for (final WeakReference<WaySegmentsObserver> observerReference : observersToNotify) {
+                final WaySegmentsObserver observer = observerReference.get();
+                if(observer != null) {
+                    observer.waySegmentsWasSplit(this, splitNodes, splitWaySegments);
+                }
             }
         }
 

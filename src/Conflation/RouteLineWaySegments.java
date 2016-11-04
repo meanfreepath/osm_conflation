@@ -6,6 +6,7 @@ import OSM.Point;
 import OSM.Region;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
+import java.lang.ref.WeakReference;
 import java.util.*;
 
 /**
@@ -91,9 +92,12 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
         //and notify any observers
         if(observers != null) {
             final LineSegment[] newSegments = {newOnSegment, insertedSegment};
-            final List<WaySegmentsObserver> observersToNotify = new ArrayList<>(observers);
-            for (final WaySegmentsObserver observer : observersToNotify) {
-                observer.waySegmentsAddedSegment(this, onSegment, newSegments);
+            final List<WeakReference<WaySegmentsObserver>> observersToNotify = new ArrayList<>(observers);
+            for (final WeakReference<WaySegmentsObserver> observerReference : observersToNotify) {
+                final WaySegmentsObserver observer = observerReference.get();
+                if(observer != null) {
+                    observer.waySegmentsAddedSegment(this, onSegment, newSegments);
+                }
             }
         }
 
@@ -293,7 +297,7 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
     }
 
     @Override
-    public void waySegmentsWasSplit(WaySegments originalWaySegments, WaySegments[] splitWaySegments) throws InvalidArgumentException {
+    public void waySegmentsWasSplit(WaySegments originalWaySegments, OSMNode[] splitNodes, WaySegments[] splitWaySegments) throws InvalidArgumentException {
 
     }
 
