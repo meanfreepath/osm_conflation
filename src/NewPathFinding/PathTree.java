@@ -11,7 +11,7 @@ import java.util.zip.CRC32;
 /**
  * Created by nick on 10/12/16.
  */
-public class PathTree implements WaySegmentsObserver {
+public class PathTree {
     private final static CRC32 idGenerator = new CRC32();
     private final static Comparator<Path> pathScoreComparator = new Comparator<Path>() {
         @Override
@@ -24,7 +24,7 @@ public class PathTree implements WaySegmentsObserver {
     public final static short matchMaskAll = matchStatusFromStop | matchStatusToStop | matchStatusFromRouteLineNode | getMatchStatusToRouteLineNode;
     public final static int MAX_PATHS_TO_CONSIDER = 320;
     private final static short NUMBER_OF_FUTURE_SEGMENTS = 5;
-    private final static long debugPathTreeId = 2861464131L;
+    private final static long debugPathTreeId = 2680167110L;
 
     public final long id;
     public final int pathTreeIndex;
@@ -66,7 +66,7 @@ public class PathTree implements WaySegmentsObserver {
         id = idForParameters(this.pathTreeIndex, this.originStop, this.destinationStop);
 
         //observe any splits on the RouteLine (i.e. when generating other PathTrees)
-        this.routeLine.addObserver(this);
+        //this.routeLine.addObserver(this); //NOTE: not needed, since routeLines are only touched by their owning Route object
 
         //the maximum path length is a multiple of the as-the-crow-flies distance between the from/to nodes, to cut down on huge path detours
         //maxPathLength = Point.distance(fromNode.getCentroid(), toNode.getCentroid()) * MAX_PATH_LENGTH_FACTOR;
@@ -164,7 +164,7 @@ public class PathTree implements WaySegmentsObserver {
 
         //debug output
         if(debug||true) {
-            System.out.format("%s: %d possible paths found, (%d successful, %d failed, %d skipped)", this, candidatePaths.size() + successfulPaths.size() + failedPaths.size(), successfulPaths.size(), failedPaths.size(), candidatePaths.size());
+            System.out.format("%s: %d possible paths found, (%d successful, %d failed, %d skipped)\n", this, candidatePaths.size() + successfulPaths.size() + failedPaths.size(), successfulPaths.size(), failedPaths.size(), candidatePaths.size());
 
             /*for(final Path path : successfulPaths) {
                 System.out.println("\t" + path);
@@ -197,6 +197,11 @@ public class PathTree implements WaySegmentsObserver {
             for (final Path path : successfulPaths) {
                 System.out.println(path + ": " + path.getTotalScore());
             }
+
+            //clear out all the other paths and release them
+            candidatePaths.clear();
+            successfulPaths.clear();
+            failedPaths.clear();
         } else {
             System.out.println("\tFAILED: ");
             for (final Path path : candidatePaths) {
@@ -209,7 +214,7 @@ public class PathTree implements WaySegmentsObserver {
         if(matchStatus != matchMaskAll) {
             return;
         }
-        routeLineSegments = new ArrayList<>(512);
+        routeLineSegments = new ArrayList<>(128);
         boolean inLeg = false;
         for(final LineSegment segment : routeLine.segments) {
             //check if we've reached the beginning point of the leg
@@ -256,31 +261,35 @@ public class PathTree implements WaySegmentsObserver {
         junctions.put(junctionNode.osm_id, junction);
         return junction;
     }
+    public void splitWaysAtIntersections(final OSMEntitySpace entitySpace, final RoutePathFinder parentPathFinder) throws InvalidArgumentException {
+        if(bestPath == null || bestPath.outcome != Path.PathOutcome.waypointReached) {
+            return;
+        }
+
+        //check if we need to split the route path at the first/last stops
+        if(previousPathTree == null) { //if this is the first part of the route's path, check if we need to split at the first stop's position
+            System.out.println("SPLIT FIRST STOP?");
+            final OSMNode pathOriginNode = bestPath.firstPathSegment.getOriginJunction().junctionNode;
+            final OSMWay pathOriginWay = bestPath.firstPathSegment.getLine().way;
+            if (pathOriginWay.getFirstNode() != pathOriginNode && pathOriginWay.getLastNode() != pathOriginNode) {
+                final OSMNode[] splitNodes = {pathOriginNode};
+                bestPath.firstPathSegment.getLine().split(splitNodes, entitySpace);
+            }
+        } else if(nextPathTree == null) { //if this is the last part of the route's path, check if we need to split at the last stop's position
+            System.out.println("SPLIT LAST STOP?");
+            final OSMNode pathDestinationNode = bestPath.lastPathSegment.getEndJunction().junctionNode;
+            final OSMWay pathDestinationWay = bestPath.lastPathSegment.getLine().way;
+            if (pathDestinationWay.getFirstNode() != pathDestinationNode && pathDestinationWay.getLastNode() != pathDestinationNode) {
+                final OSMNode[] splitNodes = {pathDestinationNode};
+                bestPath.lastPathSegment.getLine().split(splitNodes, entitySpace);
+            }
+        }
+
+        //and check if the best path needs any intermediate splits
+        bestPath.splitWaysAtIntersections(entitySpace);
+    }
     @Override
     public String toString() {
-        return String.format("PathTree #%d (idx %d) from %d/%d (%s) to %d/%d (%s): status %d, %s segments", id, pathTreeIndex, originStop.getPlatform().osm_id, originStop.getStopPosition().osm_id, originStop.getPlatform().getTag(OSMEntity.KEY_NAME), destinationStop.getPlatform().osm_id, destinationStop.getStopPosition().osm_id, destinationStop.getPlatform().getTag(OSMEntity.KEY_NAME), matchStatus, routeLineSegments != null ? Integer.toString(routeLineSegments.size()) : "N/A");
-    }
-
-    @Override
-    public void waySegmentsWasSplit(WaySegments originalWaySegments, WaySegments[] splitWaySegments) throws InvalidArgumentException {
-        System.out.println("ERROR: unimplemented post-split code for " + this);
-    }
-
-    @Override
-    public void waySegmentsWasDeleted(WaySegments waySegments) throws InvalidArgumentException {
-
-    }
-
-    @Override
-    public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment oldSegment, LineSegment[] newSegments) {
-        if(waySegments instanceof RouteLineWaySegments) {
-            if (routeLineSegments == null) {
-                return;
-            }
-            //NOTE: no need to implement this method, as long as the RouteLine is never split after routeLineSegments is determined
-            System.out.println("ERROR: unimplemented post-split code - RouteLine");
-        } else if(waySegments instanceof OSMWaySegments) {
-            System.out.println("ERROR: unimplemented post-split code");
-        }
+        return String.format("PathTree #%d (idx %d) from %s/%s (%s:%s) to %s/%s (%s:%s): status %d, %s segments", id, pathTreeIndex, originStop.getPlatform().osm_id, originStop.getStopPosition() != null ? Long.toString(originStop.getStopPosition().osm_id) : "N/A", originStop.getPlatform().getTag(OSMEntity.KEY_REF), originStop.getPlatform().getTag(OSMEntity.KEY_NAME), destinationStop != null ? Long.toString(destinationStop.getPlatform().osm_id) : "N/A", destinationStop != null && destinationStop.getStopPosition() != null ? Long.toString(destinationStop.getStopPosition().osm_id) : "N/A", destinationStop != null ? destinationStop.getPlatform().getTag(OSMEntity.KEY_REF) : "N/A", destinationStop != null ? destinationStop.getPlatform().getTag(OSMEntity.KEY_NAME) : "N/A", matchStatus, routeLineSegments != null ? Integer.toString(routeLineSegments.size()) : "N/A");
     }
 }

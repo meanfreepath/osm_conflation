@@ -154,7 +154,6 @@ public class RoutePathFinder {
 
     public void findPaths(final RouteConflator routeConflator) {
         for(final PathTree pathTree : routePathTrees) {
-            System.out.println("FIND " + pathTree);
             pathTree.findPaths(routeConflator);
         }
 
@@ -205,20 +204,18 @@ public class RoutePathFinder {
     }
     public void splitWaysAtIntersections(final OSMEntitySpace entitySpace) {
         //split ways as needed
-        /*Path previousPath = null;
         for (final PathTree pathTree : routePathTrees) {
-            if(pathTree.bestPath == null) {
+            if(pathTree.bestPath != null) {
+                try {
+                    pathTree.splitWaysAtIntersections(entitySpace, this);
+                } catch (InvalidArgumentException e) {
+                    e.printStackTrace();
+                    System.exit(1);
+                }
+            } else {
                 System.out.println(this + " has no bestPath, skipping splits");
-                continue;
             }
-            try {
-                pathTree.splitWaysAtIntersections(entitySpace, previousPath, this);
-                previousPath = pathTree.bestPath;
-            } catch (InvalidArgumentException e) {
-                e.printStackTrace();
-                break;
-            }
-        }*/
+        }
     }
     public void addWaysToRouteRelation() {
         //and add the correct ways to the route relation
