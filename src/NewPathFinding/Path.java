@@ -97,7 +97,7 @@ public class Path {
          */
         if(lastPathSegment.processingStatus == PathSegment.ProcessingStatus.complete) {
             //get a list of PathSegments that originate from the lastPathSegment's ending junction node:
-            final List<PathSegment> divergingPathSegments = lastPathSegment.getEndJunction().determineOutgoingPathSegments(routeConflator, lastPathSegment, parentPathTree);
+            final List<PathSegment> divergingPathSegments = lastPathSegment.getEndJunction().determineOutgoingPathSegments(routeConflator, lastPathSegment);
             if(divergingPathSegments.size() == 0) { //no diverging paths - dead end
                 outcome = PathOutcome.deadEnded;
             } else {
@@ -221,10 +221,6 @@ public class Path {
     @Override
     public void finalize() throws Throwable {
         System.out.println("PATHDESTROY " + this);
-        System.out.println("\t" + pathSegments.size());
-        for(final PathSegment pathSegment : pathSegments) {
-            //pathSegment.setLine(null);
-        }
         super.finalize();
     }
     /**

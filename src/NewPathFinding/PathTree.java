@@ -90,7 +90,7 @@ public class PathTree {
         final Junction originJunction = createJunction(originStop.getStopPosition());
 
         //Create a new Path object for every way that originates from the stop position
-        final List<PathSegment> initialPathSegments = originJunction.determineOutgoingPathSegments(routeConflator, null, this);
+        final List<PathSegment> initialPathSegments = originJunction.determineOutgoingPathSegments(routeConflator, null);
         for(final PathSegment initialPathSegment : initialPathSegments) {
             final Path initialPath = new Path(this, initialPathSegment);
             candidatePaths.add(initialPath);
