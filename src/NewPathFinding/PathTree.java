@@ -142,7 +142,7 @@ public class PathTree {
                 //advance the Path (which may also create new Path forks) in the direction of the RouteLineSegment's position
                 boolean didAdvance = candidatePath.advance(routeLineSegmentsToConsider, pathListIterator, this, routeConflator, debug);
                 if(debug) {
-                    System.out.println("\t" + (didAdvance ? "ADVANCED " : "NOADVANCE") + ": outcome is " + candidatePath.outcome.toString() + ", last PathSeg is " + candidatePath.lastPathSegment.processingStatus.toString());
+                    System.out.println("\t" + (didAdvance ? "ADVANCED " : "NOADVANCE") + ": outcome is " + candidatePath.outcome.toString() + ", last PathSeg is " + candidatePath.lastPathSegment.getProcessingStatus());
                 }
 
                 //compile a list of the paths that successfully reached their destination
