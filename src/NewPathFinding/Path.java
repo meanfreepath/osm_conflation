@@ -68,7 +68,7 @@ public class Path {
         }
 
         //advance the last segment on this Path
-        final boolean advancedPathSegment = lastPathSegment.advance(routeLineSegmentsToConsider, debug);
+        final boolean advancedPathSegment = lastPathSegment.advance(routeLineSegmentsToConsider, parentPathTree, debug);
 
         /**
          * If the last PathSegment was successfully processed, check its ending junction for ways sharing that node), we need to

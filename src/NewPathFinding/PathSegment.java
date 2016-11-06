@@ -6,6 +6,7 @@ import OSM.OSMNode;
 import OSM.Point;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
+import java.lang.ref.WeakReference;
 import java.util.*;
 
 /**
@@ -45,7 +46,7 @@ public class PathSegment implements WaySegmentsObserver {
     protected double traveledSegmentLength, alignedSegmentLength, detourSegmentLength; //the length of segments this path aligns with
     protected int traveledSegmentCount, alignedSegmentCount, detourSegmentCount;
     protected double alignedLengthFactor, detourLengthFactor, alignedPathScore, detourPathScore, waypointScore;
-    private List<Path> containingPaths = new ArrayList<>(PathTree.MAX_PATHS_TO_CONSIDER);
+    private List<WeakReference<Path>> containingPaths = new ArrayList<>(PathTree.MAX_PATHS_TO_CONSIDER);
 
     private ProcessingStatus processingStatus = ProcessingStatus.inprocess;
 
@@ -76,7 +77,7 @@ public class PathSegment implements WaySegmentsObserver {
         //generate a unique ID for this PathSegment
         id = idForParameters(line, originJunction.junctionNode, null);
     }
-    public boolean advance(final List<RouteLineSegment> routeLineSegmentsToConsider, final boolean debug) {
+    public boolean advance(final List<RouteLineSegment> routeLineSegmentsToConsider, final PathTree parentPathTree, final boolean debug) {
         //get a handle on the LineSegments involved in this step
         final RouteLineSegment targetSegment = routeLineSegmentsToConsider.get(0);
 
@@ -139,7 +140,6 @@ public class PathSegment implements WaySegmentsObserver {
          * i.e. check the path options and decide whether to create a fork here
          */
         final OSMNode lastNode; //the last node reachable on the line, depending on direction of travel
-        final OSMNode destinationStopPosition = containingPaths.get(0).parentPathTree.destinationStop.getStopPosition();
         final int firstTraveledSegmentIndex = line.segments.indexOf(firstTraveledSegment);
         final short matchMask = SegmentMatch.matchTypeBoundingBox | SegmentMatch.matchTypeTravelDirection | SegmentMatch.matchTypeDotProduct;// SegmentMatch.matchTypeNone;
         if (travelDirection == TravelDirection.forward) {
@@ -152,7 +152,7 @@ public class PathSegment implements WaySegmentsObserver {
                     System.out.println("PDB check FWD " + this + ":::SEG:::" + segment);
                 }
 
-                segmentStatus = checkSegment(lineMatches, (OSMLineSegment) segment, segment.destinationNode, destinationStopPosition, lastNode, matchMask);
+                segmentStatus = checkSegment(lineMatches, (OSMLineSegment) segment, segment.destinationNode, parentPathTree, lastNode, matchMask);
                 if(segmentStatus != ProcessingStatus.inprocess) { //TODO: add fallback/scoring instead of requiring full match?
                     processingStatus = segmentStatus;
                     break;
@@ -167,7 +167,7 @@ public class PathSegment implements WaySegmentsObserver {
                     System.out.println("PDB check BKW " + this + ":::SEG:::" + segment);
                 }
 
-                segmentStatus = checkSegment(lineMatches, (OSMLineSegment) segment, segment.originNode, destinationStopPosition, lastNode, matchMask);
+                segmentStatus = checkSegment(lineMatches, (OSMLineSegment) segment, segment.originNode, parentPathTree, lastNode, matchMask);
                 if(segmentStatus != ProcessingStatus.inprocess) { //TODO: add fallback/scoring instead of requiring full match?
                     processingStatus = segmentStatus;
                     break;
@@ -176,7 +176,7 @@ public class PathSegment implements WaySegmentsObserver {
         }
         return true;
     }
-    private ProcessingStatus checkSegment(final LineMatch lineMatch, final OSMLineSegment segment, final OSMNode nodeToCheck, final OSMNode destinationStopPosition, final OSMNode endingWayNode, final short matchMask) {
+    private ProcessingStatus checkSegment(final LineMatch lineMatch, final OSMLineSegment segment, final OSMNode nodeToCheck, final PathTree parentPathTree, final OSMNode endingWayNode, final short matchMask) {
         //get all the routeLineSegment's that matched with this OSM segment
         final List<SegmentMatch> osmSegmentMatches = lineMatch.getRouteLineMatchesForSegment(segment, matchMask);
 
@@ -211,8 +211,7 @@ public class PathSegment implements WaySegmentsObserver {
 
         //check if we've found the final destination node for this PathSegment's PathTree, or we're at a junction, and if so, bail
         if(nodeToCheck != null) {
-            final PathTree parentPathTree = containingPaths.get(0).parentPathTree;
-            if(nodeToCheck == destinationStopPosition) {
+            if(nodeToCheck == parentPathTree.destinationStop.getStopPosition()) {
                 setEndJunction(parentPathTree.createJunction(nodeToCheck), ProcessingStatus.reachedDestination);
                 return processingStatus;
             } else if(nodeToCheck == endingWayNode || nodeToCheck.containingWayCount > 1) {
@@ -247,7 +246,7 @@ public class PathSegment implements WaySegmentsObserver {
         }
     }
     public void addContainingPath(final Path path) {
-        containingPaths.add(path);
+        containingPaths.add(new WeakReference<Path>(path));
     }
     private void determineScore() {
         waypointScore = alignedPathScore = detourPathScore = alignedLengthFactor = traveledSegmentLength = detourSegmentLength = 0.0;
@@ -348,9 +347,20 @@ public class PathSegment implements WaySegmentsObserver {
     }
 
     @Override
-    public void waySegmentsWasSplit(WaySegments originalWaySegments, /*OSMNode[] originalNodes,*/ OSMNode[] splitNodes, WaySegments[] splitWaySegments) throws InvalidArgumentException {
+    public void waySegmentsWasSplit(WaySegments originalWaySegments, OSMNode[] splitNodes, WaySegments[] splitWaySegments) throws InvalidArgumentException {
         //check whether this PathSegment needs to update its line property
         if(processingStatus == ProcessingStatus.complete || processingStatus == ProcessingStatus.reachedDestination) {
+            //get a handle on the parent pathTree
+            PathTree parentPathTree = null;
+            for(final WeakReference<Path> containingPathReference : containingPaths) {
+                final Path containingPath = containingPathReference.get();
+                if(containingPath != null) {
+                    parentPathTree = containingPath.parentPathTree;
+                    break;
+                }
+            }
+            assert parentPathTree != null;
+
             //create an ArrayList containing the split ways
             final ArrayList<WaySegments> splitSegmentsList = new ArrayList<>(splitWaySegments.length);
             Collections.addAll(splitSegmentsList, splitWaySegments);
@@ -361,7 +371,7 @@ public class PathSegment implements WaySegmentsObserver {
             //run the PathSegment analysis, which will decide how to assign PathSegments to the split ways
             final List<PathSegment> pathSegmentsToCreate = new ArrayList<>(splitWaySegments.length - 1);
             final ProcessingStatus originalStatus = processingStatus;
-            determinePathSegmentSplitAssignments(originJunction, endJunction, splitSegmentsList, this, pathSegmentsToCreate, containingPaths.get(0).parentPathTree);
+            determinePathSegmentSplitAssignments(originJunction, endJunction, splitSegmentsList, this, pathSegmentsToCreate, parentPathTree);
 
             //and add the newly-created PathSegments (if any) to this PathSegment's containing Path objects
             if(pathSegmentsToCreate.size() > 0) {
@@ -370,8 +380,11 @@ public class PathSegment implements WaySegmentsObserver {
                 //add the new PathSegments to this PathSegment's containing Path objects
                 PathSegment previousPathSegment = this;
                 for(final PathSegment newPathSegment : pathSegmentsToCreate) {
-                    for(final Path containingPath : containingPaths) {
-                        containingPath.insertPathSegment(newPathSegment, previousPathSegment);
+                    for(final WeakReference<Path> containingPathReference : containingPaths) {
+                        final Path containingPath = containingPathReference.get();
+                        if(containingPath != null) {
+                            containingPath.insertPathSegment(newPathSegment, previousPathSegment);
+                        }
                     }
                     previousPathSegment = newPathSegment;
                 }
@@ -383,16 +396,17 @@ public class PathSegment implements WaySegmentsObserver {
             }
 
             //DEBUG
-            for(final Path containingPath : containingPaths) {
-                int errorCount = containingPath.validatePath();
-                if (errorCount > 0) {
+            for(final WeakReference<Path> containingPathReference : containingPaths) {
+                final Path containingPath = containingPathReference.get();
+                if(containingPath != null) {
+                    int errorCount = containingPath.validatePath();
+                    if (errorCount > 0) {
 
+                    }
                 }
             }
-        } else {
-            System.out.println("BAD SEG NOTIFIED");
         }
-        //NOTE: we ignore splits that affect unprocessed PathSegments
+        //NOTE: we ignore notifications on splits affecting unprocessed PathSegments (i.e. for PathTrees that don't have a bestPath)
     }
 
     @Override
