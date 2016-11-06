@@ -91,7 +91,7 @@ public class RouteConflator implements WaySegmentsObserver {
     private List<Route> exportRoutes;
     private HashMap<Long, StopArea> allRouteStops;
     public static boolean debugEnabled = false;
-    public final long debugRouteId = -261382L;
+    public final long debugRouteId = -261382L*0L;
     private OSMEntitySpace workingEntitySpace = null;
     public final static LineComparisonOptions wayMatchingOptions = new LineComparisonOptions();
     protected HashMap<Long, OSMWaySegments> candidateLines = null;

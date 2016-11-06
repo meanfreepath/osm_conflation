@@ -1,6 +1,7 @@
 package Conflation;
 
 import OSM.OSMNode;
+import OSM.OSMWay;
 import OSM.Point;
 
 import java.util.*;
@@ -97,6 +98,10 @@ public class RouteLineSegment extends LineSegment {
         matchingSegmentsById.put(match.id, match);
 
         //add to the index keyed by the OSM ways' ids
+        updateMatchesByLine(match);
+        return true;
+    }
+    private void updateMatchesByLine(final SegmentMatch match) {
         final long osmWayId = match.matchingSegment.getParent().way.osm_id;
         List<SegmentMatch> matchesForLine = matchingSegments.get(osmWayId);
         if(matchesForLine == null) {
@@ -104,7 +109,6 @@ public class RouteLineSegment extends LineSegment {
             matchingSegments.put(osmWayId, matchesForLine);
         }
         matchesForLine.add(match);
-        return true;
     }
 
     /**
@@ -123,9 +127,15 @@ public class RouteLineSegment extends LineSegment {
         matchesForLine.remove(match);
         return true;
     }
-    public SegmentMatch getMatchForOSMSegment(final OSMLineSegment segment) {
-        final long matchId = SegmentMatch.idForParameters(this, segment);
-        return matchingSegmentsById.get(matchId);
+    protected void resyncMatchesForWay(final OSMWay oldWay) {
+        final List<SegmentMatch> oldMatchesForLine = matchingSegments.get(oldWay.osm_id);
+        if(oldMatchesForLine != null) {
+            final ArrayList<SegmentMatch> oldMatchesForLineCopy = new ArrayList<>(oldMatchesForLine);
+            oldMatchesForLine.clear();
+            for (final SegmentMatch oldWayMatch : oldMatchesForLineCopy) {
+                updateMatchesByLine(oldWayMatch);
+            }
+        }
     }
     public void summarize() {
         //look up the matching segments we have for the given OSM way
