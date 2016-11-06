@@ -61,7 +61,7 @@ public class RouteLineSegment extends LineSegment {
      * @param nodeIndex the index of this segment's originNode within its parent's way (will be same as previous segment if no origin node present)
      */
     public RouteLineSegment(RouteLineWaySegments parentSegments, Point origin, Point destination, OSMNode originNode, OSMNode destinationNode, int segmentIndex, int nodeIndex) {
-        super(parentSegments.way.osm_id, origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
+        super(origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
         this.parentSegments = parentSegments;
 
         matchingSegments = new HashMap<>(8);

@@ -14,7 +14,7 @@ import java.util.zip.CRC32;
  */
 public abstract class LineSegment {
     private final static DecimalFormat DEBUG_OUTPUT_FORMATTER = new DecimalFormat("#.####");
-    private final static String ID_HASH_FORMAT = "%d:%.03f,%.03f:%.03f,%.03f";
+    private final static String ID_HASH_FORMAT = "%.03f,%.03f:%.03f,%.03f";
     public final Point originPoint, midPoint, destinationPoint;
     public final OSMNode originNode, destinationNode;
 
@@ -32,19 +32,26 @@ public abstract class LineSegment {
     public final double length;
     public final Region boundingBox, searchAreaForMatchingOtherSegments;
 
-    private static long generateIdForPoints(final long parent_id, final Point origin, final Point destination) {
+    /**
+     * Creates a unique id for the given parameters.  Note that if two or more LineSegments have the exact same origin/end points
+     * collisions may result.  Best practice is to validate the GTFS and OSM data to ensure ways aren't overlapping.
+     * @param origin Origin point of the LineSegment
+     * @param destination Origin point of the LineSegment
+     * @return CRC32 hash of a string generated form origin/destination
+     */
+    private static long generateIdForPoints(final Point origin, final Point destination) {
         idGenerator.reset();
-        idGenerator.update(String.format(ID_HASH_FORMAT, parent_id, origin.y, origin.x, destination.y, destination.x).getBytes(Charset.forName("ascii")));
+        idGenerator.update(String.format(ID_HASH_FORMAT, origin.y, origin.x, destination.y, destination.x).getBytes(Charset.forName("ascii")));
         return idGenerator.getValue();
     }
-    public LineSegment(final long parent_id, final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
+    public LineSegment(final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
         originPoint = origin;
         destinationPoint = destination;
         this.originNode = originNode;
         this.destinationNode = destinationNode;
         this.nodeIndex = nodeIndex;
         this.segmentIndex = segmentIndex;
-        this.id = generateIdForPoints(parent_id, originPoint, destinationPoint);
+        this.id = generateIdForPoints(originPoint, destinationPoint);
 
         vectorX = destinationPoint.x - originPoint.x;
         vectorY = destinationPoint.y - originPoint.y;
@@ -70,7 +77,7 @@ public abstract class LineSegment {
         this.destinationNode = destinationNode;
         this.nodeIndex = segmentToCopy.nodeIndex;
         this.segmentIndex = segmentToCopy.segmentIndex;
-        this.id = generateIdForPoints(segmentToCopy.getParent().way.osm_id, originPoint, destinationPoint);
+        this.id = generateIdForPoints(originPoint, destinationPoint);
 
         vectorX = destinationPoint.x - originPoint.x;
         vectorY = destinationPoint.y - originPoint.y;

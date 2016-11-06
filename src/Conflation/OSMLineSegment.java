@@ -10,7 +10,7 @@ public class OSMLineSegment extends LineSegment {
     public WaySegments parentSegments = null;
 
     public OSMLineSegment(WaySegments parentSegments, Point origin, Point destination, OSMNode originNode, OSMNode destinationNode, int segmentIndex, int nodeIndex) {
-        super(parentSegments.way.osm_id, origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
+        super(origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
         this.parentSegments = parentSegments;
     }
     protected OSMLineSegment(OSMLineSegment segmentToCopy, Point destination, OSMNode destinationNode) {
