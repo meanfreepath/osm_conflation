@@ -152,8 +152,8 @@ public class RouteConflator implements WaySegmentsObserver {
 
     /**
      * Define the search tags for the ways for the given route type
-     * @param relationType
-     * @return
+     * @param relationType The type of route relation ("bus", "rail", etc)
+     * @return The tags to search for the ways with
      */
     public static Map<String, List<String>> wayTagsForRouteType(final String relationType) {
         String[] keys;
@@ -190,8 +190,8 @@ public class RouteConflator implements WaySegmentsObserver {
     }
     /**
      * Define the search tags for the platforms for the given route type
-     * @param relationType
-     * @return
+     * @param relationType The type of route relation ("bus", "rail", etc)
+     * @return The tags to search for the platforms with
      */
     public Map<String, List<String>> platformTagsForRouteType(final String relationType) {
         String[] keys;
@@ -244,6 +244,7 @@ public class RouteConflator implements WaySegmentsObserver {
                 }
             }
         }
+        assert routePathsBoundingBox != null;
 
         //and get the download regions for them
         final double boundingBoxSize = SphericalMercator.metersToCoordDelta(wayMatchingOptions.segmentSearchBoxSize, routePathsBoundingBox.getCentroid().y);
