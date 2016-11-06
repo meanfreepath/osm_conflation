@@ -9,6 +9,7 @@ import java.util.*;
 import java.util.zip.CRC32;
 
 /**
+ * Tracks all the possible paths between the starting and ending waypoints
  * Created by nick on 10/12/16.
  */
 public class PathTree {
@@ -36,13 +37,12 @@ public class PathTree {
     public final Point fromRouteLinePoint;
     public Point toRouteLinePoint = null;
     public short matchStatus;
-    public List<RouteLineSegment> routeLineSegments = null;
+    public final List<RouteLineSegment> routeLineSegments;
 
     public final RoutePathFinder parentPathFinder;
     public final List<Path> candidatePaths = new ArrayList<>(MAX_PATHS_TO_CONSIDER);
     public final List<Path> successfulPaths = new ArrayList<>(MAX_PATHS_TO_CONSIDER);
     public final List<Path> failedPaths = new ArrayList<>(MAX_PATHS_TO_CONSIDER);
-    private final Map<Long, Junction> junctions = new HashMap<>(MAX_PATHS_TO_CONSIDER * 8);
     public Path bestPath = null;
     public static boolean debugEnabled = false;
 
@@ -70,6 +70,7 @@ public class PathTree {
 
         //the maximum path length is a multiple of the as-the-crow-flies distance between the from/to nodes, to cut down on huge path detours
         //maxPathLength = Point.distance(fromNode.getCentroid(), toNode.getCentroid()) * MAX_PATH_LENGTH_FACTOR;
+        routeLineSegments = new ArrayList<>(128);;
     }
     public void findPaths(final RouteConflator routeConflator) {
         boolean debug = id == debugPathTreeId;
@@ -86,11 +87,8 @@ public class PathTree {
             System.out.println("running now…");
         }
 
-        //set up the initial Junction at the stop position of the originStop
-        final Junction originJunction = createJunction(originStop.getStopPosition());
-
         //Create a new Path object for every way that originates from the stop position
-        final List<PathSegment> initialPathSegments = originJunction.determineOutgoingPathSegments(routeConflator, null);
+        final List<PathSegment> initialPathSegments = Path.determineOutgoingPathSegments(routeConflator, originStop.getStopPosition(), null);
         for(final PathSegment initialPathSegment : initialPathSegments) {
             final Path initialPath = new Path(this, initialPathSegment);
             candidatePaths.add(initialPath);
@@ -108,7 +106,7 @@ public class PathTree {
         }
 
         final long debugRlSegIdsRaw[] = {2183985599L, 1707782496L, 1936162033L, 1917356142L, 133202163L, 1161896790L, 1789482644L, 1336691900L, 2162494158L};
-        final ArrayList<Long> debugRlSegIds = new ArrayList(debugRlSegIdsRaw.length);
+        final List<Long> debugRlSegIds = new ArrayList<>(debugRlSegIdsRaw.length);
         for(final long rlId : debugRlSegIdsRaw) {
             debugRlSegIds.add(rlId);
         }
@@ -195,7 +193,7 @@ public class PathTree {
         if(bestPath != null) {
             System.out.println("\tSUCCESS: ");
             for (final Path path : successfulPaths) {
-                System.out.println(path + ": " + path.getTotalScore());
+                System.out.format("\t\tscore %.01f: %s\n", path.getTotalScore(), path);
             }
 
             //clear out all the other paths and release them
@@ -205,7 +203,7 @@ public class PathTree {
         } else {
             System.out.println("\tFAILED: ");
             for (final Path path : candidatePaths) {
-                System.out.println(path + ": " + path.getTotalScore());
+                System.out.println("\t\t" + path);
             }
         }
 
@@ -214,7 +212,6 @@ public class PathTree {
         if(matchStatus != matchMaskAll) {
             return;
         }
-        routeLineSegments = new ArrayList<>(128);
         boolean inLeg = false;
         for(final LineSegment segment : routeLine.segments) {
             //check if we've reached the beginning point of the leg
@@ -252,15 +249,6 @@ public class PathTree {
         matchStatus |= getMatchStatusToRouteLineNode;
         this.toRouteLinePoint = end;
     }
-    protected Junction createJunction(final OSMNode junctionNode) {
-        Junction junction = junctions.get(junctionNode.osm_id);
-        if(junction != null) {
-            return junction;
-        }
-        junction = new Junction(junctionNode);
-        junctions.put(junctionNode.osm_id, junction);
-        return junction;
-    }
     public void splitWaysAtIntersections(final OSMEntitySpace entitySpace, final RoutePathFinder parentPathFinder) throws InvalidArgumentException {
         if(bestPath == null || bestPath.outcome != Path.PathOutcome.waypointReached) {
             return;
@@ -269,7 +257,7 @@ public class PathTree {
         //check if we need to split the route path at the first/last stops
         if(previousPathTree == null) { //if this is the first part of the route's path, check if we need to split at the first stop's position
             System.out.println("SPLIT FIRST STOP?");
-            final OSMNode pathOriginNode = bestPath.firstPathSegment.getOriginJunction().junctionNode;
+            final OSMNode pathOriginNode = bestPath.firstPathSegment.getOriginNode();
             final OSMWay pathOriginWay = bestPath.firstPathSegment.getLine().way;
             if (pathOriginWay.getFirstNode() != pathOriginNode && pathOriginWay.getLastNode() != pathOriginNode) {
                 final OSMNode[] splitNodes = {pathOriginNode};
@@ -277,7 +265,7 @@ public class PathTree {
             }
         } else if(nextPathTree == null) { //if this is the last part of the route's path, check if we need to split at the last stop's position
             System.out.println("SPLIT LAST STOP?");
-            final OSMNode pathDestinationNode = bestPath.lastPathSegment.getEndJunction().junctionNode;
+            final OSMNode pathDestinationNode = bestPath.lastPathSegment.getEndNode();
             final OSMWay pathDestinationWay = bestPath.lastPathSegment.getLine().way;
             if (pathDestinationWay.getFirstNode() != pathDestinationNode && pathDestinationWay.getLastNode() != pathDestinationNode) {
                 final OSMNode[] splitNodes = {pathDestinationNode};

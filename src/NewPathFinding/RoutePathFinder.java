@@ -8,7 +8,10 @@ import OSM.Point;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 
 /**
  * Contains all the stop-to-stop paths for a route
@@ -190,7 +193,7 @@ public class RoutePathFinder {
 
             //check the paths are connected (start/end at same node)
             if(lastPath != null) {
-                if(lastPath.bestPath.lastPathSegment.endJunction.processStatus == Junction.JunctionProcessStatus.continuePath && lastPath.bestPath.lastPathSegment.endJunction.junctionNode == pathTree.bestPath.firstPathSegment.originJunction.junctionNode) {
+                if(lastPath.bestPath.lastPathSegment.endJunction.processStatus == Junction.JunctionProcessStatus.continuePath && lastPath.bestPath.lastPathSegment.endJunction.junctionNode == pathTree.bestPath.firstPathSegment.originNode.junctionNode) {
                     calculatedPaths.add(pathTree.bestPath);
                 } else {
                     logEvent(RouteLogType.warning, "Ends don't match for paths (" + lastPath.bestPath + ") and (" + pathTree.bestPath + ")", this);
@@ -228,7 +231,7 @@ public class RoutePathFinder {
             for (final PathSegment pathSegment : pathTree.bestPath.getPathSegments()) {
                 final OSMWay pathWay = pathSegment.getLine().way;
                 //double-check the current and previous PathSegments are connected to each other
-                if(previousPathSegment != null && previousPathSegment.getEndJunction().junctionNode != pathSegment.getOriginJunction().junctionNode) {
+                if(previousPathSegment != null && previousPathSegment.getEndNode() != pathSegment.getOriginNode()) {
                     System.err.println("PathSegments don't connect:: " + previousPathSegment +"//" + pathSegment);
                 }
                 if (!route.routeRelation.containsMember(pathWay)) {
@@ -268,7 +271,7 @@ public class RoutePathFinder {
 
     /**
      * Outputs the paths to an OSM xml file for debugging purposes
-     * @param entitySpace
+     * @param entitySpace the entity space the debug elements will be added to
      */
     public void debugOutputPaths(final OSMEntitySpace entitySpace) {
         final OSMEntitySpace segmentSpace = new OSMEntitySpace(entitySpace.allWays.size() + entitySpace.allNodes.size());

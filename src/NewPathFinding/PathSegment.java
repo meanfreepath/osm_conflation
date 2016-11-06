@@ -3,11 +3,15 @@ package NewPathFinding;
 import Conflation.*;
 import OSM.OSMEntity;
 import OSM.OSMNode;
+import OSM.OSMWay;
 import OSM.Point;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.lang.ref.WeakReference;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.ListIterator;
 
 /**
  * Created by nick on 10/20/16.
@@ -17,7 +21,7 @@ public class PathSegment implements WaySegmentsObserver {
      * Cache for all existing PathSegments, to reduce duplication when Paths traverse a similar location
      * TODO: possible issues with looping, i.e. PathSegments with different endJunctions?
      */
-    private final static double SCORE_FOR_STOP_ON_WAY = 10000.0, SCORE_FOR_ALIGNMENT = 100.0, SCORE_FOR_DETOUR = 10.0, SCORE_FACTOR_FOR_CORRECT_ONEWAY_TRAVEL = 200.0, SCORE_FACTOR_FOR_INCORRECT_ONEWAY_TRAVEL = -200.0, SCORE_FACTOR_FOR_NON_ONEWAY_TRAVEL = 100.0;
+    private final static double SCORE_FOR_ALIGNMENT = 100.0, SCORE_FACTOR_FOR_CORRECT_ONEWAY_TRAVEL = 200.0, SCORE_FACTOR_FOR_NON_ONEWAY_TRAVEL = 100.0;
 
     private final static long debugWayId = 243738308L;
     public final static double maxFutureVectorDeviation = 0.25;
@@ -32,8 +36,8 @@ public class PathSegment implements WaySegmentsObserver {
         inprocess, pendingActivation, pendingAdvance, noFirstTraveledSegment, zeroSegmentMatches, failedSegmentMatch, complete, reachedDestination
     }
 
-    protected final Junction originJunction;
-    private Junction endJunction = null;
+    protected final OSMNode originNode;
+    private OSMNode endNode = null;
 
     private OSMWaySegments line;
 
@@ -43,9 +47,8 @@ public class PathSegment implements WaySegmentsObserver {
 
     private String id;
     public final TravelDirection travelDirection;
-    protected double traveledSegmentLength, alignedSegmentLength, detourSegmentLength; //the length of segments this path aligns with
-    protected int traveledSegmentCount, alignedSegmentCount, detourSegmentCount;
-    protected double alignedLengthFactor, detourLengthFactor, alignedPathScore, detourPathScore, waypointScore;
+    protected double traveledSegmentLength = 0.0, alignedSegmentLength = 0.0, alignedPathScore = 0.0; //the length of segments this path aligns with
+    protected int traveledSegmentCount = 0, alignedSegmentCount = 0;
     private List<WeakReference<Path>> containingPaths = new ArrayList<>(PathTree.MAX_PATHS_TO_CONSIDER);
 
     private ProcessingStatus processingStatus = ProcessingStatus.inprocess;
@@ -53,9 +56,9 @@ public class PathSegment implements WaySegmentsObserver {
     public static String idForParameters(final OSMWaySegments line, final OSMNode fromNode, final OSMNode toNode) {
         return String.format("PS%d:%d->%d", line.way.osm_id, fromNode.osm_id, toNode != null ? toNode.osm_id : 0);
     }
-    protected static PathSegment createNewPathSegment(final OSMWaySegments line, final Junction fromJunction, final TravelDirection travelDirection) {
-        /*final PathSegment newPathSegment = new PathSegment(line, fromJunction, parentPathTree);
-        final String newPSID = idForParameters(line, fromJunction.junctionNode, null);
+    protected static PathSegment createNewPathSegment(final OSMWaySegments line, final OSMNode fromNode, final TravelDirection travelDirection) {
+        /*final PathSegment newPathSegment = new PathSegment(line, fromNode, parentPathTree);
+        final String newPSID = idForParameters(line, fromNode.junctionNode, null);
         PathSegment existingPathSegment = allPathSegments.get(newPathSegment.id);
         if(existingPathSegment == null) {
             newPathSegment.determineScore();
@@ -65,17 +68,17 @@ public class PathSegment implements WaySegmentsObserver {
             newPathSegment.retire(); //properly discard the newPathSegment, since it's not going to be used
         }
         return existingPathSegment;*/
-        return new PathSegment(line, fromJunction, travelDirection); //TODO: determine if caching is feasible or not
+        return new PathSegment(line, fromNode, travelDirection); //TODO: determine if caching is feasible or not
     }
-    private PathSegment(final OSMWaySegments line, final Junction fromJunction, final TravelDirection travelDirection) {
-        originJunction = fromJunction;
+    private PathSegment(final OSMWaySegments line, final OSMNode fromNode, final TravelDirection travelDirection) {
+        originNode = fromNode;
         this.travelDirection = travelDirection;
         setLine(line);
 
-        //System.out.println("Segment of " + line.way.getTag("name") + " (" + line.way.osm_id + "): from " + originJunction.junctionNode.osm_id + " (traveling " + (line.matchObject.getAvgDotProduct() >= 0.0 ? "forward" : "backward") + ")");
+        //System.out.println("Segment of " + line.way.getTag("name") + " (" + line.way.osm_id + "): from " + originNode.junctionNode.osm_id + " (traveling " + (line.matchObject.getAvgDotProduct() >= 0.0 ? "forward" : "backward") + ")");
 
         //generate a unique ID for this PathSegment
-        id = idForParameters(line, originJunction.junctionNode, null);
+        id = idForParameters(line, originNode, null);
     }
     public boolean advance(final List<RouteLineSegment> routeLineSegmentsToConsider, final PathTree parentPathTree, final boolean debug) {
         //get a handle on the LineSegments involved in this step
@@ -84,10 +87,10 @@ public class PathSegment implements WaySegmentsObserver {
         /*check that this PathSegment's origin Junction is within the RouteLineSegment's search area.  If not,
           we've just got ahead of ourselves - bail for now
          */
-        if(!targetSegment.searchAreaForMatchingOtherSegments.containsPoint(originJunction.junctionNode.getCentroid())) {
+        if(!targetSegment.searchAreaForMatchingOtherSegments.containsPoint(originNode.getCentroid())) {
             processingStatus = ProcessingStatus.pendingActivation;
             if(line.way.osm_id == debugWayId) {
-                System.out.format("\t\tSTILL WAITING FOR ACTIVATION: %.01f: %s\n",Point.distance(originJunction.junctionNode.getCentroid(), targetSegment.midPoint), targetSegment.searchAreaForMatchingOtherSegments);
+                System.out.format("\t\tSTILL WAITING FOR ACTIVATION: %.01f: %s\n",Point.distance(originNode.getCentroid(), targetSegment.midPoint), targetSegment.searchAreaForMatchingOtherSegments);
             }
             return false;
         }
@@ -95,7 +98,7 @@ public class PathSegment implements WaySegmentsObserver {
         final OSMLineSegment firstTraveledSegment = findFirstTraveledSegment();
         ProcessingStatus segmentStatus;
         if(firstTraveledSegment == null) { //Shouldn't happen
-            System.out.println("ERROR: no firstTraveledSegment found for " + originJunction.junctionNode + " traveling " + travelDirection.toString());
+            System.out.println("ERROR: no firstTraveledSegment found for " + originNode + " traveling " + travelDirection.toString());
             return false;
         }
 
@@ -121,12 +124,12 @@ public class PathSegment implements WaySegmentsObserver {
         }
 
         if(debug) {
-            System.out.format("\t\tPS way %d origin %d travel %s: Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", line.way.osm_id, originJunction.junctionNode.osm_id, travelDirection.toString(), futureVectorDotProduct, -firstTraveledSegment.vectorX, -firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
+            System.out.format("\t\tPS way %d origin %d travel %s: Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", line.way.osm_id, originNode.osm_id, travelDirection.toString(), futureVectorDotProduct, -firstTraveledSegment.vectorX, -firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
         }
 
         if(futureVectorDotProduct < maxFutureVectorDeviation) {
-            /*if(originJunction.junctionNode.osm_id == 53015856L) {
-                System.out.format("\t\tOrigin " + originJunction.junctionNode.osm_id + "(way " + line.way.osm_id + " traveling " + travelDirection.toString() + "): Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", futureVectorDotProduct, -firstTraveledSegment.vectorX, -firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
+            /*if(originNode.junctionNode.osm_id == 53015856L) {
+                System.out.format("\t\tOrigin " + originNode.junctionNode.osm_id + "(way " + line.way.osm_id + " traveling " + travelDirection.toString() + "): Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", futureVectorDotProduct, -firstTraveledSegment.vectorX, -firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
                 System.out.println("\t\tFirst OSM segment is " + firstTraveledSegment);
             }*/
             processingStatus = ProcessingStatus.pendingAdvance;
@@ -181,13 +184,13 @@ public class PathSegment implements WaySegmentsObserver {
         final List<SegmentMatch> osmSegmentMatches = lineMatch.getRouteLineMatchesForSegment(segment, matchMask);
 
         //and iterate over them, ensuring that ALL meet the match mask requirements
-        boolean segmentMatched = false;
+        SegmentMatch bestSegmentMatch = null;
         for(final SegmentMatch segmentMatch : osmSegmentMatches) {
             if(segment.getParent().way.osm_id == debugWayId) {
                 System.out.println("\tSEGMATCH: " + segmentMatch);
             }
             if((segmentMatch.type & matchMask) != SegmentMatch.matchTypeNone) {
-                segmentMatched = true;
+                bestSegmentMatch = segmentMatch;
                 break;
             }
         }
@@ -205,34 +208,54 @@ public class PathSegment implements WaySegmentsObserver {
                 e.printStackTrace();
             }
         }*/
-        if(!segmentMatched) {
+        traveledSegmentCount++;
+        traveledSegmentLength += segment.length;
+        if(bestSegmentMatch == null) {
             return ProcessingStatus.failedSegmentMatch;
         }
+
+        //update the scores based on the segment match's quality
+        if((bestSegmentMatch.type & SegmentMatch.matchTypeDotProduct) > 0) {
+            alignedPathScore += SCORE_FOR_ALIGNMENT;
+            alignedSegmentCount++;
+            alignedSegmentLength += segment.length;
+        }
+        if((bestSegmentMatch.type & SegmentMatch.matchTypeTravelDirection) > 0) {
+            if(lineMatch.osmLine.oneWayDirection == WaySegments.OneWayDirection.none) {
+                alignedPathScore += SCORE_FACTOR_FOR_NON_ONEWAY_TRAVEL;
+            } else {
+                alignedPathScore += SCORE_FACTOR_FOR_CORRECT_ONEWAY_TRAVEL;
+            }
+        }
+
 
         //check if we've found the final destination node for this PathSegment's PathTree, or we're at a junction, and if so, bail
         if(nodeToCheck != null) {
             if(nodeToCheck == parentPathTree.destinationStop.getStopPosition()) {
-                setEndJunction(parentPathTree.createJunction(nodeToCheck), ProcessingStatus.reachedDestination);
+                setEndNode(nodeToCheck, ProcessingStatus.reachedDestination);
                 return processingStatus;
-            } else if(nodeToCheck == endingWayNode || nodeToCheck.containingWayCount > 1) {
-                setEndJunction(parentPathTree.createJunction(nodeToCheck), ProcessingStatus.complete);
+            } else if(nodeToCheck == endingWayNode || nodeToCheck.containingWayCount > 1) { //reached the end of the way, or this node is a possible junction node
+                setEndNode(nodeToCheck, ProcessingStatus.complete);
                 return processingStatus;
             }
         }
         return ProcessingStatus.inprocess;
+    }
+    public double getScore() {
+        return traveledSegmentLength > 0.0 ? alignedPathScore / traveledSegmentLength : 0.0;
     }
     private OSMLineSegment findFirstTraveledSegment() {
         //scan the line's segment list for the segment, returning it if found
         //if this is the first check, scan the line's segment list for the segment originating from the Junction's node
         if (travelDirection == TravelDirection.forward) {
             for(final LineSegment segment : line.segments) {
-                if (segment.originNode == originJunction.junctionNode) {
+                if (segment.originNode == originNode) {
                     return (OSMLineSegment) segment;
                 }
             }
         } else {
             for(final LineSegment segment : line.segments) {
-                if (segment.destinationNode == originJunction.junctionNode) {
+                if (segment.destinationNode == originNode) {
                     return (OSMLineSegment) segment;
                 }
             }
@@ -246,55 +269,7 @@ public class PathSegment implements WaySegmentsObserver {
         }
     }
     public void addContainingPath(final Path path) {
-        containingPaths.add(new WeakReference<Path>(path));
-    }
-    private void determineScore() {
-        waypointScore = alignedPathScore = detourPathScore = alignedLengthFactor = traveledSegmentLength = detourSegmentLength = 0.0;
-        traveledSegmentCount = alignedSegmentCount = detourSegmentCount = 0;
-
-       /* //add scores if the origin and/or destination stops are present on this PathSegment
-        if(originJunction.junctionNode == parentPathTree.fromNode) {
-            waypointScore += SCORE_FOR_STOP_ON_WAY;
-        }
-        if(endJunction.junctionNode == parentPathTree.toNode) {
-            waypointScore += SCORE_FOR_STOP_ON_WAY;
-        }
-
-        //determine the match score by iterating over the contained LineSegments on this PathSegment
-        final long routeLineId = parentPathTree.parentPathFinder.route.routeLineSegment.way.osm_id;
-        final double directionMultiplier;
-        if(travelDirection == TravelDirection.forward) { //i.e. we're traveling along the node order of this way
-            //determine whether we're going with or against the oneway tag on the current way
-            directionMultiplier = calculateDirectionMultiplier(WaySegments.OneWayDirection.forward, endJunction.junctionNode, parentPathTree.parentPathFinder);
-        } else { //i.e. we're traveling against the node order of this way
-            directionMultiplier = calculateDirectionMultiplier(WaySegments.OneWayDirection.backward, endJunction.junctionNode, parentPathTree.parentPathFinder);
-        }
-        //walk the segments of this PathSegment's way, checking whether they contain nodes that intersect other ways
-        for (LineSegment containedSegment : containedSegments) {
-            processSegmentScore(containedSegment, routeLineId, directionMultiplier);
-        }
-
-        if(alignedSegmentLength > 0.0) {
-            alignedPathScore /= alignedSegmentLength;
-        }
-        if(detourSegmentLength > 0.0) {
-            detourPathScore /= detourSegmentLength;
-        }
-        if(traveledSegmentLength > 0.0) {
-            alignedLengthFactor = alignedSegmentLength / traveledSegmentLength;
-            detourLengthFactor = detourSegmentLength / traveledSegmentLength;
-        }
-
-        if(line.way.osm_id == debugWayId) {
-            System.out.println("WAY:: " + line.way.osm_id + " matched? " + Boolean.toString(lineMatched) + ", % travelled: " + (Math.round(alignedLengthFactor * 10000.0) / 100.0) + ", score " + waypointScore + "/" + alignedPathScore);
-        }
-
-        //System.out.println("PROCESSED Segment of " + line.way.getTag("name") + " (" + line.way.osm_id + "): " + originJunction.junctionNode.osm_id + "->" + endJunction.junctionNode.osm_id + ", length: " + Math.round(100.0 * alignedSegmentLength / traveledSegmentLength) + "%, score " + getScore());
-
-        //if this segment is the root segment of a Path, default its originating node to the "first" (based on our direction of travel) node on the path
-        /*if(parentPathSegment == null && originatingNode == null) {
-            originatingNode = firstNode;
-        }*/
+        containingPaths.add(new WeakReference<>(path));
     }
     public OSMWaySegments getLine() {
         return line;
@@ -305,39 +280,39 @@ public class PathSegment implements WaySegmentsObserver {
         }
         line = newLine;
         if(line != null) {
-            if(line.way.getNodes().indexOf(originJunction.junctionNode) == -1) {
-                System.out.format("ERROR: new line %s doesn't contain origin junction node %s", line, originJunction.junctionNode);
+            if(line.way.getNodes().indexOf(originNode) == -1) {
+                System.out.format("ERROR: new line %s doesn't contain origin junction node %s", line, originNode);
             }
-            if(endJunction != null && line.way.getNodes().indexOf(endJunction.junctionNode) == -1) {
-                System.out.format("ERROR: new line %s doesn't contain ending junction node %s", line, endJunction.junctionNode);
+            if(endNode != null && line.way.getNodes().indexOf(endNode) == -1) {
+                System.out.format("ERROR: new line %s doesn't contain ending junction node %s", line, endNode);
             }
             line.addObserver(this); //track all changes to the underlying line, i.e. for splits
         }
     }
-    public Junction getOriginJunction() {
-        return originJunction;
+    public OSMNode getOriginNode() {
+        return originNode;
     }
-    public Junction getEndJunction() {
-        return endJunction;
+    public OSMNode getEndNode() {
+        return endNode;
     }
     public ProcessingStatus getProcessingStatus() {
         return processingStatus;
     }
-    public void setEndJunction(final Junction endJunction, final ProcessingStatus processingStatus) {
-        this.endJunction = endJunction;
+    public void setEndNode(final OSMNode endNode, final ProcessingStatus processingStatus) {
+        this.endNode = endNode;
         this.processingStatus = processingStatus;
-        //endJunction.junctionPathSegments.add(this);
+        //endNode.junctionPathSegments.add(this);
 
         //update the PathSegment cache
-        id = idForParameters(line, originJunction.junctionNode, endJunction.junctionNode); //update the id as well
+        id = idForParameters(line, originNode, endNode); //update the id as well
     }
 
     @Override
     public String toString() {
         if(processingStatus == ProcessingStatus.inprocess) {
-            return String.format("%s (%d): from %d going %s [status “%s”]", line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originJunction.junctionNode.osm_id, travelDirection.toString(), processingStatus.toString());
+            return String.format("%s (%d): from %d going %s [status “%s”]", line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originNode.osm_id, travelDirection.toString(), processingStatus.toString());
         } else {
-            return String.format("%s (%d): %d to %s going %s [status “%s”]", line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originJunction.junctionNode.osm_id, endJunction != null ? Long.toString(endJunction.junctionNode.osm_id) : "NONE", travelDirection.toString(), processingStatus.toString());
+            return String.format("%s (%d): %d to %s going %s [status “%s”]", line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originNode.osm_id, endNode != null ? Long.toString(endNode.osm_id) : "NONE", travelDirection.toString(), processingStatus.toString());
         }
     }
     @Override
@@ -350,17 +325,6 @@ public class PathSegment implements WaySegmentsObserver {
     public void waySegmentsWasSplit(WaySegments originalWaySegments, OSMNode[] splitNodes, WaySegments[] splitWaySegments) throws InvalidArgumentException {
         //check whether this PathSegment needs to update its line property
         if(processingStatus == ProcessingStatus.complete || processingStatus == ProcessingStatus.reachedDestination) {
-            //get a handle on the parent pathTree
-            PathTree parentPathTree = null;
-            for(final WeakReference<Path> containingPathReference : containingPaths) {
-                final Path containingPath = containingPathReference.get();
-                if(containingPath != null) {
-                    parentPathTree = containingPath.parentPathTree;
-                    break;
-                }
-            }
-            assert parentPathTree != null;
-
             //create an ArrayList containing the split ways
             final ArrayList<WaySegments> splitSegmentsList = new ArrayList<>(splitWaySegments.length);
             Collections.addAll(splitSegmentsList, splitWaySegments);
@@ -371,7 +335,7 @@ public class PathSegment implements WaySegmentsObserver {
             //run the PathSegment analysis, which will decide how to assign PathSegments to the split ways
             final List<PathSegment> pathSegmentsToCreate = new ArrayList<>(splitWaySegments.length - 1);
             final ProcessingStatus originalStatus = processingStatus;
-            determinePathSegmentSplitAssignments(originJunction, endJunction, splitSegmentsList, this, pathSegmentsToCreate, parentPathTree);
+            determinePathSegmentSplitAssignments(originNode, endNode, splitSegmentsList, this, pathSegmentsToCreate);
 
             //and add the newly-created PathSegments (if any) to this PathSegment's containing Path objects
             if(pathSegmentsToCreate.size() > 0) {
@@ -419,7 +383,7 @@ public class PathSegment implements WaySegmentsObserver {
 
     }
 
-    private static void determinePathSegmentSplitAssignments(final Junction originalOriginJunction, final Junction originalEndJunction, final List<WaySegments> splitWaySegments, PathSegment curSegment, List<PathSegment> pathSegmentsToCreate, final PathTree parentPathTree) {
+    private static void determinePathSegmentSplitAssignments(final OSMNode originalOriginJunction, final OSMNode originalEndJunction, final List<WaySegments> splitWaySegments, PathSegment curSegment, List<PathSegment> pathSegmentsToCreate) {
         boolean inOriginalPathSegment = false, creatingNewPathSegments = false;
         int debugIndex = 0;
         System.out.println("\n\tCHECK SPLIT on PS " + curSegment);
@@ -427,7 +391,7 @@ public class PathSegment implements WaySegmentsObserver {
         for(final WaySegments splitLine : splitWaySegments) {
             //get the index of the start/end junctions for the current PathSegment
             final int wayNodeMaxIndex = splitLine.way.getNodes().size() - 1;
-            int originIndex = splitLine.way.indexOfNode(originalOriginJunction.junctionNode), endIndex = splitLine.way.indexOfNode(originalEndJunction.junctionNode);
+            int originIndex = splitLine.way.indexOfNode(originalOriginJunction), endIndex = splitLine.way.indexOfNode(originalEndJunction);
             final OSMNode lastReachedNodeOnWay;
             System.out.format("\n\t\t%s: way %d/%d (id %d, %d->%d, %dnodes): Indexes: %d/%d\n", curSegment.travelDirection, ++debugIndex, splitWaySegments.size(), splitLine.way.osm_id, splitLine.way.getFirstNode().osm_id, splitLine.way.getLastNode().osm_id, splitLine.way.getNodes().size(), originIndex, endIndex);
 
@@ -469,11 +433,10 @@ public class PathSegment implements WaySegmentsObserver {
                     break;
                 }
 
-                //if curSegment's endJunction isn't on the line, then we need to start creating new PathSegments to fill out the original PathSegment's length
+                //if curSegment's endNode isn't on the line, then we need to start creating new PathSegments to fill out the original PathSegment's length
 
                 //create a new ending junction for curSegment at the last-traveled node on the splitWay
-                final Junction newEndJunction = parentPathTree.createJunction(lastReachedNodeOnWay);
-                curSegment.setEndJunction(newEndJunction, ProcessingStatus.complete);
+                curSegment.setEndNode(lastReachedNodeOnWay, ProcessingStatus.complete);
 
                 if (splitLine != curSegment.line) { //if the line is different from splitLine, update it here
                     System.out.println("\t\t" + curSegment.travelDirection.toString() + ": CHANGED FROM " + curSegment.line.way.osm_id + " to " + splitLine.way.osm_id);
@@ -488,18 +451,17 @@ public class PathSegment implements WaySegmentsObserver {
                 System.out.println("\t\tWILL CREATE NEW");
             } else {
                 //and create a new PathSegment with the last PathSegment's ending junction as its origin
-                curSegment = createNewPathSegment((OSMWaySegments) splitLine, lastPathSegment.getEndJunction(), curSegment.travelDirection);
+                curSegment = createNewPathSegment((OSMWaySegments) splitLine, lastPathSegment.getEndNode(), curSegment.travelDirection);
 
                 //and create a new end junction at the last-traveled node on the way, and cap the current segment at it
                 if(endIndex >= 0) {
-                    curSegment.setEndJunction(originalEndJunction, ProcessingStatus.complete);
+                    curSegment.setEndNode(originalEndJunction, ProcessingStatus.complete);
                     pathSegmentsToCreate.add(curSegment);
                     creatingNewPathSegments = false;
                     System.out.println("\t\tFINISHED REGENERATING ON " + curSegment);
                     break;
                 } else {
-                    final Junction newJunction = parentPathTree.createJunction(lastReachedNodeOnWay);
-                    curSegment.setEndJunction(newJunction, ProcessingStatus.complete);
+                    curSegment.setEndNode(lastReachedNodeOnWay, ProcessingStatus.complete);
                     pathSegmentsToCreate.add(curSegment);
                     System.out.println("\t\tADDED " + curSegment + ", CONTINUING...");
                 }
