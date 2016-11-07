@@ -1,5 +1,6 @@
 package com.company;
 
+import Conflation.RouteConflator;
 import Conflation.StopArea;
 import Conflation.StopConflator;
 import OSM.*;
@@ -18,6 +19,7 @@ import java.util.List;
  */
 public class OSMTaskManagerExporter {
     private final OSMEntitySpace entitySpace;
+    private final RouteConflator.RouteType routeType;
 
     private static class DividedBox {
         private static int idGenerator = 0;
@@ -38,20 +40,24 @@ public class OSMTaskManagerExporter {
 
     }
 
-    public OSMTaskManagerExporter(final OSMEntitySpace space) {
+    public OSMTaskManagerExporter(final OSMEntitySpace space, RouteConflator.RouteType routeType) {
         entitySpace = space;
+        this.routeType = routeType;
     }
 
     public void conflateStops() {
         final StopConflator conflator = new StopConflator(null);
         List<StopArea> allStops = new ArrayList<>(entitySpace.allEntities.size());
-        for(final OSMEntity entity : entitySpace.allNodes.values()) {
-            if("bus_stop".equals(entity.getTag("highway")) || "platform".equals(entity.getTag("public_transport"))) {
-                allStops.add(new StopArea(entity, null));
+        if(routeType == RouteConflator.RouteType.bus) {
+            for (final OSMEntity entity : entitySpace.allNodes.values()) {
+                if (OSMEntity.TAG_LEGACY_BUS_STOP.equals(entity.getTag(OSMEntity.KEY_HIGHWAY)) || OSMEntity.TAG_PLATFORM.equals(entity.getTag(OSMEntity.KEY_PUBLIC_TRANSPORT))) {
+                    allStops.add(new StopArea(entity, null));
+                }
             }
-        }
+        } //TODO: implement other route types
+
         try {
-            conflator.conflateStopsWithOSM(allStops, OSMEntity.KEY_BUS, entitySpace);
+            conflator.conflateStopsWithOSM(allStops, RouteConflator.RouteType.bus, entitySpace);
         } catch (InvalidArgumentException e) {
             e.printStackTrace();
         }
