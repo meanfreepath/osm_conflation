@@ -47,14 +47,10 @@ public class RoutePathFinder {
         calculatedPaths = new ArrayList<>(routePathTrees.size());
     }
     /**
-     * Takes the stop data and uses it to split the RouteLine into route legs, for later path discovery
+     * Takes the stop data and uses it to generate the pathTrees between the RouteLine's stops, for later path discovery
      * Must be called after the Route's stops have been matched to their respective OSM ways
      */
-    public void splitRouteLineByStops() {
-        final HashMap<String, String> debugTags = new HashMap<>(2);
-        debugTags.put(OSMEntity.KEY_PUBLIC_TRANSPORT, OSMEntity.TAG_STOP_POSITION);
-        debugTags.put(OSMEntity.KEY_BUS, OSMEntity.TAG_YES);
-
+    public void generatePathTrees() {
         System.out.println("Route " + route.routeLine.way.osm_id + ": " + route.stops.size() + " stops");
         //Find the closest segment and point on the routeLineSegment to the stops' positions
         int pathTreeIndex = 0, endIndex = route.stops.size() - 1;
