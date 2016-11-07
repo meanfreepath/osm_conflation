@@ -1,6 +1,8 @@
 package Conflation;
 
 import NewPathFinding.PathSegment;
+import OSM.OSMEntity;
+import OSM.OSMWay;
 import OSM.Point;
 import OSM.Region;
 
@@ -15,6 +17,10 @@ public class SegmentMatch {
     private final static double DOT_PRODUCT_FOR_PARALLEL_LINE = 0.999; //segments with a dot product > than this are considered "parallel" for some calculations
     public final static short matchTypeNone = 0, matchTypeBoundingBox = 1, matchTypeDotProduct = 2, matchTypeDistance = 4, matchTypeTravelDirection = 8;
     public final static short matchMaskAll = matchTypeBoundingBox | matchTypeDistance | matchTypeDotProduct | matchTypeTravelDirection;
+
+    //tag definitions used for checking for contraflow bus lanes
+    private final static String[] integerTagsForward = {"lanes:bus:forward", "lanes:psv:forward"}, integerTagsBackward = {"lanes:bus:backward", "lanes:psv:backward"};
+    private final static String[] stringTagsForward = {"bus:lanes:forward", "psv:lanes:forward"}, stringTagsBackward = {"bus:lanes:backward", "psv:lanes:backward"};;
 
     public final long id;
     public final double orthogonalDistance, midPointDistance, dotProduct;
@@ -46,13 +52,69 @@ public class SegmentMatch {
         if(orthogonalDistance <= options.maxSegmentOrthogonalDistance && midPointDistance <= options.maxSegmentMidPointDistance) {
             matchType |= matchTypeDistance;
         }
+        final String routeType = "bus"; //TODO: get from the route line
+
         //check oneway directions
         final WaySegments.OneWayDirection oneWayDirection = matchingSegment.getParent().oneWayDirection;
-        if(oneWayDirection == WaySegments.OneWayDirection.none || oneWayDirection == WaySegments.OneWayDirection.forward && dotProduct > 0.0 || oneWayDirection == WaySegments.OneWayDirection.backward && dotProduct < 0.0) {
+        if(oneWayDirection == WaySegments.OneWayDirection.none || checkOneWayDirection(matchingSegment.getParent().way, routeType, oneWayDirection, dotProduct)) {
             matchType |= matchTypeTravelDirection;
         }
         type = matchType;
         totalCount++;
+    }
+
+    /**
+     * Checks whether we can travel contraflow to the given way's oneway direction, using the way's tags
+     * @param way The way to check
+     * @param routeType The type of route (i.e. "bus")
+     * @param oneWayDirection The direction we're attempting to travel on the way
+     * @param dotProduct The dot product of the RouteLineSegment with the osmLineSegment on the way
+     * @return true if travel is possible, false otherwise
+     */
+    private static boolean checkOneWayDirection(final OSMWay way, final String routeType, final WaySegments.OneWayDirection oneWayDirection, final double dotProduct) {
+        final boolean travelingWithOneWayDirection = oneWayDirection == WaySegments.OneWayDirection.forward && dotProduct > 0.0 || oneWayDirection == WaySegments.OneWayDirection.backward && dotProduct < 0.0;
+
+        //if traveling against the oneway direction of the way, check if there are any exceptions based on the route's type
+        if(!travelingWithOneWayDirection && routeType.equals(OSMEntity.TAG_BUS)) {
+            //set up the tags to check for, based on the travel direction
+            final String[] integerTags, stringTags;
+            final String laneTag;
+            if(oneWayDirection == WaySegments.OneWayDirection.forward) {
+                integerTags = integerTagsBackward;
+                stringTags = stringTagsBackward;
+                laneTag = OSMEntity.TAG_OPPOSITE_LANE;
+            } else {
+                integerTags = integerTagsForward;
+                stringTags = stringTagsForward;
+                laneTag = OSMEntity.TAG_LANE;
+            }
+
+            //check the busway=* schema
+            if (laneTag.equalsIgnoreCase(way.getTag(OSMEntity.KEY_BUSWAY))) {
+                return true;
+            }
+
+            //check the lanes:bus:* schema
+            for(final String tag : integerTags) {
+                final String tagValue = way.getTag(tag);
+                if(tagValue != null) {
+                    try {
+                        if(Integer.parseInt(tagValue) > 0) {
+                            return true;
+                        }
+                    } catch(NumberFormatException ignored) {}
+                }
+            }
+
+            //check the bus:lanes:* schema
+            for(final String tag : stringTags) {
+                final String tagValue = way.getTag(tag);
+                if(tagValue != null && tagValue.contains(OSMEntity.TAG_YES)) {
+                    return true;
+                }
+            }
+        }
+        return travelingWithOneWayDirection;
     }
     public static SegmentMatch checkCandidateForMatch(final RouteConflator.LineComparisonOptions options, final RouteLineSegment routeLineSegment, final OSMLineSegment osmLineSegment) {
         //run some basic validation checks
