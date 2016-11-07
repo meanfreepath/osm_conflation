@@ -13,9 +13,10 @@ import java.util.Map;
 public abstract class OSMEntity {
     public final static String KEY_LATITUDE = "lat", KEY_LONGITUDE = "lon", KEY_OSMID = "osm_id", KEY_FROM = "from", KEY_VIA = "via", KEY_TO = "to", KEY_OPERATOR = "operator", KEY_ROUTE = "route", KEY_ROUTE_MASTER = "route_master", KEY_NAME = "name", KEY_REF = "ref", KEY_LOCAL_REF = "local_ref", KEY_DESCRIPTION = "description", KEY_WEBSITE = "website", KEY_TYPE = "type", KEY_COLOUR = "colour", KEY_AMENITY = "amenity", KEY_WHEELCHAIR = "wheelchair", KEY_SOURCE = "source";
     public final static String TAG_ROUTE = "route", TAG_ROUTE_MASTER = "route_master", TAG_BUS = "bus", TAG_LIGHT_RAIL = "light_rail", TAG_TRAM = "tram", TAG_SUBWAY = "subway", TAG_TRAIN = "train", TAG_FERRY = "ferry", TAG_AERIALWAY = "aerialway", TAG_YES = "yes", TAG_NO = "no";
+    public final static String TAG_LANE = "lane", TAG_OPPOSITE_LANE = "opposite_lane";
     public final static String MEMBERSHIP_DEFAULT = "", MEMBERSHIP_STOP = "stop", MEMBERSHIP_PLATFORM = "platform";
 
-    public final static String KEY_HIGHWAY = "highway", KEY_RAILWAY = "railway", KEY_SUBWAY = "subway", KEY_PUBLIC_TRANSPORT = "public_transport", KEY_PUBLIC_TRANSPORT_VERSION = "public_transport:version", KEY_BUS = "bus", KEY_TRAIN = "train", KEY_FERRY = "ferry", KEY_TRAM = "tram", KEY_AERIALWAY = "aerialway", KEY_FUNICULAR = "funicular";
+    public final static String KEY_HIGHWAY = "highway", KEY_RAILWAY = "railway", KEY_SUBWAY = "subway", KEY_PUBLIC_TRANSPORT = "public_transport", KEY_PUBLIC_TRANSPORT_VERSION = "public_transport:version", KEY_BUS = "bus", KEY_BUSWAY = "busway", KEY_TRAIN = "train", KEY_FERRY = "ferry", KEY_TRAM = "tram", KEY_AERIALWAY = "aerialway", KEY_FUNICULAR = "funicular";
     public final static String TAG_LEGACY_BUS_STOP = "bus_stop", TAG_PLATFORM = "platform", TAG_STOP_POSITION = "stop_position", TAG_LEGACY_FERRY_TERMINAL = "ferry_terminal";
 
     protected final static String
