@@ -91,7 +91,7 @@ public class RouteConflator implements WaySegmentsObserver {
     private List<Route> exportRoutes;
     private HashMap<Long, StopArea> allRouteStops;
     public static boolean debugEnabled = false;
-    public final long debugRouteId = -261382L*0L;
+    public final String debugTripMarker = "10673026:1";
     private OSMEntitySpace workingEntitySpace = null;
     public final static LineComparisonOptions wayMatchingOptions = new LineComparisonOptions();
     protected HashMap<Long, OSMWaySegments> candidateLines = null;
@@ -607,7 +607,7 @@ public class RouteConflator implements WaySegmentsObserver {
     public void conflateRoutePaths(final StopConflator stopConflator) {
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
-            if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
+            if (debugTripMarker != null && !route.tripMarker.equals(debugTripMarker)) {
                 System.out.println("skipping (not a flagged route)");
                 continue;
             }
@@ -635,12 +635,12 @@ public class RouteConflator implements WaySegmentsObserver {
         //with the candidate lines determined, begin the pathfinding stage to lock down the path between the route's stops
         for(final Route route : exportRoutes) {
             System.out.println("Begin PathFinding for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
-            if (debugRouteId != 0 && route.routeRelation.osm_id != debugRouteId) {
+            if (debugTripMarker != null && !route.tripMarker.equals(debugTripMarker)) {
                 System.out.println("skipping (not a flagged route)");
                 continue;
             }
 
-            if(debugEnabled) {
+            if(true||debugEnabled) {
                 try {
                     route.debugOutputSegments(workingEntitySpace, candidateLines.values());
                 } catch (IOException | InvalidArgumentException e) {
