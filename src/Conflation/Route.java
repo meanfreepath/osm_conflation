@@ -82,9 +82,15 @@ public class Route {
     }
 
     public void findRoutePaths(final RouteConflator routeConflator) {
-        routePathFinder.splitRouteLineByStops();
+        //first generate the pathTrees using the routeLine and this route's stops
+        routePathFinder.generatePathTrees();
 
+        //debugCheckMatchIndexIntegrity();
+
+        //and run the pathfinding algorithm
         routePathFinder.findPaths(routeConflator);
+
+        //debugCheckMatchIndexIntegrity();
 
         //if the route wasn't fully matched, mark it
         if(routePathFinder.getFailedPaths() > 0) {

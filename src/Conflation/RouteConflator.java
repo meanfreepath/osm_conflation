@@ -640,20 +640,23 @@ public class RouteConflator implements WaySegmentsObserver {
                 continue;
             }
 
+            if(debugEnabled) {
+                try {
+                    route.debugOutputSegments(workingEntitySpace, candidateLines.values());
+                } catch (IOException | InvalidArgumentException e) {
+                    e.printStackTrace();
+                }
+            }
+
             //run the pathfinding algorithm for each route
             route.findRoutePaths(this);
 
-            route.debugCheckMatchIndexIntegrity();
+            //flush the match indexes for the routeLine, since they're no longer needed
+            route.routeLine.flushMatchIndexes();
+            //route.debugCheckMatchIndexIntegrity();
 
             //and add the stops data to the OSMRelation for the route
             route.syncStopsWithRelation();
-
-            if(debugEnabled) {
-                System.out.println("--------------------------------------------------------\nPRE-SPLIT Paths for " + route.routePathFinder.route.routeRelation.osm_id + ":");
-                for (final PathTree pathTree : route.routePathFinder.routePathTrees) {
-                    System.out.println("PATH: " + pathTree.bestPath);
-                }
-            }
 
             //split any ways that aren't fully contained by the route path
             route.routePathFinder.splitWaysAtIntersections(workingEntitySpace);
@@ -674,9 +677,8 @@ public class RouteConflator implements WaySegmentsObserver {
             if(true||debugEnabled) {
                 try {
                     workingEntitySpace.outputXml("newresult" + route.routeRelation.osm_id + ".osm");
-                    route.debugOutputSegments(workingEntitySpace, candidateLines.values());
                     route.routePathFinder.debugOutputPaths(workingEntitySpace);
-                } catch (IOException | InvalidArgumentException e) {
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
             }

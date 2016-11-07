@@ -137,6 +137,12 @@ public class RouteLineSegment extends LineSegment {
             }
         }
     }
+    protected void flushMatches() {
+        matchingSegments.clear();
+        matchingSegmentsById.clear();
+        bestMatchForLine.clear();
+        bestMatchOverall = null;
+    }
     public void summarize() {
         //look up the matching segments we have for the given OSM way
         bestMatchForLine.clear();

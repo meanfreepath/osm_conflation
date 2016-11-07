@@ -259,6 +259,14 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
 
         return routeLineMatch;
     }
+    public void flushMatchIndexes() {
+        for(final LineSegment segment : segments) {
+            final RouteLineSegment routeLineSegment = (RouteLineSegment) segment;
+            routeLineSegment.flushMatches();
+        }
+        lineMatchesByOSMWayId.clear();
+        lineMatchesByRouteLineSegmentId.clear();
+    }
     /*private void resyncLineMatches() {
         final List<Long> lineMatchesToRemove = new ArrayList<>(lineMatchesByOSMWayId.size());
         for(final LineMatch lineMatch : lineMatchesByOSMWayId.values()) {
@@ -303,6 +311,9 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
         } else if(originalWaySegments instanceof OSMWaySegments) {
             //get a handle on the original line's matching segments
             final LineMatch originalLineMatch = lineMatchesByOSMWayId.get(originalWaySegments.way.osm_id);
+            if(originalLineMatch == null) { //if there isn't one, bail.  Will happen when after match index is flushed
+                return;
+            }
             final List<SegmentMatch> originalLineSegmentMatches = new ArrayList<>(originalLineMatch.matchingSegments);
 
             //remove all the existing SegmentMatches from the various indexes, keeping a list of RouteLineSegments that need to be rematched
