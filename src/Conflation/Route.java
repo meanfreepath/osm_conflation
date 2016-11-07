@@ -18,7 +18,7 @@ public class Route {
     public final RouteConflator.LineComparisonOptions wayMatchingOptions;
     public final String name, ref, tripMarker, tripId;
     public final OSMRelation routeRelation;
-    public final String routeType;
+    public final RouteConflator.RouteType routeType;
     public final List<StopArea> stops;
     public final RouteLineWaySegments routeLine;
     public final RoutePathFinder routePathFinder;
@@ -26,7 +26,7 @@ public class Route {
     protected Route(final OSMRelation routeRelation, final OSMWay routePath, List<StopArea> stops, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
         this.routeRelation = routeRelation;
         this.wayMatchingOptions = wayMatchingOptions;
-        routeType = routeRelation.getTag(OSMEntity.KEY_TYPE);
+        routeType = RouteConflator.RouteType.fromString(routeRelation.getTag(OSMEntity.KEY_ROUTE));
         name = routeRelation.getTag(OSMEntity.KEY_NAME);
         ref = routeRelation.getTag(OSMEntity.KEY_REF);
         tripMarker = routeRelation.getTag(RouteConflator.GTFS_TRIP_MARKER);

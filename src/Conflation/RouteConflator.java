@@ -28,6 +28,28 @@ public class RouteConflator implements WaySegmentsObserver {
     }
     public final static String GTFS_AGENCY_ID = "gtfs:agency_id", GTFS_ROUTE_ID = "gtfs:route_id", GTFS_TRIP_ID = "gtfs:trip_id", GTFS_TRIP_MARKER = "gtfs:trip_marker", GTFS_IGNORE = "gtfs:ignore";
 
+    public enum RouteType {
+        bus, railway, light_rail, monorail, train, tram, subway, ferry;
+
+        public static RouteType fromString(final String routeType) {
+            switch(routeType) {
+                case OSMEntity.TAG_BUS:
+                    return bus;
+                case OSMEntity.TAG_LIGHT_RAIL:
+                    return light_rail;
+                case OSMEntity.TAG_TRAIN:
+                    return train;
+                case OSMEntity.TAG_SUBWAY:
+                    return subway;
+                case OSMEntity.TAG_TRAM:
+                    return tram;
+                case OSMEntity.TAG_FERRY:
+                    return ferry;
+            }
+            return null;
+        }
+    }
+
     /**
      * Class used for indexing OSMWays in the downloaded region into subregions, for more efficient
      * bounding box checks
@@ -84,14 +106,14 @@ public class RouteConflator implements WaySegmentsObserver {
         }
     }
 
-    public final String routeType;
+    public final RouteType routeType;
     private final OSMRelation importRouteMaster;
     private final List<Route> importRoutes;
     private OSMRelation exportRouteMaster;
     private List<Route> exportRoutes;
     private HashMap<Long, StopArea> allRouteStops;
     public static boolean debugEnabled = false;
-    public final String debugTripMarker = "10673026:1";
+    public final String debugTripMarker = null;//"10673026:1";
     private OSMEntitySpace workingEntitySpace = null;
     public final static LineComparisonOptions wayMatchingOptions = new LineComparisonOptions();
     protected HashMap<Long, OSMWaySegments> candidateLines = null;
@@ -99,8 +121,8 @@ public class RouteConflator implements WaySegmentsObserver {
 
     public RouteConflator(final OSMRelation routeMaster) throws InvalidArgumentException {
         importRouteMaster = routeMaster;
-        routeType = importRouteMaster.getTag(OSMEntity.KEY_ROUTE_MASTER);
-        if(!validateRouteType(routeType)) {
+        routeType = RouteType.fromString(routeMaster.getTag(OSMEntity.KEY_ROUTE_MASTER));
+        if(routeType == null) {
             final String errMsg[] = {"Invalid route type provided"};
             throw new InvalidArgumentException(errMsg);
         }
@@ -133,43 +155,27 @@ public class RouteConflator implements WaySegmentsObserver {
             importRoutes.add(new Route(subRoute, routePath, routeStops, wayMatchingOptions));
         }
     }
-    public static boolean validateRouteType(final String routeType) {
-        if(routeType == null) {
-            return false;
-        }
-        switch (routeType) {
-            case OSMEntity.TAG_BUS:
-            case OSMEntity.TAG_LIGHT_RAIL:
-            case OSMEntity.TAG_TRAIN:
-            case OSMEntity.TAG_SUBWAY:
-            case OSMEntity.TAG_TRAM:
-            case OSMEntity.TAG_FERRY:
-                return true;
-            default:
-                return false;
-        }
-    }
 
     /**
      * Define the search tags for the ways for the given route type
      * @param relationType The type of route relation ("bus", "rail", etc)
      * @return The tags to search for the ways with
      */
-    public static Map<String, List<String>> wayTagsForRouteType(final String relationType) {
+    public static Map<String, List<String>> wayTagsForRouteType(final RouteType relationType) {
         String[] keys;
         String[][] tags;
         switch (relationType) {
-            case OSMEntity.TAG_BUS:
+            case bus:
                 keys = new String[]{"highway"};
                 tags = new String[keys.length][];
                 tags[0] = new String[]{"motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link", "residential", "unclassified", "service", "living_street"};
                 break;
-            case OSMEntity.TAG_LIGHT_RAIL:
+            case light_rail:
                 keys = new String[]{"railway"};
                 tags = new String[keys.length][];
                 tags[0] = new String[]{"rail", "light_rail", "subway", "tram"};
                 break;
-            case OSMEntity.TAG_SUBWAY:
+            case subway:
                 keys = new String[]{"railway"};
                 tags = new String[keys.length][];
                 tags[0] = new String[]{"rail", "light_rail", "subway"};
@@ -193,17 +199,17 @@ public class RouteConflator implements WaySegmentsObserver {
      * @param relationType The type of route relation ("bus", "rail", etc)
      * @return The tags to search for the platforms with
      */
-    public Map<String, List<String>> platformTagsForRouteType(final String relationType) {
+    public Map<String, List<String>> platformTagsForRouteType(final RouteType relationType) {
         String[] keys;
         String[][] tags;
         switch (relationType) {
-            case OSMEntity.TAG_BUS:
+            case bus:
                 keys = new String[]{"highway"};
                 tags = new String[keys.length][];
                 tags[0] = new String[]{"bus_stop", "bus_station"};
                 break;
-            case OSMEntity.TAG_LIGHT_RAIL:
-            case OSMEntity.TAG_SUBWAY:
+            case light_rail:
+            case subway:
                 keys = new String[]{"railway"};
                 tags = new String[keys.length][];
                 tags[0] = new String[]{"platform"};
@@ -235,7 +241,7 @@ public class RouteConflator implements WaySegmentsObserver {
         final List<OSMWay> routePaths = new ArrayList<>(importRoutes.size());
         Region routePathsBoundingBox = null;
         for(final Route route : importRoutes) {
-            if(route.routeType != null && route.routeType.equals(OSMEntity.TAG_ROUTE)) {
+            if(route.routeType != null) {
                 routePaths.add(route.routeLine.way);
                 if(routePathsBoundingBox == null) {
                     routePathsBoundingBox = new Region(route.routeLine.way.getBoundingBox());

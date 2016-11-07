@@ -52,7 +52,7 @@ public class SegmentMatch {
         if(orthogonalDistance <= options.maxSegmentOrthogonalDistance && midPointDistance <= options.maxSegmentMidPointDistance) {
             matchType |= matchTypeDistance;
         }
-        final String routeType = "bus"; //TODO: get from the route line
+        final RouteConflator.RouteType routeType = RouteConflator.RouteType.bus; //TODO: get from the route line
 
         //check oneway directions
         final WaySegments.OneWayDirection oneWayDirection = matchingSegment.getParent().oneWayDirection;
@@ -71,11 +71,11 @@ public class SegmentMatch {
      * @param dotProduct The dot product of the RouteLineSegment with the osmLineSegment on the way
      * @return true if travel is possible, false otherwise
      */
-    private static boolean checkOneWayDirection(final OSMWay way, final String routeType, final WaySegments.OneWayDirection oneWayDirection, final double dotProduct) {
+    private static boolean checkOneWayDirection(final OSMWay way, final RouteConflator.RouteType routeType, final WaySegments.OneWayDirection oneWayDirection, final double dotProduct) {
         final boolean travelingWithOneWayDirection = oneWayDirection == WaySegments.OneWayDirection.forward && dotProduct > 0.0 || oneWayDirection == WaySegments.OneWayDirection.backward && dotProduct < 0.0;
 
         //if traveling against the oneway direction of the way, check if there are any exceptions based on the route's type
-        if(!travelingWithOneWayDirection && routeType.equals(OSMEntity.TAG_BUS)) {
+        if(!travelingWithOneWayDirection && routeType == RouteConflator.RouteType.bus) {
             //set up the tags to check for, based on the travel direction
             final String[] integerTags, stringTags;
             final String laneTag;
