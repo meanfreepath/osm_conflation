@@ -70,6 +70,7 @@ public class StreetNameMatcher {
         streetAbbreviations.put("Rd", "Road");
         streetAbbreviations.put("P&R", "Park and Ride");
         streetAbbreviations.put("Ct", "Court");
+        streetAbbreviations.put("Acs", "Access");
 
         numericAbbreviations.put("1st", "First");
         numericAbbreviations.put("2nd", "Second");
