@@ -28,8 +28,8 @@ public class StopConflator {
      */
     protected void matchStopsToWays() {
         final int stopCount = routeConflator.getAllRouteStops().size();
-        if(stopCount == 0) { //TODO add warning
-            System.out.println("No stops found for route " + routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_NAME));
+        if(stopCount == 0) {
+            System.out.format("ERROR: No stops found for route_master %s [ref %s]\n", routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_NAME), routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_REF));
             return;
         }
 
@@ -47,7 +47,7 @@ public class StopConflator {
         for(final Route route : routeConflator.getExportRoutes()) {
             for(final StopArea routeStop : route.stops) {
                 //skip stops that already have a stop position assigned (the stop's way(s) are associated with the stop position)
-                if(routeStop.getStopPosition() != null) {
+                if(routeStop.getStopPosition(routeConflator.routeType) != null) {
                     continue;
                 }
 
@@ -67,7 +67,7 @@ public class StopConflator {
         final StreetNameMatcher matcher = new StreetNameMatcher(Locale.US);
         for(final StopArea stop : routeConflator.getAllRouteStops()) {
             //skip stops that already have a stop position assigned (the stop's way(s) are associated with the stop position)
-            if(stop.getStopPosition() != null) {
+            if(stop.getStopPosition(routeConflator.routeType) != null) {
                 continue;
             }
 
@@ -132,7 +132,7 @@ public class StopConflator {
             }
 
             //check if there's an existing stop_position node that can be associated with the StopArea, and if so there's no need to set now
-            if(stopArea.getStopPosition() != null) {
+            if(stopArea.getStopPosition(routeConflator.routeType) != null) {
                 continue;
             }
 
@@ -176,11 +176,10 @@ public class StopConflator {
             }
 
             //and add the stop position to the stop area
-            stopArea.setStopPosition(nearestNodeOnWay);
-            nearestNodeOnWay.setTag(routeConflator.routeType.toString(), OSMEntity.TAG_YES);
+            stopArea.setStopPosition(nearestNodeOnWay, routeConflator.routeType);
 
             //clear the way matches for the stop, since they're no longer needed once the stop position is set
-            if(stopArea.getStopPosition() != null) {
+            if(stopArea.getStopPosition(routeConflator.routeType) != null) {
                 stopArea.clearAllWayMatches();
             }
 
@@ -305,7 +304,7 @@ public class StopConflator {
                         final double stopDistance = Point.distance(stop.getPlatform().getCentroid(), existingEntity.getCentroid());
                         if (stopDistance < StopArea.maxDistanceBetweenDuplicateStops) {
                             //System.out.println("Within distance of " + stop + "! " + existingEntity.osm_id + ": " + existingEntity.getTag(OSMEntity.KEY_REF) + "/" + existingEntity.getTag(OSMEntity.KEY_NAME) + ", dist " + stopDistance);
-                            stop.getPlatform().setTag(StopArea.KEY_GTFS_CONFLICT, "yes");
+                            stop.getPlatform().setTag(StopArea.KEY_GTFS_CONFLICT, "id #" + existingEntity.osm_id);
                         }
                     } else if(OSMEntity.TAG_STOP_POSITION.equals(entityType)) { //no action taken on existing stop positions
                         //System.out.println("No GTFS/REF MATCH FOR " + existingEntity.getTags().toString());
@@ -325,9 +324,23 @@ public class StopConflator {
                         //remove from the imported entity list since we've matched it
                         importedExistingStopsIterator.remove();
                     } else if(OSMEntity.TAG_STOP_POSITION.equals(entityType)) {
-                        stop.setStopPosition((OSMNode) existingEntity);
+                        //check that the stop_position supports the current routeType (i.e. for mixed-mode platforms like shared bus/tram stops)
+                        boolean supportsRouteType = OSMEntity.TAG_YES.equalsIgnoreCase(existingEntity.getTag(routeType.spKeyForRouteType()));
+                        if(!supportsRouteType) {
+                            boolean supportsOtherRouteType = false;
+                            for(final RouteConflator.RouteType otherRouteType : RouteConflator.RouteType.values()) {
+                                if(OSMEntity.TAG_YES.equalsIgnoreCase(existingEntity.getTag(otherRouteType.spKeyForRouteType()))) {
+                                    supportsOtherRouteType = true;
+                                    break;
+                                }
+                            }
+                            supportsRouteType = !supportsOtherRouteType;
+                        }
+                        if(supportsRouteType) {
+                            stop.setStopPosition((OSMNode) existingEntity, routeType);
+                        }
 
-                        //remove from the imported entity list since we've matched it
+                        //remove from the imported entity list since we've processed it
                         importedExistingStopsIterator.remove();
                     }
                 }

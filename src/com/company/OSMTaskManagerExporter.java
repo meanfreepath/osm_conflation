@@ -51,7 +51,7 @@ public class OSMTaskManagerExporter {
         if(routeType == RouteConflator.RouteType.bus) {
             for (final OSMEntity entity : entitySpace.allNodes.values()) {
                 if (OSMEntity.TAG_LEGACY_BUS_STOP.equals(entity.getTag(OSMEntity.KEY_HIGHWAY)) || OSMEntity.TAG_PLATFORM.equals(entity.getTag(OSMEntity.KEY_PUBLIC_TRANSPORT))) {
-                    allStops.add(new StopArea(entity, null));
+                    allStops.add(new StopArea(entity));
                 }
             }
         } //TODO: implement other route types

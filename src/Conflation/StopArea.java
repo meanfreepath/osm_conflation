@@ -26,7 +26,12 @@ public class StopArea implements WaySegmentsObserver {
     public final static double stopNodeTolerance = 3.0, maxDistanceFromPlatformToWay = waySearchAreaBoundingBoxSize / 2.0, maxDistanceBetweenDuplicateStops = duplicateStopPlatformBoundingBoxSize / 2.0;
     public final static String KEY_GTFS_STOP_ID = "gtfs:stop_id", KEY_GTFS_CONFLICT = "gtfs:conflict";
     private OSMEntity platform; //can be a node or way
-    private OSMNode stopPosition = null;
+
+    /**
+     * The stop_position node(s) associated with the platform.  NOTE: 99% of platforms only have a single stop_position,
+     * but shared-mode platforms (i.e. bus & tram) may have a stop_position on different ways
+     */
+    private Map<RouteConflator.RouteType,OSMNode> stopPositions = new HashMap<>(1);
     private Region nearbyWaySearchRegion, nearbyStopSearchRegion;
 
     public enum WayMatchType {
@@ -183,9 +188,8 @@ public class StopArea implements WaySegmentsObserver {
     public final List<SummarizedMatch> bestWayMatches = new ArrayList<>(8);
     public SummarizedMatch bestWayMatch = null;
 
-    public StopArea(final OSMEntity platform, final OSMNode stopPosition) {
+    public StopArea(final OSMEntity platform) {
         setPlatform(platform);
-        setStopPosition(stopPosition);
     }
     protected StopWayMatch.SegmentProximityMatch addProximityMatch(final SegmentMatch match) {
         //first get a handle on the OSM way matches for the given routeLine
@@ -266,25 +270,29 @@ public class StopArea implements WaySegmentsObserver {
         nearbyWaySearchRegion = platform.getBoundingBox().regionInset(waySearchBuffer, waySearchBuffer);
         nearbyStopSearchRegion = platform.getBoundingBox().regionInset(stopSearchBuffer, stopSearchBuffer);
     }
-    public OSMNode getStopPosition() {
-        return stopPosition;
+    public OSMNode getStopPosition(final RouteConflator.RouteType forRouteType) {
+        return stopPositions.get(forRouteType);
     }
-    protected void setStopPosition(final OSMNode stopNode) {
-        stopPosition = stopNode;
+    protected void setStopPosition(final OSMNode stopNode, final RouteConflator.RouteType forRouteType) {
+        if(stopNode == null) {
+            stopPositions.remove(forRouteType);
+            return;
+        }  else {
+            stopPositions.put(forRouteType, stopNode);
+        }
 
         //set the tags of the node to ensure they match the platform
-        if(stopPosition != null) {
-            OSMPresetFactory.makeStopPosition(stopNode);
-            if (platform.hasTag(OSMEntity.KEY_NAME)) {
-                stopNode.setTag(OSMEntity.KEY_NAME, platform.getTag(OSMEntity.KEY_NAME));
-            }
-            if (platform.hasTag(OSMEntity.KEY_REF)) {
-                stopNode.setTag(OSMEntity.KEY_REF, platform.getTag(OSMEntity.KEY_REF));
-            }
-            if (platform.hasTag(KEY_GTFS_STOP_ID)) {
-                stopNode.setTag(KEY_GTFS_STOP_ID, platform.getTag(KEY_GTFS_STOP_ID));
-            }
+        OSMPresetFactory.makeStopPosition(stopNode);
+        if (platform.hasTag(OSMEntity.KEY_NAME)) {
+            stopNode.setTag(OSMEntity.KEY_NAME, platform.getTag(OSMEntity.KEY_NAME));
         }
+        if (platform.hasTag(OSMEntity.KEY_REF)) {
+            stopNode.setTag(OSMEntity.KEY_REF, platform.getTag(OSMEntity.KEY_REF));
+        }
+        if (platform.hasTag(KEY_GTFS_STOP_ID)) {
+            stopNode.setTag(KEY_GTFS_STOP_ID, platform.getTag(KEY_GTFS_STOP_ID));
+        }
+        stopNode.setTag(forRouteType.spKeyForRouteType(), OSMEntity.TAG_YES);
     }
     protected Region getNearbyWaySearchRegion() {
         return nearbyWaySearchRegion;
@@ -296,7 +304,7 @@ public class StopArea implements WaySegmentsObserver {
     @Override
     public void waySegmentsWasSplit(final WaySegments originalWaySegments, OSMNode[] splitNodes, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
         if(originalWaySegments instanceof OSMWaySegments) {
-            //TODO need to implement
+            //TODO: implement
             /*//first find the match to the original way
             final StopWayMatch originalWayMatch = wayMatches.get(originalWaySegments.way.osm_id);
             if (originalWayMatch == null) { //shouldn't happen
@@ -387,6 +395,10 @@ public class StopArea implements WaySegmentsObserver {
     }
     @Override
     public String toString() {
-        return String.format("StopArea @%d P(#%d: “%s”[ref:%s]), *S(#%s: %s[ref:%s])", hashCode(), platform.osm_id, platform.getTag(OSMEntity.KEY_NAME), platform.getTag(OSMEntity.KEY_REF), stopPosition != null ? stopPosition.osm_id : "N/A", stopPosition != null ? stopPosition.getTag(OSMEntity.KEY_NAME) : "", stopPosition != null ? stopPosition.getTag(OSMEntity.KEY_REF) : "");
+        final List<String> spStrings = new ArrayList<>(stopPositions.size());
+        for(final OSMNode stopPos : stopPositions.values()) {
+            spStrings.add(String.format("#%d [ref:%s]", stopPos.osm_id, stopPos.getTag(OSMEntity.KEY_REF)));
+        }
+        return String.format("StopArea @%d P(#%d: “%s”[ref:%s]), *S(%s)", hashCode(), platform.osm_id, platform.getTag(OSMEntity.KEY_NAME), platform.getTag(OSMEntity.KEY_REF), String.join(", ", spStrings));
     }
 }

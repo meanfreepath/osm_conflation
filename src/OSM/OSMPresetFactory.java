@@ -9,17 +9,17 @@ public abstract class OSMPresetFactory {
     }
     public static void makeBusPlatform(final OSMEntity entity) {
         makePlatform(entity);
-        entity.setTag(OSMEntity.KEY_BUS, OSMEntity.TAG_YES);
         entity.setTag(OSMEntity.KEY_HIGHWAY, OSMEntity.TAG_LEGACY_BUS_STOP); //legacy tag
     }
     public static void makeTrainPlatform(final OSMEntity entity) {
         makePlatform(entity);
-        entity.setTag(OSMEntity.KEY_TRAIN, OSMEntity.TAG_YES);
         entity.setTag(OSMEntity.KEY_RAILWAY, OSMEntity.TAG_PLATFORM); //legacy tag
+        if(entity instanceof OSMWay) {
+            entity.setTag(OSMEntity.KEY_AREA, OSMEntity.TAG_YES);
+        }
     }
     public static void makeSubwayPlatform(final OSMEntity entity) {
         makePlatform(entity);
-        entity.setTag(OSMEntity.KEY_SUBWAY, OSMEntity.TAG_YES);
         entity.setTag(OSMEntity.KEY_RAILWAY, OSMEntity.TAG_PLATFORM); //legacy tag
     }
     public static void makeStopPosition(final OSMEntity entity) {

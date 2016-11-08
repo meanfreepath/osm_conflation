@@ -3,6 +3,7 @@ package Conflation;
 import NewPathFinding.PathTree;
 import OSM.*;
 import Overpass.OverpassConverter;
+import com.sun.istack.internal.NotNull;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
@@ -45,6 +46,30 @@ public class RouteConflator implements WaySegmentsObserver {
                     return tram;
                 case OSMEntity.TAG_FERRY:
                     return ferry;
+            }
+            return null;
+        }
+
+        /**
+         * Gets the supplementary route type key (i.e. bus=yes, tram=yes, etc) for public_transport=stop_position
+         * @return The key the stop_position should have if it supports the given route type
+         */
+        public String spKeyForRouteType() {
+            switch (this) {
+                case bus:
+                    return OSMEntity.KEY_BUS;
+                case railway:
+                case light_rail:
+                case train:
+                    return OSMEntity.KEY_TRAIN;
+                case monorail:
+                    return OSMEntity.KEY_MONORAIL;
+                case tram:
+                    return OSMEntity.KEY_TRAM;
+                case subway:
+                    return OSMEntity.KEY_SUBWAY;
+                case ferry:
+                    return OSMEntity.KEY_FERRY;
             }
             return null;
         }
@@ -106,6 +131,7 @@ public class RouteConflator implements WaySegmentsObserver {
         }
     }
 
+    @NotNull
     public final RouteType routeType;
     private final OSMRelation importRouteMaster;
     private final List<Route> importRoutes;
@@ -149,7 +175,7 @@ public class RouteConflator implements WaySegmentsObserver {
             //create a list of StopArea objects to represent the stops on the route
             final ArrayList<StopArea> routeStops = new ArrayList<>(Route.INITIAL_STOPS_CAPACITY);
             for(final OSMRelation.OSMRelationMember stopMember : subRoute.getMembers(OSMEntity.TAG_PLATFORM)) {
-                routeStops.add(new StopArea(stopMember.member, null));
+                routeStops.add(new StopArea(stopMember.member));
             }
 
             importRoutes.add(new Route(subRoute, routePath, routeStops, wayMatchingOptions));
@@ -467,12 +493,13 @@ public class RouteConflator implements WaySegmentsObserver {
 
                 if(existingStop == null) {
                     newStopPlatform = workingEntitySpace.addEntity(stop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null);
-                    if (stop.getStopPosition() != null) {
-                        newStopPosition = (OSMNode) workingEntitySpace.addEntity(stop.getStopPosition(), OSMEntity.TagMergeStrategy.keepTags, null);
+                    if (stop.getStopPosition(routeType) != null) {
+                        newStopPosition = (OSMNode) workingEntitySpace.addEntity(stop.getStopPosition(routeType), OSMEntity.TagMergeStrategy.keepTags, null);
                     } else {
                         newStopPosition = null;
                     }
-                    existingStop = new StopArea(newStopPlatform, newStopPosition);
+                    existingStop = new StopArea(newStopPlatform);
+                    existingStop.setStopPosition(newStopPosition, routeType);
                     allRouteStops.put(stop.getPlatform().osm_id, existingStop);
                 }
                 exportRouteStops.add(existingStop);

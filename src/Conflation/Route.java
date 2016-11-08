@@ -68,7 +68,7 @@ public class Route {
             if(!routeRelation.containsMember(stop.getPlatform())) {
                 routeRelation.addMember(stop.getPlatform(), OSMEntity.MEMBERSHIP_PLATFORM);
             }
-            final OSMNode stopPosition = stop.getStopPosition();
+            final OSMNode stopPosition = stop.getStopPosition(routeType);
             if(stopPosition != null && !routeRelation.containsMember(stopPosition)) {
                 routeRelation.addMember(stopPosition, OSMEntity.MEMBERSHIP_STOP);
             }
