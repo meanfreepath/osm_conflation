@@ -25,11 +25,11 @@ public class PathTree {
     public final static short matchMaskAll = matchStatusFromStop | matchStatusToStop | matchStatusFromRouteLineNode | getMatchStatusToRouteLineNode;
     public final static int MAX_PATHS_TO_CONSIDER = 320;
     private final static short NUMBER_OF_FUTURE_SEGMENTS = 5;
-    private final static long debugPathTreeId = 2680167110L;
+    private final static long debugPathTreeId = 757276094L;
 
     public final long id;
     public final int pathTreeIndex;
-    public final RouteLineWaySegments routeLine;
+    public final Route route;
     public final PathTree previousPathTree;
     public PathTree nextPathTree = null;
     public final StopArea originStop;
@@ -51,8 +51,8 @@ public class PathTree {
         idGenerator.update(String.format("PT:%d:%d:%d", index, fromStop != null ? fromStop.getPlatform().osm_id : 0, toStop != null ? toStop.getPlatform().osm_id : 0).getBytes(Charset.forName("ascii")));
         return idGenerator.getValue();
     }
-    public PathTree(final RouteLineWaySegments routeLine, final StopArea originStop, final Point originRouteLinePoint, final PathTree previousPath, final int pathTreeIndex, final RoutePathFinder parentPathFinder) {
-        this.routeLine = routeLine;
+    public PathTree(final Route route, final StopArea originStop, final Point originRouteLinePoint, final PathTree previousPath, final int pathTreeIndex, final RoutePathFinder parentPathFinder) {
+        this.route = route;
         this.originStop = originStop;
         fromRouteLinePoint = originRouteLinePoint;
         this.previousPathTree = previousPath;
@@ -70,7 +70,7 @@ public class PathTree {
 
         //the maximum path length is a multiple of the as-the-crow-flies distance between the from/to nodes, to cut down on huge path detours
         //maxPathLength = Point.distance(fromNode.getCentroid(), toNode.getCentroid()) * MAX_PATH_LENGTH_FACTOR;
-        routeLineSegments = new ArrayList<>(128);;
+        routeLineSegments = new ArrayList<>(128);
     }
     public void findPaths(final RouteConflator routeConflator) {
         boolean debug = id == debugPathTreeId;
@@ -88,12 +88,11 @@ public class PathTree {
         }
 
         //Create a new Path object for every way that originates from the stop position
-        final List<PathSegment> initialPathSegments = Path.determineOutgoingPathSegments(routeConflator, originStop.getStopPosition(), null);
+        final List<PathSegment> initialPathSegments = Path.determineOutgoingPathSegments(routeConflator, originStop.getStopPosition(routeConflator.routeType), null);
         for(final PathSegment initialPathSegment : initialPathSegments) {
             final Path initialPath = new Path(this, initialPathSegment);
             candidatePaths.add(initialPath);
         }
-        System.out.println("Starting with " + candidatePaths.size() + " paths");
 
         //prepopulate the future segments to use in the futureVector calculation
         final ArrayList<RouteLineSegment> routeLineSegmentsToConsider = new ArrayList<>(NUMBER_OF_FUTURE_SEGMENTS);
@@ -161,28 +160,8 @@ public class PathTree {
         }
 
         //debug output
-        if(debug||true) {
+        if(debug) {
             System.out.format("%s: %d possible paths found, (%d successful, %d failed, %d skipped)\n", this, candidatePaths.size() + successfulPaths.size() + failedPaths.size(), successfulPaths.size(), failedPaths.size(), candidatePaths.size());
-
-            /*for(final Path path : successfulPaths) {
-                System.out.println("\t" + path);
-            }//*/
-            if(successfulPaths.size() == 0) {
-                int longestPathSize = 0, pathSize;
-                for(final Path path : failedPaths) {
-                    pathSize = path.getPathSegments().size();
-                    if(pathSize > longestPathSize) {
-                        longestPathSize = pathSize;
-                    }
-                }
-
-                /*for(final Path path : candidatePaths) {
-                    pathSize = path.getPathSegments().size();
-                    if(pathSize >= longestPathSize - 2) {
-                        System.out.println("\t" + path);
-                    }
-                }*/
-            }
         }
 
 
@@ -191,9 +170,11 @@ public class PathTree {
         bestPath = successfulPaths.size() > 0 ? successfulPaths.get(0) : null;
 
         if(bestPath != null) {
-            System.out.println("\tSUCCESS: ");
-            for (final Path path : successfulPaths) {
-                System.out.format("\t\tscore %.01f: %s\n", path.getTotalScore(), path);
+            if(debug) {
+                System.out.println("\tSUCCESS: ");
+                for (final Path path : successfulPaths) {
+                    System.out.format("\t\tscore %.01f: %s\n", path.getTotalScore(), path);
+                }
             }
 
             //clear out all the other paths and release them
@@ -202,7 +183,27 @@ public class PathTree {
             failedPaths.clear();
         } else {
             System.out.println("\tFAILED: ");
-            for (final Path path : candidatePaths) {
+            int longestPathSize = 0, pathSize, maxPathDiff = 3;
+            for(final Path path : failedPaths) {
+                pathSize = path.getPathSegments().size();
+                if(pathSize > longestPathSize) {
+                    longestPathSize = pathSize;
+                }
+            }
+            final List<Path> outputPaths = new ArrayList<>(MAX_PATHS_TO_CONSIDER);
+            for(final Path path : failedPaths) {
+                pathSize = path.getPathSegments().size();
+                if(pathSize >= longestPathSize - maxPathDiff) {
+                    outputPaths.add(path);
+                }
+            }
+            for(final Path path : candidatePaths) {
+                pathSize = path.getPathSegments().size();
+                if(pathSize >= longestPathSize - maxPathDiff) {
+                    outputPaths.add(path);
+                }
+            }
+            for (final Path path : outputPaths) {
                 System.out.println("\t\t" + path);
             }
         }
@@ -213,7 +214,7 @@ public class PathTree {
             return;
         }
         boolean inLeg = false;
-        for(final LineSegment segment : routeLine.segments) {
+        for(final LineSegment segment : route.routeLine.segments) {
             //check if we've reached the beginning point of the leg
             if(!inLeg && segment.originPoint == fromRouteLinePoint) {
                 inLeg = true;
@@ -256,7 +257,6 @@ public class PathTree {
 
         //check if we need to split the route path at the first/last stops
         if(previousPathTree == null) { //if this is the first part of the route's path, check if we need to split at the first stop's position
-            System.out.println("SPLIT FIRST STOP?");
             final OSMNode pathOriginNode = bestPath.firstPathSegment.getOriginNode();
             final OSMWay pathOriginWay = bestPath.firstPathSegment.getLine().way;
             if (pathOriginWay.getFirstNode() != pathOriginNode && pathOriginWay.getLastNode() != pathOriginNode) {
@@ -264,7 +264,6 @@ public class PathTree {
                 bestPath.firstPathSegment.getLine().split(splitNodes, entitySpace);
             }
         } else if(nextPathTree == null) { //if this is the last part of the route's path, check if we need to split at the last stop's position
-            System.out.println("SPLIT LAST STOP?");
             final OSMNode pathDestinationNode = bestPath.lastPathSegment.getEndNode();
             final OSMWay pathDestinationWay = bestPath.lastPathSegment.getLine().way;
             if (pathDestinationWay.getFirstNode() != pathDestinationNode && pathDestinationWay.getLastNode() != pathDestinationNode) {
@@ -278,6 +277,7 @@ public class PathTree {
     }
     @Override
     public String toString() {
-        return String.format("PathTree #%d (idx %d) from %s/%s (%s:%s) to %s/%s (%s:%s): status %d, %s segments", id, pathTreeIndex, originStop.getPlatform().osm_id, originStop.getStopPosition() != null ? Long.toString(originStop.getStopPosition().osm_id) : "N/A", originStop.getPlatform().getTag(OSMEntity.KEY_REF), originStop.getPlatform().getTag(OSMEntity.KEY_NAME), destinationStop != null ? Long.toString(destinationStop.getPlatform().osm_id) : "N/A", destinationStop != null && destinationStop.getStopPosition() != null ? Long.toString(destinationStop.getStopPosition().osm_id) : "N/A", destinationStop != null ? destinationStop.getPlatform().getTag(OSMEntity.KEY_REF) : "N/A", destinationStop != null ? destinationStop.getPlatform().getTag(OSMEntity.KEY_NAME) : "N/A", matchStatus, routeLineSegments != null ? Integer.toString(routeLineSegments.size()) : "N/A");
+        final OSMNode originStopPosition = originStop.getStopPosition(route.routeType), destinationStopPosition = originStop.getStopPosition(route.routeType);
+        return String.format("PathTree #%d (idx %d) from %s/%s (%s:%s) to %s/%s (%s:%s): status %d, %s segments", id, pathTreeIndex, originStop.getPlatform().osm_id, originStopPosition != null ? Long.toString(originStopPosition.osm_id) : "N/A", originStop.getPlatform().getTag(OSMEntity.KEY_REF), originStop.getPlatform().getTag(OSMEntity.KEY_NAME), destinationStop != null ? Long.toString(destinationStop.getPlatform().osm_id) : "N/A", destinationStop != null && destinationStopPosition != null ? Long.toString(destinationStopPosition.osm_id) : "N/A", destinationStop != null ? destinationStop.getPlatform().getTag(OSMEntity.KEY_REF) : "N/A", destinationStop != null ? destinationStop.getPlatform().getTag(OSMEntity.KEY_NAME) : "N/A", matchStatus, routeLineSegments != null ? Integer.toString(routeLineSegments.size()) : "N/A");
     }
 }

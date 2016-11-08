@@ -170,11 +170,11 @@ public class Path {
         final String lastNodeId = lastPathSegment.getEndNode() != null ? Long.toString(lastPathSegment.getEndNode().osm_id) : "N/A";
         return String.format("Path[%d->%s] outcome %s: %s", firstPathSegment.getOriginNode().osm_id, lastNodeId, outcome.toString(), String.join("->", streets));
     }
-    @Override
+    /*@Override
     public void finalize() throws Throwable {
         System.out.println("PATHDESTROY " + this);
         super.finalize();
-    }
+    }*/
     /**
      * Checks the PathSegments' originating/ending nodes and splits any ways that extend past them
      * Only needs to be called on the "best" path
@@ -195,34 +195,35 @@ public class Path {
             }
 
             int origSize = pathSegments.size();
-            System.out.println("Check for Split: " + pathSegment);
+            if(debugEnabled) {
+                System.out.println("DEBUG: Check for Split: " + pathSegment);
+            }
             final OSMWay pathSegmentWay = pathSegment.getLine().way, previousSegmentWay = previousSegment.getLine().way;
             final OSMNode pathSegmentOriginNode = pathSegment.getOriginNode();
 
             //only need to split if the current pathSegment is on a different way than the previous pathSegment
             if (pathSegmentWay != previousSegmentWay) {
-                System.out.format("\tDifferent ways: %d[%d->%d] vs %d[%d->%d]\n", previousSegmentWay.osm_id, previousSegmentWay.getFirstNode().osm_id, previousSegmentWay.getLastNode().osm_id, pathSegmentWay.osm_id, pathSegmentWay.getFirstNode().osm_id, pathSegmentWay.getLastNode().osm_id);
+                if(debugEnabled) {
+                    System.out.format("DEBUG: \tDifferent ways: %d[%d->%d] vs %d[%d->%d]\n", previousSegmentWay.osm_id, previousSegmentWay.getFirstNode().osm_id, previousSegmentWay.getLastNode().osm_id, pathSegmentWay.osm_id, pathSegmentWay.getFirstNode().osm_id, pathSegmentWay.getLastNode().osm_id);
+                }
                 final OSMNode splitNodes[] = {pathSegmentOriginNode};
 
                 //split the previous pathSegment if it does not end with the first/last node of its contained way
                 if (pathSegmentOriginNode != previousSegmentWay.getFirstNode() && pathSegmentOriginNode != previousSegmentWay.getLastNode()) {
-                    System.out.format("\tSPLIT PREVIOUS PS at %d: %s\n", pathSegmentOriginNode.osm_id, previousSegment);
+                    if(debugEnabled) {
+                        System.out.format("DEBUG: \tSPLIT PREVIOUS PS at %d: %s\n", pathSegmentOriginNode.osm_id, previousSegment);
+                    }
                     previousSegment.getLine().split(splitNodes, entitySpace);
                 }
 
                 //split the current pathSegment if it does not start with the first/last node of its contained way
                 if (pathSegmentOriginNode != pathSegmentWay.getFirstNode() && pathSegmentOriginNode != pathSegmentWay.getLastNode()) {
-                    System.out.format("\tSPLIT CURRENT PS at %d: %s\n", pathSegmentOriginNode.osm_id, pathSegment);
+                    if(debugEnabled) {
+                        System.out.format("\tSPLIT CURRENT PS at %d: %s\n", pathSegmentOriginNode.osm_id, pathSegment);
+                    }
                     pathSegment.getLine().split(splitNodes, entitySpace);
                 }
             }
-            if(origSize != pathSegments.size()) {
-                System.out.println("\tSIZE INCREASED FROM " + origSize + " TO " + pathSegments.size());
-                System.out.println(this);
-            } else {
-                System.out.println("\tNO SIZE INCREASE");
-            }
-
             previousSegment = pathSegment;
         }
 
@@ -291,7 +292,7 @@ public class Path {
     }*/
     public void debugOutputPathSegments(final OSMEntitySpace entitySpace, final int pathIndex) {
         int segmentIndex = 0;
-        final OSMNode pathBeginNode = (OSMNode) entitySpace.addEntity(parentPathTree.originStop.getStopPosition(), OSMEntity.TagMergeStrategy.keepTags, null);
+        final OSMNode pathBeginNode = (OSMNode) entitySpace.addEntity(parentPathTree.originStop.getStopPosition(parentPathTree.route.routeType), OSMEntity.TagMergeStrategy.keepTags, null);
         OSMNode matchOriginNode = pathBeginNode, matchLastNode;
         for (final PathSegment pathSegment : pathSegments) {
             final OSMRelation pathRelation = entitySpace.createRelation(null, null);
@@ -393,6 +394,10 @@ public class Path {
     }
 
     protected static List<PathSegment> determineOutgoingPathSegments(final RouteConflator routeConflator, final OSMNode junctionNode, final PathSegment incomingPathSegment) {
+        if(junctionNode.containingWayCount == 0) { //shouldn't happen unless dataset is out of sync
+            System.out.format("ERROR: no containing ways found for junction node %s\n", junctionNode);
+            return new ArrayList<>();
+        }
         final List<PathSegment> divergingPathSegments = new ArrayList<>(junctionNode.containingWayCount - 1);
 
         for(final OSMWay containingWay : junctionNode.containingWays.values()) {

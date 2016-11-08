@@ -1,10 +1,7 @@
 package NewPathFinding;
 
 import Conflation.*;
-import OSM.OSMEntity;
-import OSM.OSMEntitySpace;
-import OSM.OSMWay;
-import OSM.Point;
+import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
@@ -76,7 +73,7 @@ public class RoutePathFinder {
             }
 
             //create the PathTree starting at the current stop
-            final NewPathFinding.PathTree curLeg = new NewPathFinding.PathTree(route.routeLine, curStop, closestPointOnRouteLineToPlatform, lastLeg, pathTreeIndex++, this);
+            final NewPathFinding.PathTree curLeg = new NewPathFinding.PathTree(route, curStop, closestPointOnRouteLineToPlatform, lastLeg, pathTreeIndex++, this);
             routePathTrees.add(curLeg);
             if(lastLeg != null) {
                 lastLeg.nextPathTree = curLeg;
@@ -91,12 +88,13 @@ public class RoutePathFinder {
         }
     }
     private static void determineRouteLinePoints(final StopArea curStop, final Point searchBeginPoint, final Route route, final Point[] returnPoints) {
-        if(curStop.getStopPosition() == null) {
+        final OSMNode stopPosition = curStop.getStopPosition(route.routeType);
+        if(stopPosition == null) {
             return;
         }
 
         //for the first/last stops, automatically set to the first/last segment on the routeLine (prevents issues if provided GTFS route line doesn't extend all the way to first/last stops)
-        final Point stopPoint = curStop.getStopPosition().getCentroid();
+        final Point stopPoint = stopPosition.getCentroid();
         RouteLineSegment closestSegment = null;
         if(route.stops.indexOf(curStop) == 0) {
             closestSegment = (RouteLineSegment) route.routeLine.segments.get(0);
