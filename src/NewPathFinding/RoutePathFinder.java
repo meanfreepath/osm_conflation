@@ -216,19 +216,21 @@ public class RoutePathFinder {
     }
     public void addWaysToRouteRelation() {
         //and add the correct ways to the route relation
+        PathSegment previousPathSegment = null;
         for(final PathTree pathTree : routePathTrees) {
             if(pathTree.bestPath == null) {
                 continue;
             }
             //System.out.println("OUTPUT PATH FOR " + pathTree.parentPathFinder.route.routeRelation.osm_id + "::" + pathTree.bestPath);
-            PathSegment previousPathSegment = null;
             for (final PathSegment pathSegment : pathTree.bestPath.getPathSegments()) {
                 final OSMWay pathWay = pathSegment.getLine().way;
                 //double-check the current and previous PathSegments are connected to each other
                 if(previousPathSegment != null && previousPathSegment.getEndNode() != pathSegment.getOriginNode()) {
                     System.err.println("PathSegments don't connect:: " + previousPathSegment +"//" + pathSegment);
                 }
-                if (!route.routeRelation.containsMember(pathWay)) {
+
+                //and add to the route relation if its way doesn't match the previous PathSegment's way
+                if(previousPathSegment == null || previousPathSegment.getLine().way != pathWay) {
                     //System.out.println(pathSegment + ": USED " + pathWay.getTag("name") + "(" + pathWay.osm_id + ")");
                     route.routeRelation.addMember(pathWay, OSMEntity.MEMBERSHIP_DEFAULT);
                 }
