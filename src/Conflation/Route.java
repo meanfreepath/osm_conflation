@@ -32,11 +32,17 @@ public class Route {
         tripMarker = routeRelation.getTag(RouteConflator.GTFS_TRIP_MARKER);
         tripId = routeRelation.getTag(RouteConflator.GTFS_TRIP_ID);
 
-        //get a handle on the provided route path, and remove any duplicated nodes from it (can screw up segmenting/matching)
-        routePath.setTag(RouteConflator.GTFS_IGNORE, "yes");
-        final OSMNode[] duplicateNodes = routePath.identifyDuplicateNodesByPosition(0.1);
-        for(final OSMNode dupeNode : duplicateNodes) {
-            routePath.removeNode(dupeNode);
+        //get a handle on the provided route path, and remove any *adjacent* duplicated nodes from it (can screw up segmenting/matching)
+        routePath.setTag(RouteConflator.GTFS_IGNORE, OSMEntity.TAG_YES);
+        final OSMNode[][] duplicateNodes = routePath.identifyDuplicateNodesByPosition(0.1);
+        if(duplicateNodes.length > 0) {
+            final List<OSMNode> routePathNodes = new ArrayList<>(routePath.getNodes());
+            for (final OSMNode[] nodePair : duplicateNodes) {
+                //remove any node that is at the same location as its immediate neighbor
+                if(routePathNodes.indexOf(nodePair[1]) - routePathNodes.indexOf(nodePair[0]) == 1) {
+                    routePath.removeNode(nodePair[1]);
+                }
+            }
         }
 
         this.stops = new ArrayList<>(stops);
@@ -230,7 +236,7 @@ public class Route {
             cellWay.setTag("name", cell.toString());
         }
 
-        segmentSpace.outputXml("segments" + routeRelation.osm_id + ".osm");
+        segmentSpace.outputXml("segments" + tripMarker + ".osm");
     }
     private static void debugCreateSegmentWay(final SegmentMatch osmSegmentMatch, final int totalMatchCount, final String nodeMatchFormat, final String wayMatchFormat, final Map<String, OSMNode> nodeSpaceMap, final Map<String, OSMWay> waySpaceMap, final OSMEntitySpace entitySpace, final OSMEntitySpace segmentSpace) {
         OSMNode matchOriginNode, matchLastNode;

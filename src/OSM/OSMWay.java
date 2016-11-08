@@ -297,27 +297,28 @@ public class OSMWay extends OSMEntity {
     }
     /**
      * Check for nodes that occupy the same position on this way
-     * @param tolerance
-     * @return
+     * @param tolerance The distance (in meters) to use to identify nodes as being in the same location
+     * @return Array of duplicate node pairs
      */
-    public OSMNode[] identifyDuplicateNodesByPosition(final double tolerance) {
+    public OSMNode[][] identifyDuplicateNodesByPosition(final double tolerance) {
         if(nodes.size() < 2) {
             return null;
         }
         ListIterator<OSMNode> outsideIterator = nodes.listIterator(), insideIterator;
         OSMNode outsideNode, insideNode;
-        final List<OSMNode> duplicateNodes = new ArrayList<>(nodes.size());
+        final List<OSMNode[]> duplicateNodes = new ArrayList<>(nodes.size());
         while (outsideIterator.hasNext()) {
             outsideNode = outsideIterator.next();
             insideIterator = nodes.listIterator(outsideIterator.nextIndex());
             while (insideIterator.hasNext()) {
                 insideNode = insideIterator.next();
                 if(insideNode != outsideNode && Point.distance(outsideNode.getCentroid(), insideNode.getCentroid()) <= tolerance) {
-                    duplicateNodes.add(insideNode);
+                    final OSMNode[] nodePair = {outsideNode, insideNode};
+                    duplicateNodes.add(nodePair);
                 }
             }
         }
-        return duplicateNodes.toArray(new OSMNode[duplicateNodes.size()]);
+        return duplicateNodes.toArray(new OSMNode[duplicateNodes.size()][]);
     }
     @Override
     public String toString() {
