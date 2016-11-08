@@ -59,6 +59,7 @@ public class ApiClient {
                 final MessageDigest md5 = MessageDigest.getInstance("MD5");
                 final byte[] digest = md5.digest(fullQuery.getBytes(Charset.forName("UTF-8")));
                 final String fileName = "./cache/cache_" + Base64.getUrlEncoder().encodeToString(digest) + ".txt";
+                //System.out.println("FETCH " + fileName);
                 cacheFile = new File(fileName);
                 if (cacheFile.exists()) {
                     final FileInputStream fStream = new FileInputStream(cacheFile.getAbsoluteFile());
