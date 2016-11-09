@@ -15,7 +15,7 @@ import java.util.*;
  */
 public class Route {
     public final static int INITIAL_STOPS_CAPACITY = 32;
-    public final RouteConflator.LineComparisonOptions wayMatchingOptions;
+    public final RouteConflator routeConflator;
     public final String name, ref, tripMarker, tripId;
     public final OSMRelation routeRelation;
     public final RouteConflator.RouteType routeType;
@@ -23,9 +23,9 @@ public class Route {
     public final RouteLineWaySegments routeLine;
     public final RoutePathFinder routePathFinder;
 
-    protected Route(final OSMRelation routeRelation, final OSMWay routePath, List<StopArea> stops, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
+    protected Route(final OSMRelation routeRelation, final OSMWay routePath, List<StopArea> stops, final RouteConflator routeConflator) {
         this.routeRelation = routeRelation;
-        this.wayMatchingOptions = wayMatchingOptions;
+        this.routeConflator = routeConflator;
         routeType = RouteConflator.RouteType.fromString(routeRelation.getTag(OSMEntity.KEY_ROUTE));
         name = routeRelation.getTag(OSMEntity.KEY_NAME);
         ref = routeRelation.getTag(OSMEntity.KEY_REF);
@@ -46,7 +46,7 @@ public class Route {
         }
 
         this.stops = new ArrayList<>(stops);
-        routeLine = new RouteLineWaySegments(routePath, wayMatchingOptions.maxSegmentLength);
+        routeLine = new RouteLineWaySegments(routePath, routeConflator);
         routePathFinder = new RoutePathFinder(this);
     }
 
@@ -56,14 +56,14 @@ public class Route {
      * @param newEntitySpace
      */
     protected Route(final Route oldRoute, final List<StopArea> stops, final OSMEntitySpace newEntitySpace) {
-        this.wayMatchingOptions = oldRoute.wayMatchingOptions;
+        this.routeConflator = oldRoute.routeConflator;
         this.name = oldRoute.name;
         this.ref = oldRoute.ref;
         this.tripMarker = oldRoute.tripMarker;
         this.tripId = oldRoute.tripId;
         this.routeType = oldRoute.routeType;
         routeRelation = newEntitySpace.createRelation(oldRoute.routeRelation.getTags(), null);
-        routeLine = new RouteLineWaySegments(oldRoute.routeLine.way, wayMatchingOptions.maxSegmentLength);
+        routeLine = new RouteLineWaySegments(oldRoute.routeLine.way, routeConflator);
 
         this.stops = new ArrayList<>(stops);
 

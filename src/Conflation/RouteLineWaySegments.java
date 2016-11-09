@@ -46,8 +46,8 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
      */
     public final HashMap<Long,Map<Long, LineMatch>> lineMatchesByRouteLineSegmentId;
 
-    public RouteLineWaySegments(final OSMWay way, final double maxSegmentLength) {
-        super(way, maxSegmentLength);
+    public RouteLineWaySegments(final OSMWay way, final RouteConflator routeConflator) {
+        super(way, routeConflator);
         lineMatchesByRouteLineSegmentId = new HashMap<>(segments.size());
 
         this.addObserver(this); //watch for changes to the contained segments
@@ -179,6 +179,8 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
     private void matchSegmentsOnLine(final RouteLineSegment routeLineSegment, final OSMWaySegments candidateLine, final DebugMatchCounting matchCounting) {
         OSMLineSegment osmLineSegment;
         SegmentMatch currentMatch;
+        final RouteConflator routeConflator = parentRouteConflator.get();
+        final RouteConflator.LineComparisonOptions wayMatchingOptions = routeConflator != null ? routeConflator.wayMatchingOptions : null;
         //now check the given OSM way's segments against this segment
         for (final LineSegment candidateSegment : candidateLine.segments) {
             osmLineSegment = (OSMLineSegment) candidateSegment;
@@ -189,7 +191,7 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
                 continue;
             }*/
 
-            currentMatch = SegmentMatch.checkCandidateForMatch(RouteConflator.wayMatchingOptions, routeLineSegment, osmLineSegment);
+            currentMatch = SegmentMatch.checkCandidateForMatch(wayMatchingOptions, routeLineSegment, osmLineSegment);
 
             //if there was a reasonable match with the OSMLineSegment, add it to the various match indexes
             if(currentMatch != null && routeLineSegment.addMatch(currentMatch)) {
@@ -353,6 +355,9 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
 
     @Override
     public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment oldSegment, LineSegment[] newSegments) {
+        final RouteConflator routeConflator = parentRouteConflator.get();
+        final RouteConflator.LineComparisonOptions wayMatchingOptions = routeConflator != null ? routeConflator.wayMatchingOptions : null;
+
         if(waySegments instanceof RouteLineWaySegments) { //case when the RouteLine has been updated
             //argument casting
             final RouteLineSegment oldRouteLineSegment = (RouteLineSegment) oldSegment;
@@ -374,7 +379,7 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
 
                     //check the existingMatch's matched segment against the newly-added RouteLineSegments
                     for(final RouteLineSegment newSegment : newRouteLineSegments) {
-                        currentMatch = SegmentMatch.checkCandidateForMatch(RouteConflator.wayMatchingOptions, newSegment, existingMatch.matchingSegment);
+                        currentMatch = SegmentMatch.checkCandidateForMatch(wayMatchingOptions, newSegment, existingMatch.matchingSegment);
                         if (currentMatch != null && newSegment.addMatch(currentMatch)) {
                             affectedLineMatch = addMatchToDependentIndexes(currentMatch);
                             affectedLineMatches.put(affectedLineMatch.osmLine.way.osm_id, affectedLineMatch);
@@ -414,7 +419,7 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
                     //now, match the new OSM segments with the RouteLineSegment
                     SegmentMatch newSegmentMatch;
                     for (final OSMLineSegment newSegment : newOSMSegments) {
-                        newSegmentMatch = SegmentMatch.checkCandidateForMatch(RouteConflator.wayMatchingOptions, removeMatch.mainSegment, newSegment);
+                        newSegmentMatch = SegmentMatch.checkCandidateForMatch(wayMatchingOptions, removeMatch.mainSegment, newSegment);
                         if (newSegmentMatch != null && removeMatch.mainSegment.addMatch(newSegmentMatch)) {
                             addMatchToDependentIndexes(newSegmentMatch);
                         }

@@ -23,7 +23,6 @@ public class PathSegment implements WaySegmentsObserver {
     private final static double SCORE_FOR_ALIGNMENT = 100.0, SCORE_FACTOR_FOR_TRAVEL_DIRECTION = 100.0;
 
     private final static long debugWayId = 92002258L;
-    public final static double maxFutureVectorDeviation = 0.25;
 
     /**
      * Whether this PathSegment is traveling with (0->N) or against(N->0) its line's segments' node direction
@@ -79,7 +78,7 @@ public class PathSegment implements WaySegmentsObserver {
         //generate a unique ID for this PathSegment
         id = idForParameters(line, originNode, null);
     }
-    public boolean advance(final List<RouteLineSegment> routeLineSegmentsToConsider, final PathTree parentPathTree, final boolean debug) {
+    public boolean advance(final List<RouteLineSegment> routeLineSegmentsToConsider, final PathTree parentPathTree, final RouteConflator routeConflator, final boolean debug) {
         //get a handle on the LineSegments involved in this step
         final RouteLineSegment targetSegment = routeLineSegmentsToConsider.get(0);
 
@@ -126,7 +125,7 @@ public class PathSegment implements WaySegmentsObserver {
             System.out.format("\t\tPDB: RL#%d/%d on PS way %d origin %d travel %s: Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", targetSegment.segmentIndex, targetSegment.nodeIndex, line.way.osm_id, originNode.osm_id, travelDirection.toString(), futureVectorDotProduct, -firstTraveledSegment.vectorX, -firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
         }
 
-        if(futureVectorDotProduct < maxFutureVectorDeviation) {
+        if(futureVectorDotProduct < routeConflator.wayMatchingOptions.getMinFutureVectorDotProduct()) {
             /*if(originNode.junctionNode.osm_id == 53015856L) {
                 System.out.format("\t\tOrigin " + originNode.junctionNode.osm_id + "(way " + line.way.osm_id + " traveling " + travelDirection.toString() + "): Dot product of %.02f of fs [%.01f, %.01f] with fv [%.01f, %.01f]\n", futureVectorDotProduct, -firstTraveledSegment.vectorX, -firstTraveledSegment.vectorY, futureVector[0], futureVector[1]);
                 System.out.println("\t\tFirst OSM segment is " + firstTraveledSegment);
@@ -154,7 +153,7 @@ public class PathSegment implements WaySegmentsObserver {
                     System.out.println("\t\t\tPDB check FWD " + this + ":::SEG:::" + segment);
                 }
 
-                segmentStatus = checkSegment(lineMatches, (OSMLineSegment) segment, segment.destinationNode, parentPathTree, lastNode, matchMask);
+                segmentStatus = checkSegment(lineMatches, (OSMLineSegment) segment, segment.destinationNode, parentPathTree, routeConflator, lastNode, matchMask);
                 if(segmentStatus != ProcessingStatus.inprocess) { //TODO: add fallback/scoring instead of requiring full match?
                     processingStatus = segmentStatus;
                     break;
@@ -169,7 +168,7 @@ public class PathSegment implements WaySegmentsObserver {
                     System.out.println("\t\t\tPDB check BKW " + this + ":::SEG:::" + segment);
                 }
 
-                segmentStatus = checkSegment(lineMatches, (OSMLineSegment) segment, segment.originNode, parentPathTree, lastNode, matchMask);
+                segmentStatus = checkSegment(lineMatches, (OSMLineSegment) segment, segment.originNode, parentPathTree, routeConflator, lastNode, matchMask);
                 if(segmentStatus != ProcessingStatus.inprocess) { //TODO: add fallback/scoring instead of requiring full match?
                     processingStatus = segmentStatus;
                     break;
@@ -178,7 +177,7 @@ public class PathSegment implements WaySegmentsObserver {
         }
         return true;
     }
-    private ProcessingStatus checkSegment(final LineMatch lineMatch, final OSMLineSegment segment, final OSMNode nodeToCheck, final PathTree parentPathTree, final OSMNode endingWayNode, final short matchMask) {
+    private ProcessingStatus checkSegment(final LineMatch lineMatch, final OSMLineSegment segment, final OSMNode nodeToCheck, final PathTree parentPathTree, final RouteConflator routeConflator, final OSMNode endingWayNode, final short matchMask) {
         //get all the routeLineSegment's that matched with this OSM segment
         final List<SegmentMatch> osmSegmentMatches = lineMatch.getRouteLineMatchesForSegment(segment, matchMask);
 
@@ -188,7 +187,7 @@ public class PathSegment implements WaySegmentsObserver {
 
         //and iterate over them, ensuring that ALL meet the match mask requirements
         SegmentMatch bestSegmentMatch = null;
-        double minDistance = RouteConflator.wayMatchingOptions.segmentSearchBoxSize;
+        double minDistance = routeConflator.wayMatchingOptions.segmentSearchBoxSize;
         for(final SegmentMatch segmentMatch : osmSegmentMatches) {
             if(segment.getParent().way.osm_id == debugWayId) {
                 System.out.println("\t\t\t\tSEGMATCH: " + segmentMatch);

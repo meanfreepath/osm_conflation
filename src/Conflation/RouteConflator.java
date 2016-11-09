@@ -16,15 +16,23 @@ import java.util.*;
 public class RouteConflator implements WaySegmentsObserver {
     public static class LineComparisonOptions {
         public double maxSegmentLength = 5.0, maxSegmentOrthogonalDistance = 10.0, maxSegmentMidPointDistance = 10.0, segmentSearchBoxSize = 30.0;
-        private double minSegmentDotProduct;
+        private double minSegmentDotProduct, minFutureVectorDotProduct;
+
+        public LineComparisonOptions() {
+            setMaxSegmentAngle(30.0); //default to 30 degrees
+            setMaxFutureVectorAngle(75.0);
+        }
         public void setMaxSegmentAngle(final double angle) {
             minSegmentDotProduct = Math.cos(angle * Math.PI / 180.0);
+        }
+        public void setMaxFutureVectorAngle(final double angle) {
+            minFutureVectorDotProduct = Math.cos(angle * Math.PI / 180.0);
         }
         public double getMinSegmentDotProduct() {
             return minSegmentDotProduct;
         }
-        public LineComparisonOptions() {
-            minSegmentDotProduct = 0.866; //default to 30 degrees
+        public double getMinFutureVectorDotProduct() {
+            return minFutureVectorDotProduct;
         }
     }
     public final static String GTFS_AGENCY_ID = "gtfs:agency_id", GTFS_ROUTE_ID = "gtfs:route_id", GTFS_TRIP_ID = "gtfs:trip_id", GTFS_TRIP_MARKER = "gtfs:trip_marker", GTFS_IGNORE = "gtfs:ignore";
@@ -85,13 +93,13 @@ public class RouteConflator implements WaySegmentsObserver {
         private static double cellSize;
         private static double searchBuffer = 0.0;
 
-        private static void initCellsForBounds(final Region bounds) {
+        private static void initCellsForBounds(final Region bounds, final RouteConflator routeConflator) {
             //wipe any existing cells (i.e. from a previous run)
             allCells.clear();
 
             //and prepare the region, including a buffer zone equal to the greatest of the various search/bounding box dimensions
             cellSize = SphericalMercator.metersToCoordDelta(cellSizeInMeters, bounds.getCentroid().y);
-            searchBuffer = -SphericalMercator.metersToCoordDelta(Math.max(RouteConflator.wayMatchingOptions.segmentSearchBoxSize, Math.max(StopArea.duplicateStopPlatformBoundingBoxSize, StopArea.waySearchAreaBoundingBoxSize)), bounds.getCentroid().y);
+            searchBuffer = -SphericalMercator.metersToCoordDelta(Math.max(routeConflator.wayMatchingOptions.segmentSearchBoxSize, Math.max(StopArea.duplicateStopPlatformBoundingBoxSize, StopArea.waySearchAreaBoundingBoxSize)), bounds.getCentroid().y);
 
             //generate the cells needed to fill the entire bounds (plus the searchBuffer)
             final Region baseCellRegion = bounds.regionInset(searchBuffer, searchBuffer);
@@ -141,12 +149,13 @@ public class RouteConflator implements WaySegmentsObserver {
     public static boolean debugEnabled = false;
     public final String debugTripMarker = null;//"10673026:1";
     private OSMEntitySpace workingEntitySpace = null;
-    public final static LineComparisonOptions wayMatchingOptions = new LineComparisonOptions();
+    public final LineComparisonOptions wayMatchingOptions;
     protected HashMap<Long, OSMWaySegments> candidateLines = null;
     public final Map<String, List<String>> allowedRouteTags, allowedPlatformTags;
 
-    public RouteConflator(final OSMRelation routeMaster) throws InvalidArgumentException {
+    public RouteConflator(final OSMRelation routeMaster, LineComparisonOptions lineComparisonOptions) throws InvalidArgumentException {
         importRouteMaster = routeMaster;
+        wayMatchingOptions = lineComparisonOptions;
         routeType = RouteType.fromString(routeMaster.getTag(OSMEntity.KEY_ROUTE_MASTER));
         if(routeType == null) {
             final String errMsg[] = {"Invalid route type provided"};
@@ -178,7 +187,7 @@ public class RouteConflator implements WaySegmentsObserver {
                 routeStops.add(new StopArea(stopMember.member));
             }
 
-            importRoutes.add(new Route(subRoute, routePath, routeStops, wayMatchingOptions));
+            importRoutes.add(new Route(subRoute, routePath, routeStops, this));
         }
     }
 
@@ -345,7 +354,7 @@ public class RouteConflator implements WaySegmentsObserver {
         conflateExistingRouteRelations(existingRoutes, existingSubRoutes);
 
         //create the Cell index for all the ways, for faster lookup below
-        Cell.initCellsForBounds(routePathsBoundingBox);
+        Cell.initCellsForBounds(routePathsBoundingBox, this);
 
         //create OSMWaySegments objects for all downloaded ways
         candidateLines = new HashMap<>(workingEntitySpace.allWays.size());
@@ -356,7 +365,7 @@ public class RouteConflator implements WaySegmentsObserver {
                 continue;
             }
             if (way.isComplete()) {
-                final OSMWaySegments line = new OSMWaySegments(way, wayMatchingOptions.maxSegmentLength);
+                final OSMWaySegments line = new OSMWaySegments(way, this);
                 candidateLines.put(way.osm_id, line);
                 line.addObserver(this);
 
@@ -519,7 +528,7 @@ public class RouteConflator implements WaySegmentsObserver {
                 }
                 final OSMWay importRoutePath = (OSMWay) importRoute.routeRelation.getMembers("").get(0).member;
                 final OSMRelation exportRouteRelation = (OSMRelation) workingEntitySpace.addEntity(existingRouteRelation, OSMEntity.TagMergeStrategy.copyTags, null);
-                exportRoute = new Route(exportRouteRelation, importRoutePath, exportRouteStops, wayMatchingOptions);
+                exportRoute = new Route(exportRouteRelation, importRoutePath, exportRouteStops, this);
             } else {
                 exportRoute = new Route(importRoute, exportRouteStops, workingEntitySpace);
             }

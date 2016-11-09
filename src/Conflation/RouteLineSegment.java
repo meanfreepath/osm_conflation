@@ -61,7 +61,7 @@ public class RouteLineSegment extends LineSegment {
      * @param nodeIndex the index of this segment's originNode within its parent's way (will be same as previous segment if no origin node present)
      */
     public RouteLineSegment(RouteLineWaySegments parentSegments, Point origin, Point destination, OSMNode originNode, OSMNode destinationNode, int segmentIndex, int nodeIndex) {
-        super(origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
+        super(parentSegments.parentRouteConflator.get(), origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
         this.parentSegments = parentSegments;
 
         matchingSegments = new HashMap<>(8);
@@ -76,7 +76,7 @@ public class RouteLineSegment extends LineSegment {
      * @param destinationNode the new destination node to use, if any
      */
     protected RouteLineSegment(final RouteLineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
-        super(segmentToCopy, destination, destinationNode);
+        super(segmentToCopy.parentSegments.parentRouteConflator.get(), segmentToCopy, destination, destinationNode);
         this.parentSegments = segmentToCopy.parentSegments;
 
         //NOTE: these matches are re-run in post-split observer functions in RouteLineWaySegments
@@ -183,7 +183,8 @@ public class RouteLineSegment extends LineSegment {
         }
         matchList.sort(matchComparatorDistance);
         final List<SegmentMatch> distanceCandidates = new ArrayList<>(matchList.size());
-        for (double maxDistance = RouteConflator.wayMatchingOptions.maxSegmentLength * 0.25;maxDistance<=RouteConflator.wayMatchingOptions.maxSegmentMidPointDistance; maxDistance*=2.0) {
+        final RouteConflator.LineComparisonOptions matchingOptions = parentSegments.parentRouteConflator.get().wayMatchingOptions;
+        for (double maxDistance = matchingOptions.maxSegmentLength * 0.25;maxDistance<=matchingOptions.maxSegmentMidPointDistance; maxDistance*=2.0) {
             distanceCandidates.clear();
             for (final SegmentMatch match : matchList) {
                 if (match.midPointDistance < maxDistance) {

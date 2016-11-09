@@ -25,12 +25,13 @@ public class Main {
         OSMEntitySpace importSpace = new OSMEntitySpace(262144);
 
         //define the options for the comparison routines
-        final RouteConflator.LineComparisonOptions options = RouteConflator.wayMatchingOptions;
-        options.segmentSearchBoxSize = 65.0;
-        options.maxSegmentLength = 10.0;
-        options.setMaxSegmentAngle(50.0);
-        options.maxSegmentOrthogonalDistance = 15.0;
-        options.maxSegmentMidPointDistance = Math.sqrt(options.maxSegmentOrthogonalDistance * options.maxSegmentOrthogonalDistance + 4.0 * options.maxSegmentLength * options.maxSegmentLength);
+        final RouteConflator.LineComparisonOptions matchingOptions = new RouteConflator.LineComparisonOptions();
+        matchingOptions.segmentSearchBoxSize = 65.0;
+        matchingOptions.maxSegmentLength = 10.0;
+        matchingOptions.setMaxSegmentAngle(50.0);
+        matchingOptions.setMaxFutureVectorAngle(75.0);
+        matchingOptions.maxSegmentOrthogonalDistance = 15.0;
+        matchingOptions.maxSegmentMidPointDistance = Math.sqrt(matchingOptions.maxSegmentOrthogonalDistance * matchingOptions.maxSegmentOrthogonalDistance + 4.0 * matchingOptions.maxSegmentLength * matchingOptions.maxSegmentLength);
 
         //propagate the debug value as needed
         RouteConflator.debugEnabled = debugEnabled;
@@ -49,6 +50,9 @@ public class Main {
         //selectedRoutes.add("102581"); //D-Line: not preferring matching trunk_link near NB stop "15th Ave NW & NW Leary Way"
         selectedRoutes.add("102615"); // E-Line
         //selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
+        //selectedRoutes.add("100512"); //A-Line
+        //selectedRoutes.add("102548"); //B-Line
+        //selectedRoutes.add("102619"); //F-Line
         //selectedRoutes.add("102623"); //894: Mercer Island loopy route
         //selectedRoutes.add("100184"); //31
 
@@ -92,7 +96,7 @@ public class Main {
                 workingEntitySpace.name = "Working space";
 
                 //create an object to handle the processing of the data for this route master
-                final RouteConflator routeConflator = new RouteConflator(importRouteMaster);
+                final RouteConflator routeConflator = new RouteConflator(importRouteMaster, matchingOptions);
 
                 //fetch all ways from OSM that are within the route master's bounding box
                 boolean dataFetched = routeConflator.downloadRegionsForImportDataset(workingEntitySpace);

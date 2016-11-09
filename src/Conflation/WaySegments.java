@@ -27,17 +27,18 @@ public abstract class WaySegments {
     public final OSMWay way;
     public final ArrayList<LineSegment> segments;
     public final OneWayDirection oneWayDirection;
-    public final double maxSegmentLength;
     protected List<WeakReference<WaySegmentsObserver>> observers = null;
+    public final WeakReference<RouteConflator> parentRouteConflator;
 
     /**
      * Create a new object, split into segments with the given maximum length
      * @param way the way to use
-     * @param maxSegmentLength the maximum segment length, in meters
+     * @param routeConflator the parent RouteConflator of this line
      */
-    public WaySegments(final OSMWay way, final double maxSegmentLength) {
+    public WaySegments(final OSMWay way, final RouteConflator routeConflator) {
         this.way = way;
-        this.maxSegmentLength = maxSegmentLength;
+        parentRouteConflator = new WeakReference<>(routeConflator);
+        final double maxSegmentLength = routeConflator.wayMatchingOptions.maxSegmentLength;
         oneWayDirection = determineOneWayDirection(way);
 
         //generate a list of line segments out of this line
@@ -87,9 +88,9 @@ public abstract class WaySegments {
     }
     protected WaySegments(final WaySegments originalSegments, final OSMWay splitWay, final List<LineSegment> splitSegments) {
         this.way = splitWay;
-        this.maxSegmentLength = originalSegments.maxSegmentLength;
         this.oneWayDirection = originalSegments.oneWayDirection;
         this.segments = new ArrayList<>(splitSegments);
+        this.parentRouteConflator = originalSegments.parentRouteConflator;
 
         //copy the appropriate segments from the originalSegments
         int newSegmentIndex = 0, newNodeIndex = 0;
