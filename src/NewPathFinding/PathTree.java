@@ -25,7 +25,7 @@ public class PathTree {
     public final static short matchMaskAll = matchStatusFromStop | matchStatusToStop | matchStatusFromRouteLineNode | getMatchStatusToRouteLineNode;
     public final static int MAX_PATHS_TO_CONSIDER = 320;
     private final static short NUMBER_OF_FUTURE_SEGMENTS = 5;
-    private final static long debugPathTreeId = 757276094L;
+    private final static long debugPathTreeId = 0L;
 
     public final long id;
     public final int pathTreeIndex;
@@ -159,11 +159,7 @@ public class PathTree {
             }
         }
 
-        //debug output
-        if(debug) {
-            System.out.format("%s: %d possible paths found, (%d successful, %d failed, %d skipped)\n", this, candidatePaths.size() + successfulPaths.size() + failedPaths.size(), successfulPaths.size(), failedPaths.size(), candidatePaths.size());
-        }
-
+        System.out.format("INFO: %s: %d possible paths found, (%d successful, %d failed, %d skipped)\n", this, candidatePaths.size() + successfulPaths.size() + failedPaths.size(), successfulPaths.size(), failedPaths.size(), candidatePaths.size());
 
         //now determine the best path, based on its score
         successfulPaths.sort(pathScoreComparator);
@@ -181,7 +177,7 @@ public class PathTree {
             candidatePaths.clear();
             successfulPaths.clear();
             failedPaths.clear();
-        } else {
+        } else { //debug output
             System.out.println("\tFAILED: ");
             int longestPathSize = 0, pathSize, maxPathDiff = 3;
             for(final Path path : failedPaths) {
