@@ -469,7 +469,7 @@ public class RouteConflator implements WaySegmentsObserver {
 
                 //break on the first GTFS id match
                 System.out.println("check TRIP " + importRoute.tripMarker + " vs " + relation.getTag(GTFS_TRIP_MARKER));
-                if(importRoute.tripMarker != null && importRoute.tripMarker.equals(relation.getTag(GTFS_TRIP_MARKER)) && importRouteAgencyId != null && importRouteAgencyId.equals(relation.getTag(GTFS_AGENCY_ID))) {
+                if(importRoute.tripMarker != null && importRoute.tripMarker.equals(relation.getTag(GTFS_TRIP_MARKER))) {
                     existingRouteRelation = relation;
                     System.out.format("INFO: Matched trip to existing relation #%d using %s tag\n", existingRouteRelation.osm_id, GTFS_TRIP_MARKER);
                     matchingRoutesIterator.remove();
@@ -521,10 +521,9 @@ public class RouteConflator implements WaySegmentsObserver {
                 existingRouteRelation.copyTagsFrom(importRoute.routeRelation, OSMEntity.TagMergeStrategy.copyTags);
 
                 //remove all existing members from the route relation - will be substituted with matched data later
-                final ListIterator<OSMRelation.OSMRelationMember> memberListIterator = existingRouteRelation.getMembers().listIterator();
-                while(memberListIterator.hasNext()) {
-                    memberListIterator.next();
-                    memberListIterator.remove();
+                final List<OSMRelation.OSMRelationMember> existingRouteMembers = new ArrayList<>(existingRouteRelation.getMembers());
+                for(final OSMRelation.OSMRelationMember member : existingRouteMembers) {
+                    existingRouteRelation.removeMember(member.member, Integer.MAX_VALUE);
                 }
                 final OSMWay importRoutePath = (OSMWay) importRoute.routeRelation.getMembers("").get(0).member;
                 final OSMRelation exportRouteRelation = (OSMRelation) workingEntitySpace.addEntity(existingRouteRelation, OSMEntity.TagMergeStrategy.copyTags, null);
