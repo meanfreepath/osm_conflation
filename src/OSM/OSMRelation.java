@@ -52,7 +52,7 @@ public class OSMRelation extends OSMEntity {
         super.downgradeToIncompleteEntity();
         final List<OSMRelationMember> membersToRemove = new ArrayList<>(members);
         for(final OSMRelationMember member : membersToRemove) {
-            removeMember(member.member);
+            removeMember(member.member, Integer.MAX_VALUE);
         }
         completedMemberCount = 0;
     }
@@ -195,19 +195,23 @@ public class OSMRelation extends OSMEntity {
 
     /**
      * Removes the given member from this relation
-     * @param member
+     * @param member the entity to be removed
+     * @param maxToRemove the max number of memberships to remove (i.e. if an entity has multiple member instances)
      * @return TRUE if removed, FALSE if not found in relation
      */
-    public boolean removeMember(final OSMEntity member) {
-        OSMRelationMember relationMemberToRemove = null;
+    public boolean removeMember(final OSMEntity member, final int maxToRemove) {
+        final List<OSMRelationMember> relationMembersToRemove = new ArrayList<>(4);
+        int numRemoved = 0;
         for(final OSMRelationMember containedMember : members) {
             if(member == containedMember.member) {
-                relationMemberToRemove = containedMember;
-                break;
+                relationMembersToRemove.add(containedMember);
+                if(++numRemoved >= maxToRemove) {
+                    break;
+                }
             }
         }
 
-        if(relationMemberToRemove != null) {
+        for(final OSMRelationMember relationMemberToRemove : relationMembersToRemove) {
             if(members.remove(relationMemberToRemove)) {
                 markAsModified();
                 if(relationMemberToRemove.member.isComplete()) {

@@ -450,7 +450,7 @@ public class OSMEntitySpace {
         //remove the instances of localEntityToDelete in any relations
         final Map<Long, OSMRelation> containingRelations = new HashMap<>(localEntityToDelete.containingRelations);
         for(final OSMRelation relation : containingRelations.values()) {
-            relation.removeMember(localEntityToDelete);
+            relation.removeMember(localEntityToDelete, Integer.MAX_VALUE);
         }
 
         //and remove all references from the main data arrays
