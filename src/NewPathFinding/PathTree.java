@@ -125,21 +125,23 @@ public class PathTree {
             }
 
             final ListIterator<Path> pathListIterator = candidatePaths.listIterator();
+            final List<OSMNode> iterationProcessedNodes = new ArrayList<>(8); //tracks nodes processed for each RouteLineSegment, to prevent infinite path loops
             while (pathListIterator.hasNext()) {
                 final Path candidatePath = pathListIterator.next();
                 if(candidatePath.outcome != Path.PathOutcome.unknown) {
                     pathListIterator.remove();
                     continue;
                 }
+                iterationProcessedNodes.clear();
 
                 if(debug) {
                     System.out.println("\tCheck path ending with: " + candidatePath.lastPathSegment);
                 }
 
                 //advance the Path (which may also create new Path forks) in the direction of the RouteLineSegment's position
-                boolean didAdvance = candidatePath.advance(routeLineSegmentsToConsider, pathListIterator, this, routeConflator, debug);
+                boolean didAdvance = candidatePath.advance(routeLineSegmentsToConsider, pathListIterator, this, routeConflator, iterationProcessedNodes, debug);
                 if(debug) {
-                    System.out.println("\t" + (didAdvance ? "ADVANCED " : "NOADVANCE") + ": outcome is " + candidatePath.outcome.toString() + ", last PathSeg is " + candidatePath.lastPathSegment.getProcessingStatus());
+                    System.out.format("\t%s: outcome is %s, %d nodes processed, last PathSeg is %s\n", didAdvance ? "ADVANCED " : "NOADVANCE", candidatePath.outcome, iterationProcessedNodes.size(), candidatePath.lastPathSegment.getProcessingStatus());
                 }
 
                 //compile a list of the paths that successfully reached their destination

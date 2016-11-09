@@ -10,6 +10,7 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.stream.Collectors;
 
 /**
  * Represents a possible (non-branched) path between two nodes
@@ -17,7 +18,6 @@ import java.util.ListIterator;
  */
 public class Path {
     private final static int INITIAL_PATH_SEGMENT_CAPACITY = 64, INITIAL_DETOUR_PATH_SEGMENT_CAPACITY = 8;
-    private final static double PATH_SEGMENT_LOOP_PENALTY = 500.0;
     public static boolean debugEnabled = false;
 
     public enum PathOutcome {
@@ -62,7 +62,7 @@ public class Path {
         //and finally, add the new PathSegment to the list
         addPathSegment(segmentToAdd, -1);
     }
-    protected boolean advance(final List<RouteLineSegment> routeLineSegmentsToConsider, final ListIterator<Path> pathIterator, final PathTree parentPathTree, final RouteConflator routeConflator, final boolean debug) {
+    protected boolean advance(final List<RouteLineSegment> routeLineSegmentsToConsider, final ListIterator<Path> pathIterator, final PathTree parentPathTree, final RouteConflator routeConflator, final List<OSMNode> iterationProcessedNodes, final boolean debug) {
         //bail if the outcome has already been determined for this Path
         if(outcome != PathOutcome.unknown) {
             return false;
@@ -75,33 +75,55 @@ public class Path {
          * If the last PathSegment was successfully processed, check its ending node for ways sharing that node; we need to
          * check whether to fork this path or continue on
          */
-        if(lastPathSegment.getProcessingStatus() == PathSegment.ProcessingStatus.complete) {
-            //get a list of PathSegments that originate from the lastPathSegment's ending node:
-            final List<PathSegment> divergingPathSegments = determineOutgoingPathSegments(routeConflator, lastPathSegment.getEndNode(), lastPathSegment);
-            if(divergingPathSegments.size() == 0) { //no diverging paths - dead end
-                outcome = PathOutcome.deadEnded;
-            } else {
-                //add the first diverging PathSegment to this Path - no need to create a separate path for it
-                addPathSegment(divergingPathSegments.get(0), -1);
-                advance(routeLineSegmentsToConsider, pathIterator, parentPathTree, routeConflator, debug);
+        switch(lastPathSegment.getProcessingStatus()) {
+            case complete: //PathSegment processed normally
+                final OSMNode endingNode = lastPathSegment.getEndNode();
 
-                //and create (divergingPathCount - 1) new Paths to handle the possible branches
-                final ListIterator<PathSegment> divergingPathIterator = divergingPathSegments.listIterator(1);
-                while (divergingPathIterator.hasNext()) {
-                    final PathSegment divergingPathSegment = divergingPathIterator.next();
-                    final Path newPath = new Path(this, divergingPathSegment);
-                    pathIterator.add(newPath);
-                    if(debug) {
-                        System.out.println("\tAdded new path beginning at " + divergingPathSegment.getOriginNode() + ", way " + divergingPathSegment.getLine().way.osm_id);
+                /**
+                 * check if the ending node on the last-processed PathSegment was processed on the current iteration:
+                 * if so, the Path has looped and will be discarded
+                 */
+                if(iterationProcessedNodes.contains(endingNode)) {
+                    outcome = PathOutcome.deadEnded;
+                    break;
+                }
+                iterationProcessedNodes.add(endingNode);
+
+                //get a list of PathSegments that originate from the lastPathSegment's ending node:
+                final List<PathSegment> divergingPathSegments = determineOutgoingPathSegments(routeConflator, endingNode, lastPathSegment);
+                if(divergingPathSegments.size() == 0) { //no diverging paths - dead end
+                    outcome = PathOutcome.deadEnded;
+                } else {
+                    //add the first diverging PathSegment to this Path - no need to create a separate path for it
+                    addPathSegment(divergingPathSegments.get(0), -1);
+                    advance(routeLineSegmentsToConsider, pathIterator, parentPathTree, routeConflator, iterationProcessedNodes, debug);
+
+                    //and create (divergingPathCount - 1) new Paths to handle the possible branches
+                    final ListIterator<PathSegment> divergingPathIterator = divergingPathSegments.listIterator(1);
+                    while (divergingPathIterator.hasNext()) {
+                        final PathSegment divergingPathSegment = divergingPathIterator.next();
+                        final Path newPath = new Path(this, divergingPathSegment);
+                        pathIterator.add(newPath);
+                        if(debug) {
+                            System.out.println("\tAdded new path beginning at " + divergingPathSegment.getOriginNode() + ", way " + divergingPathSegment.getLine().way.osm_id);
+                        }
                     }
                 }
-            }
-        } else if(lastPathSegment.getProcessingStatus() == PathSegment.ProcessingStatus.reachedDestination) {
-            outcome = PathOutcome.waypointReached;
-        } else if(lastPathSegment.getProcessingStatus() == PathSegment.ProcessingStatus.pendingAdvance || lastPathSegment.getProcessingStatus() == PathSegment.ProcessingStatus.pendingActivation) {
-            //do nothing - waiting until the RouteLineSegment passes nearby again (if ever)
-        } else {
-            outcome = PathOutcome.deadEnded;
+                break;
+            case reachedDestination: //PathSegment contains the destination stop
+                outcome = PathOutcome.waypointReached;
+                break;
+            case pendingAdvance:
+            case pendingActivation:
+                //do nothing - waiting until the RouteLineSegment passes nearby again (if ever)
+                break;
+            case noFirstTraveledSegment:
+            case zeroSegmentMatches:
+            case failedSegmentMatch:
+                outcome = PathOutcome.deadEnded;
+                break;
+            case inprocess: //shouldn't happen
+                break;
         }
         return didAdvancePathSegment;
     }
@@ -145,28 +167,10 @@ public class Path {
         //System.out.format("Path has waypoint/path scores: %.01f/%.01f\n", waypointScore, pathScore);
         return pathScore / pathSegments.size();
     }
-    public List<OSMWay> getPathWays() {
-        List<OSMWay> ways = new ArrayList<>(pathSegments.size());
-        PathSegment lastPathSegment = null;
-        for(final PathSegment pathSegment : pathSegments) {
-            final OSMWay curWay = pathSegment.getLine().way;
-            if(lastPathSegment != null) {
-                if(curWay != lastPathSegment.getLine().way) {
-                    ways.add(curWay);
-                }
-            } else {
-                ways.add(curWay);
-            }
-            lastPathSegment = pathSegment;
-        }
-        return ways;
-    }
     @Override
     public String toString() {
         final List<String> streets = new ArrayList<>(pathSegments.size());
-        for(final PathSegment pathSegment : pathSegments) {
-            streets.add(pathSegment.toString());
-        }
+        streets.addAll(pathSegments.stream().map(PathSegment::toString).collect(Collectors.toList()));
         final String lastNodeId = lastPathSegment.getEndNode() != null ? Long.toString(lastPathSegment.getEndNode().osm_id) : "N/A";
         return String.format("Path[%d->%s] outcome %s: %s", firstPathSegment.getOriginNode().osm_id, lastNodeId, outcome.toString(), String.join("->", streets));
     }
@@ -194,7 +198,7 @@ public class Path {
                 continue;
             }
 
-            int origSize = pathSegments.size();
+            //int origSize = pathSegments.size();
             if(debugEnabled) {
                 System.out.println("DEBUG: Check for Split: " + pathSegment);
             }
