@@ -91,12 +91,12 @@ public class Route {
         //first generate the pathTrees using the routeLine and this route's stops
         routePathFinder.generatePathTrees();
 
-        //debugCheckMatchIndexIntegrity();
+        debugCheckMatchIndexIntegrity("PathTrees Generated");
 
         //and run the pathfinding algorithm
         routePathFinder.findPaths(routeConflator);
 
-        //debugCheckMatchIndexIntegrity();
+        debugCheckMatchIndexIntegrity("Paths found");
 
         //if the route wasn't fully matched, mark it
         if(routePathFinder.getFailedPaths() > 0) {
@@ -301,7 +301,11 @@ public class Route {
     /**
      * Checks if the total match counts in the various match indexes are identical
      */
-    public void debugCheckMatchIndexIntegrity() {
+    public void debugCheckMatchIndexIntegrity(final String message) {
+        if(!RouteConflator.debugEnabled) {
+            return;
+        }
+
         //garbage collect to get better SegmentMatch total count
         System.gc();
 
@@ -344,6 +348,6 @@ public class Route {
             }
         }
 
-        System.out.format("INDEX COUNTS:\n\tSegmentMatch: %d global, %d in RouteLineSegments, %d/%d/%d Total/RL/OSM in LineMatches.\n\tLineMatch: %d/%d OSM/RLSeg-based objects\n", SegmentMatch.totalCount, routeLineSegmentMatchCount, overallLineMatchCounts, lineMatchByRouteLineCounts, lineMatchByOSMLineCounts, lineMatchCountByOSM, lineMatchCountByRLSeg);
+        System.out.format("INFO: Match Index counts after “%s”:\n\tSegmentMatch: %d global, %d in RouteLineSegments, %d/%d/%d Total/RL/OSM in LineMatches.\n\tLineMatch: %d/%d OSM/RLSeg-based objects\n", message, SegmentMatch.totalCount, routeLineSegmentMatchCount, overallLineMatchCounts, lineMatchByRouteLineCounts, lineMatchByOSMLineCounts, lineMatchCountByOSM, lineMatchCountByRLSeg);
     }
 }

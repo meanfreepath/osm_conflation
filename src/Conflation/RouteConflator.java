@@ -461,6 +461,7 @@ public class RouteConflator implements WaySegmentsObserver {
         exportRoutes = new ArrayList<>(importRoutes.size());
         allRouteStops = new HashMap<>(importRoutes.size() * 64);
         for(final Route importRoute : importRoutes) {
+            //System.out.println("CHECK subroute \"" + importRoute.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + importRoute.routeRelation.osm_id + ")");
             //first try to match up the import route (trip) with the matching routes, using the GTFS trip_marker
             OSMRelation existingRouteRelation = null;
             ListIterator<OSMRelation> matchingRoutesIterator = matchingRoutes.listIterator();
@@ -468,7 +469,7 @@ public class RouteConflator implements WaySegmentsObserver {
                 final OSMRelation relation = matchingRoutesIterator.next();
 
                 //break on the first GTFS id match
-                System.out.println("check TRIP " + importRoute.tripMarker + " vs " + relation.getTag(GTFS_TRIP_MARKER));
+                //System.out.println("check TRIP " + importRoute.tripMarker + " vs " + relation.getTag(GTFS_TRIP_MARKER));
                 if(importRoute.tripMarker != null && importRoute.tripMarker.equals(relation.getTag(GTFS_TRIP_MARKER))) {
                     existingRouteRelation = relation;
                     System.out.format("INFO: Matched trip to existing relation #%d using %s tag\n", existingRouteRelation.osm_id, GTFS_TRIP_MARKER);
@@ -656,7 +657,7 @@ public class RouteConflator implements WaySegmentsObserver {
             //get a handle on the WaySegments that geographically match the route's routeLineSegment
             route.routeLine.findMatchingLineSegments(this);
 
-            route.debugCheckMatchIndexIntegrity();
+            route.debugCheckMatchIndexIntegrity("matched LineSegments");
         }
 
         //update the route's stop proximity matches to include the match info on the OSM ways
@@ -666,7 +667,7 @@ public class RouteConflator implements WaySegmentsObserver {
         System.out.println("Matched stops in " + (new Date().getTime() - timeStartStopMatching) + "ms");
 
         for(final Route route : exportRoutes) {
-            route.debugCheckMatchIndexIntegrity();
+            route.debugCheckMatchIndexIntegrity("stops matched");
         }
 
         //TODO: debug bail
@@ -675,7 +676,8 @@ public class RouteConflator implements WaySegmentsObserver {
 
         //with the candidate lines determined, begin the pathfinding stage to lock down the path between the route's stops
         for(final Route route : exportRoutes) {
-            System.out.println("Begin PathFinding for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
+            final Date t0 = new Date();
+            System.out.format("INFO: Begin PathFinding for subroute “%s” (tripMarker %s)\n", route.routeRelation.getTag(OSMEntity.KEY_NAME), route.tripMarker);
             if (debugTripMarker != null && !route.tripMarker.equals(debugTripMarker)) {
                 System.out.println("skipping (not a flagged route)");
                 continue;
@@ -694,7 +696,8 @@ public class RouteConflator implements WaySegmentsObserver {
 
             //flush the match indexes for the routeLine, since they're no longer needed
             route.routeLine.flushMatchIndexes();
-            //route.debugCheckMatchIndexIntegrity();
+            //route.debugCheckMatchIndexIntegrity("match indexes flushed");
+            System.out.format("INFO: paths found in %dms\n", new Date().getTime() - t0.getTime());
 
             //and add the stops data to the OSMRelation for the route
             route.syncStopsWithRelation();
@@ -702,7 +705,7 @@ public class RouteConflator implements WaySegmentsObserver {
             //split any ways that aren't fully contained by the route path
             route.routePathFinder.splitWaysAtIntersections(workingEntitySpace);
 
-            route.debugCheckMatchIndexIntegrity();
+            route.debugCheckMatchIndexIntegrity("route ways split");
 
             //debug paths
             if(debugEnabled) {
