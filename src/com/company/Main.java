@@ -1,9 +1,6 @@
 package com.company;
 
-import Conflation.Route;
-import Conflation.RouteConflator;
-import Conflation.StopArea;
-import Conflation.StopConflator;
+import Conflation.*;
 import OSM.*;
 import PathFinding.PathTree;
 import com.sun.javaws.exceptions.InvalidArgumentException;
@@ -34,6 +31,7 @@ public class Main {
         matchingOptions.maxSegmentMidPointDistance = Math.sqrt(matchingOptions.maxSegmentOrthogonalDistance * matchingOptions.maxSegmentOrthogonalDistance + 4.0 * matchingOptions.maxSegmentLength * matchingOptions.maxSegmentLength);
 
         //propagate the debug value as needed
+        RouteDataManager.debugEnabled = debugEnabled;
         RouteConflator.debugEnabled = debugEnabled;
         StopConflator.debugEnabled = debugEnabled;
         StopArea.debugEnabled = debugEnabled;
@@ -48,25 +46,31 @@ public class Main {
         //selectedRoutes.add("100221");
         //selectedRoutes.add("100062"); //errors splitting
         //selectedRoutes.add("102581"); //D-Line: not preferring matching trunk_link near NB stop "15th Ave NW & NW Leary Way"
-        selectedRoutes.add("102615"); // E-Line
+        //selectedRoutes.add("102615"); // E-Line
         //selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
         //selectedRoutes.add("100512"); //A-Line
         //selectedRoutes.add("102548"); //B-Line
         //selectedRoutes.add("102619"); //F-Line
         //selectedRoutes.add("102623"); //894: Mercer Island loopy route
         //selectedRoutes.add("100184"); //31
+        //selectedRoutes.add("100221"); //41
+        selectedRoutes.add("100214"); //372
 
         try {
             importSpace.loadFromXML(importFileName);
 
-            /*final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace);
-            exporter.conflateStops();
+            //create the working entity space for all data
+            final RouteDataManager routeDataManager = new RouteDataManager(65536);
+
+            //output all the stops in a format that works with the OSM Task Manager
+            /*final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace, routeDataManager, RouteConflator.RouteType.bus);
+            exporter.conflateStops(routeDataManager);
             exporter.outputForOSMTaskingManager("boxes", "https://www.meanfreepath.com/kcstops/");
             if(Math.random() < 2) {
                 return;
-            }*/
+            }//*/
 
-            //first create a list of all the route_master relations in the import dataset
+            //create a list of all the route_master relations in the import dataset
             final List<OSMRelation> importRouteMasterRelations = new ArrayList<>(importSpace.allRelations.size());
             String relationType;
             for(final OSMRelation relation : importSpace.allRelations.values()) {
@@ -75,40 +79,42 @@ public class Main {
                     importRouteMasterRelations.add(relation);
                 }
             }
-            importSpace = null; //data no longer needed
+            importSpace = null; //import data no longer needed
 
             //loop through the route masters, processing their subroutes in one entity space
-            for(final OSMRelation importRouteMaster : importRouteMasterRelations) {
-                if(!selectedRoutes.contains(importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID))) {
-                    continue;
+            final List<RouteConflator> routeConflators = new ArrayList<>(importRouteMasterRelations.size());
+            try {
+                for (final OSMRelation importRouteMaster : importRouteMasterRelations) {
+                    if (!selectedRoutes.contains(importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID))) {
+                        continue;
+                    }
+
+                    //output an OSM XML file with only the current route data
+                    System.out.format("Processing route %s (ref %s, GTFS id %s), %d trips…\n", importRouteMaster.getTag(OSMEntity.KEY_NAME), importRouteMaster.getTag(OSMEntity.KEY_REF), importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID), importRouteMaster.getMembers().size());
+                    if (debugEnabled) {
+                        OSMEntitySpace originalRouteSpace = new OSMEntitySpace(2048);
+                        originalRouteSpace.addEntity(importRouteMaster, OSMEntity.TagMergeStrategy.keepTags, null);
+                        originalRouteSpace.outputXml("gtfsroute_" + importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID) + ".osm");
+                        originalRouteSpace = null;
+                    }
+
+                    //create an object to handle the processing of the data for this route_master
+                    routeConflators.add(new RouteConflator(importRouteMaster, routeDataManager, matchingOptions));
                 }
+            } catch(InvalidArgumentException e) {
+                e.printStackTrace();
+                System.exit(1);
+            }
 
-                //output an OSM XML file with only the current route data
-                System.out.format("Processing route %s (ref %s, GTFS id %s), %d trips…\n", importRouteMaster.getTag(OSMEntity.KEY_NAME), importRouteMaster.getTag(OSMEntity.KEY_REF), importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID), importRouteMaster.getMembers().size());
-                if(debugEnabled) {
-                    OSMEntitySpace originalRouteSpace = new OSMEntitySpace(2048);
-                    originalRouteSpace.addEntity(importRouteMaster, OSMEntity.TagMergeStrategy.keepTags, null);
-                    originalRouteSpace.outputXml("gtfsroute_" + importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID) + ".osm");
-                    originalRouteSpace = null;
-                }
+            //fetch all ways from OSM that are within the routes' bounding boxes
+            routeDataManager.downloadRegionsForImportDataset(routeConflators, matchingOptions);
 
-                final OSMEntitySpace workingEntitySpace = new OSMEntitySpace(65536); //the entity space that all processing will occur on
-                workingEntitySpace.name = "Working space";
+            //fetch all existing stops from OSM in the entire route's bounding box, and match them with the route's stops
+            final StopConflator stopConflator = new StopConflator();
+            routeDataManager.conflateStopsWithOSM(routeConflators);
 
-                //create an object to handle the processing of the data for this route master
-                final RouteConflator routeConflator = new RouteConflator(importRouteMaster, matchingOptions);
-
-                //fetch all ways from OSM that are within the route master's bounding box
-                boolean dataFetched = routeConflator.downloadRegionsForImportDataset(workingEntitySpace);
-                if(!dataFetched) {
-                    System.out.println("Unable to fetch data for Route #" + importRouteMaster.getTag(OSMEntity.KEY_REF) + "(\"" + importRouteMaster.getTag(OSMEntity.KEY_NAME) + "\")");
-                    continue;
-                }
-
-                //fetch all existing stops from OSM in the entire route's bounding box, and match them with the route's stops
-                final StopConflator stopConflator = new StopConflator(routeConflator);
-                stopConflator.conflateStopsWithOSM();
-
+            //now run the conflation algorithms on each route_master
+            for(final RouteConflator routeConflator : routeConflators) {
                 //and match the subroutes' routePath to the downloaded OSM ways.  Also matches the stops in the route to their nearest matching way
                 routeConflator.conflateRoutePaths(stopConflator);
 
@@ -118,7 +124,7 @@ public class Main {
                     relationSpace.addEntity(route.routeRelation, OSMEntity.TagMergeStrategy.keepTags, null);
                 }
                 //also include any entities that were changed during the process
-                for(final OSMEntity changedEntity : workingEntitySpace.allEntities.values()) {
+                for(final OSMEntity changedEntity : routeDataManager.allEntities.values()) {
                     if(changedEntity.getAction() == OSMEntity.ChangeAction.modify) {
                         relationSpace.addEntity(changedEntity, OSMEntity.TagMergeStrategy.keepTags, null);
                     }

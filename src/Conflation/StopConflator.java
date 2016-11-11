@@ -1,11 +1,14 @@
 package Conflation;
 
-import OSM.*;
-import Overpass.OverpassConverter;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import OSM.OSMEntity;
+import OSM.OSMNode;
+import OSM.Point;
+import OSM.Region;
 
-import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * Manages the association of stops/waypoints with their respective OSM ways
@@ -16,32 +19,16 @@ public class StopConflator {
     private final static double MAX_LEVENSHTEIN_DISTANCE_RATIO = 0.20;
     public static boolean debugEnabled = false;
 
-    public final RouteConflator routeConflator;
-
-    public StopConflator(final RouteConflator routeConflator) {
-        this.routeConflator = routeConflator;
-    }
-
     /**
      * Match the routeConflator's stops to the best possible OSM way, based on its name, position,
      * way's proximity to routeLineSegment, etc
      */
-    protected void matchStopsToWays() {
+    protected void matchStopsToWays(final RouteConflator routeConflator) {
         final int stopCount = routeConflator.getAllRouteStops().size();
         if(stopCount == 0) {
             System.out.format("ERROR: No stops found for route_master %s [ref %s]\n", routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_NAME), routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_REF));
             return;
         }
-
-        //first, add all the route's stops to the Cell index
-        for (final RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
-            for(final StopArea stop : routeConflator.getAllRouteStops()) {
-                if (Region.intersects(cell.boundingBox, stop.getNearbyStopSearchRegion())) {
-                    cell.addStop(stop);
-                }
-            }
-        }
-
 
         //run a comparison based on proximity to the nearest OSM line for each subroute
         for(final Route route : routeConflator.getExportRoutes()) {
@@ -123,9 +110,9 @@ public class StopConflator {
 
     /**
      * Adds the best match for each stop platform to their best-matched nearby way
-     * @param entitySpace
+     * @param routeConflator The routeConflator whose stops will get stop positions
      */
-    protected void createStopPositionsForPlatforms(final OSMEntitySpace entitySpace) {
+    protected void createStopPositionsForPlatforms(final RouteConflator routeConflator) {
         for(final StopArea stopArea : routeConflator.getAllRouteStops()) {
             if(stopArea.bestWayMatch == null) {
                 continue;
@@ -172,7 +159,7 @@ public class StopConflator {
 
             //and create a new node if a good candidate can't be found on the way
             if(nearestNodeOnWay == null) {
-                nearestNodeOnWay = bestSegment.getParent().insertNode(entitySpace.createNode(nearestPointOnSegment.x, nearestPointOnSegment.y, null), bestSegment);
+                nearestNodeOnWay = bestSegment.getParent().insertNode(routeConflator.getWorkingEntitySpace().createNode(nearestPointOnSegment.x, nearestPointOnSegment.y, null), bestSegment);
             }
 
             //and add the stop position to the stop area
@@ -188,183 +175,5 @@ public class StopConflator {
                 System.out.println("No sufficient match found for stop " + stopArea);
             }*/
         }
-    }
-    /**
-     * Downloads all OSM stops in the current route's area, and conflates them with the route's associated import stops
-     * @throws InvalidArgumentException
-     */
-    public void conflateStopsWithOSM() throws InvalidArgumentException {
-        conflateStopsWithOSM(routeConflator.getAllRouteStops(), routeConflator.routeType, routeConflator.getWorkingEntitySpace());
-    }
-
-    /**
-     * Downloads all OSM stops in the given stop list's area, and conflates them with the given stop list's stops
-     * @param allStops the list of stops to conflate with existing OSM data
-     * @param routeType the type of stops to search for (bus, train, etc)
-     * @param destinationEntitySpace the entity space the stops (existing and imported) will be placed in
-     * @throws InvalidArgumentException
-     */
-    public void conflateStopsWithOSM(final Collection<StopArea> allStops, final RouteConflator.RouteType routeType, final OSMEntitySpace destinationEntitySpace) throws InvalidArgumentException {
-        if(allStops.size() == 0) {
-            return;
-        }
-
-        //fetch all possible useful entities that intersect the route's stops' combined bounding box
-        final Point[] includedStops = new Point[allStops.size()];
-        int s = 0;
-        for(final StopArea stop : allStops) {
-            includedStops[s++] = stop.getPlatform().getCentroid();
-        }
-        Region stopDownloadRegion = new Region(includedStops);
-
-        //expand the total area little further, to ensure the start/end of the route is included (problem with King County data)
-        final double stopSearchBuffer = -SphericalMercator.metersToCoordDelta(100.0/*StopArea.duplicateStopPlatformBoundingBoxSize*/, stopDownloadRegion.getCentroid().y);
-        stopDownloadRegion = stopDownloadRegion.regionInset(stopSearchBuffer, stopSearchBuffer);
-
-        final OverpassConverter converter = new OverpassConverter();
-        try {
-            final String query;
-            final LatLonRegion stopDownloadRegionLL = SphericalMercator.mercatorToLatLon(stopDownloadRegion);
-            switch (routeType) {
-                case bus: //bus stops are typically nodes, but may also be ways
-                    final String[] queryComponentsBus = {
-                            String.format("node[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("node[\"public_transport\"~\"platform|stop_position\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("way[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude)
-                    };
-                    query = "(" + String.join(";", queryComponentsBus) + ");(._;>;);";
-                    break;
-                case light_rail:
-                case train:
-                case subway:
-                case railway:
-                case tram:
-                    final String[] queryComponentsRail = {
-                            String.format("node[\"railway\"~\"platform|tram_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("node[\"public_transport\"~\"platform|stop_position\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("way[\"railway\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude)
-                    };
-                    query = "(" + String.join(";", queryComponentsRail) + ");(._;>;);";
-                    break;
-                case monorail: //TODO: not implemented yet
-                case ferry:
-                default:
-                    return;
-            }
-            converter.fetchFromOverpass(query);
-        } catch (InvalidArgumentException e) {
-            e.printStackTrace();
-            return;
-        }
-
-        //add the downloaded OSM stops to the working entity space
-        final OSMEntitySpace existingStopsSpace = converter.getEntitySpace();
-        existingStopsSpace.markAllEntitiesWithAction(OSMEntity.ChangeAction.none);
-
-        if(debugEnabled||true) {
-            try {
-                existingStopsSpace.outputXml("stopdownload.osm");
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        //and another list of stops in the existing OSM data
-        final ArrayList<OSMEntity> importedExistingStops = new ArrayList<>(existingStopsSpace.allEntities.size());
-        for(final OSMEntity existingStop : existingStopsSpace.allEntities.values()) {
-            importedExistingStops.add(destinationEntitySpace.addEntity(existingStop, OSMEntity.TagMergeStrategy.keepTags, null));
-        }
-
-        //and compare them to the existing OSM data
-        for(final StopArea stop : allStops) {
-            final String importGtfsId = stop.getPlatform().getTag(StopArea.KEY_GTFS_STOP_ID);
-            assert importGtfsId != null;
-            final String importRefTag = stop.getPlatform().getTag(OSMEntity.KEY_REF);
-            double importRefTagNumeric;
-            try {
-                assert importRefTag != null;
-                importRefTagNumeric = Double.parseDouble(importRefTag);
-            } catch(NumberFormatException e) {
-                importRefTagNumeric = Double.MAX_VALUE;
-            }
-
-            final ListIterator<OSMEntity> importedExistingStopsIterator = importedExistingStops.listIterator();
-            while (importedExistingStopsIterator.hasNext()) {
-                final OSMEntity existingEntity = importedExistingStopsIterator.next();
-                final String existingGtfsId = existingEntity.getTag(StopArea.KEY_GTFS_STOP_ID);
-
-                //if the GTFS id or ref match, merge the existing stop entity with the import stop's data
-                final boolean idMatchFound = checkMatchingTags(existingGtfsId, importGtfsId, importRefTag, importRefTagNumeric, existingEntity);
-                if(!idMatchFound) { //if no matching entities found, check that the import data doesn't conflict with existing stops
-                    //check whether the entity is a platform or a stop_position
-                    final String entityType = existingEntity.getTag(OSMEntity.KEY_PUBLIC_TRANSPORT);
-
-                    if(entityType == null || OSMEntity.TAG_PLATFORM.equals(entityType)) { //if a platform, mark as a conflict
-                        final double stopDistance = Point.distance(stop.getPlatform().getCentroid(), existingEntity.getCentroid());
-                        if (stopDistance < StopArea.maxDistanceBetweenDuplicateStops) {
-                            //System.out.println("Within distance of " + stop + "! " + existingEntity.osm_id + ": " + existingEntity.getTag(OSMEntity.KEY_REF) + "/" + existingEntity.getTag(OSMEntity.KEY_NAME) + ", dist " + stopDistance);
-                            stop.getPlatform().setTag(StopArea.KEY_GTFS_CONFLICT, "id #" + existingEntity.osm_id);
-                        }
-                    } else if(OSMEntity.TAG_STOP_POSITION.equals(entityType)) { //no action taken on existing stop positions
-                        //System.out.println("No GTFS/REF MATCH FOR " + existingEntity.getTags().toString());
-                    }
-                } else {
-                    //check whether the entity is a platform or a stop_position (may be null if simply a highway=bus_stop)
-                    final String entityType = existingEntity.getTag(OSMEntity.KEY_PUBLIC_TRANSPORT);
-
-                    if(entityType == null || OSMEntity.TAG_PLATFORM.equals(entityType)) {
-                        //copy the tags from the GTFS stop into the existing stop (we keep the existing platform's location, since these are usually better-positioned than the GTFS data's)
-                        existingEntity.copyTagsFrom(stop.getPlatform(), OSMEntity.TagMergeStrategy.copyTags);
-                        destinationEntitySpace.deleteEntity(stop.getPlatform()); //delete the GTFS entity from the working space - no longer needed
-                        stop.setPlatform(existingEntity); //and point the StopArea's platform to the existing platform entity
-
-                        stop.getPlatform().removeTag(StopArea.KEY_GTFS_CONFLICT); //in case previously marked as a conflict
-
-                        //remove from the imported entity list since we've matched it
-                        importedExistingStopsIterator.remove();
-                    } else if(OSMEntity.TAG_STOP_POSITION.equals(entityType)) {
-                        //check that the stop_position supports the current routeType (i.e. for mixed-mode platforms like shared bus/tram stops)
-                        boolean supportsRouteType = OSMEntity.TAG_YES.equalsIgnoreCase(existingEntity.getTag(routeType.spKeyForRouteType()));
-                        if(!supportsRouteType) {
-                            boolean supportsOtherRouteType = false;
-                            for(final RouteConflator.RouteType otherRouteType : RouteConflator.RouteType.values()) {
-                                if(OSMEntity.TAG_YES.equalsIgnoreCase(existingEntity.getTag(otherRouteType.spKeyForRouteType()))) {
-                                    supportsOtherRouteType = true;
-                                    break;
-                                }
-                            }
-                            supportsRouteType = !supportsOtherRouteType;
-                        }
-                        if(supportsRouteType) {
-                            stop.setStopPosition((OSMNode) existingEntity, routeType);
-                        }
-
-                        //remove from the imported entity list since we've processed it
-                        importedExistingStopsIterator.remove();
-                    }
-                }
-            }
-        }
-    }
-    private static boolean checkMatchingTags(final String existingGtfsId, final String importGtfsId, final String importRefTag, final double importRefTagNumeric, final OSMEntity existingEntity) {
-        //if the GTFS id or ref match, merge the existing stop with the import stop's data
-        boolean idMatchFound = false;
-        if(importGtfsId.equals(existingGtfsId)) {
-            idMatchFound = true;
-            // System.out.println("GTFS id match! " + existingEntity.osm_id + ": " + existingEntity.getTag(gtfsIdTag) + "/" + existingEntity.getTag(OSMEntity.KEY_NAME));
-        } else if(existingEntity.hasTag(OSMEntity.KEY_REF)) { //try matching by ref if no importer id
-            final String existingRefTag = existingEntity.getTag(OSMEntity.KEY_REF);
-            assert existingRefTag != null;
-            if(existingRefTag.trim().equals(importRefTag)) { //string match
-                idMatchFound = true;
-            } else if(importRefTagNumeric != Double.MAX_VALUE) { //try doing a basic numeric match if strings don't match (special case for already-imported King County metro data)
-                try {
-                    final double existingRefTagNumeric = Double.parseDouble(existingRefTag);
-                    idMatchFound = existingRefTagNumeric == importRefTagNumeric;
-                } catch(NumberFormatException ignored) {}
-            }
-        }
-        return idMatchFound;
     }
 }

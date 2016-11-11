@@ -1,8 +1,8 @@
 package com.company;
 
 import Conflation.RouteConflator;
+import Conflation.RouteDataManager;
 import Conflation.StopArea;
-import Conflation.StopConflator;
 import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.json.JSONWriter;
@@ -18,8 +18,9 @@ import java.util.List;
  * Created by nick on 12/3/15.
  */
 public class OSMTaskManagerExporter {
-    private final OSMEntitySpace entitySpace;
+    private final OSMEntitySpace importEntitySpace, exportEntitySpace;
     private final RouteConflator.RouteType routeType;
+    private final List<StopArea> allStops;
 
     private static class DividedBox {
         private static int idGenerator = 0;
@@ -40,27 +41,24 @@ public class OSMTaskManagerExporter {
 
     }
 
-    public OSMTaskManagerExporter(final OSMEntitySpace space, RouteConflator.RouteType routeType) {
-        entitySpace = space;
+    public OSMTaskManagerExporter(final OSMEntitySpace importSpace, final OSMEntitySpace exportSpace, RouteConflator.RouteType routeType) {
+        importEntitySpace = importSpace;
+        exportEntitySpace = exportSpace;
         this.routeType = routeType;
+        allStops = new ArrayList<>(importEntitySpace.allEntities.size());
     }
 
-    public void conflateStops() {
-        final StopConflator conflator = new StopConflator(null);
-        List<StopArea> allStops = new ArrayList<>(entitySpace.allEntities.size());
+    public void conflateStops(RouteDataManager routeDataManager) throws InvalidArgumentException {
+        allStops.clear();
         if(routeType == RouteConflator.RouteType.bus) {
-            for (final OSMEntity entity : entitySpace.allNodes.values()) {
+            for (final OSMEntity entity : importEntitySpace.allNodes.values()) {
                 if (OSMEntity.TAG_LEGACY_BUS_STOP.equals(entity.getTag(OSMEntity.KEY_HIGHWAY)) || OSMEntity.TAG_PLATFORM.equals(entity.getTag(OSMEntity.KEY_PUBLIC_TRANSPORT))) {
                     allStops.add(new StopArea(entity));
                 }
             }
         } //TODO: implement other route types
 
-        try {
-            conflator.conflateStopsWithOSM(allStops, RouteConflator.RouteType.bus, entitySpace);
-        } catch (InvalidArgumentException e) {
-            e.printStackTrace();
-        }
+        routeDataManager.conflateStopsWithOSM(allStops, routeType);
     }
 
     /**
@@ -75,9 +73,9 @@ public class OSMTaskManagerExporter {
         }
 
         //get the bounding box of all the data (plus a little buffer to ensure everything's contained
-        final double coordFactor = SphericalMercator.metersToCoordDelta(1.0, entitySpace.getBoundingBox().getCentroid().y);
+        final double coordFactor = SphericalMercator.metersToCoordDelta(1.0, exportEntitySpace.getBoundingBox().getCentroid().y);
         final double boundingBoxBuffer = -10.0 * coordFactor;
-        final Region boundingBox = entitySpace.getBoundingBox().regionInset(boundingBoxBuffer, boundingBoxBuffer);
+        final Region boundingBox = exportEntitySpace.getBoundingBox().regionInset(boundingBoxBuffer, boundingBoxBuffer);
 
         //run a rough calculation of the number of boxes needed
         final double boxSizeInCoords = DividedBox.BOX_SIZE * coordFactor;
@@ -85,16 +83,8 @@ public class OSMTaskManagerExporter {
         final int verticalBoxCount = (int) Math.ceil((boundingBox.origin.y - boundingBox.origin.y) / boxSizeInCoords);
         final List<DividedBox> subBoxes = new ArrayList<>(horizontalBoxCount * verticalBoxCount);
 
-        //include all GTFS stops, and any existing stops that conflict with them
-        final List<OSMEntity> filteredEntities = new ArrayList<>(8192);
-        for(final OSMEntity entity: entitySpace.allEntities.values()) {
-            if(entity.hasTag(StopArea.KEY_GTFS_CONFLICT) || entity.hasTag(StopArea.KEY_GTFS_STOP_ID)) {
-                filteredEntities.add(entity);
-            }
-        }
-
         //divide the bounding box into multiple smaller boxes
-        createSubBoxesInRegion(boundingBox, boxSizeInCoords, boxSizeInCoords, filteredEntities, subBoxes);
+        createSubBoxesInRegion(boundingBox, boxSizeInCoords, boxSizeInCoords, allStops, subBoxes);
 
         //now subdivide boxes with a large number of stops into smaller boxes
         final List<DividedBox> boxesToRemove = new ArrayList<>(128);
@@ -102,10 +92,10 @@ public class OSMTaskManagerExporter {
         for(final DividedBox box : subBoxes) {
             final int stopsInBox = box.containedEntities.size();
             if(stopsInBox > 250) { //break into 9 boxes
-                createSubBoxesInRegion(box.region, boxSizeInCoords / 3.0, boxSizeInCoords / 3.0, filteredEntities, boxesToAdd);
+                createSubBoxesInRegion(box.region, boxSizeInCoords / 3.0, boxSizeInCoords / 3.0, allStops, boxesToAdd);
                 boxesToRemove.add(box);
             } else if(stopsInBox > 100) { //break into 4 boxes
-                createSubBoxesInRegion(box.region, boxSizeInCoords / 2.0, boxSizeInCoords / 2.0, filteredEntities, boxesToAdd);
+                createSubBoxesInRegion(box.region, boxSizeInCoords / 2.0, boxSizeInCoords / 2.0, allStops, boxesToAdd);
                 boxesToRemove.add(box);
             }
         }
@@ -176,15 +166,15 @@ public class OSMTaskManagerExporter {
         fileWriter.close();
 
 
-        final OSMEntitySpace debugEntitySpace = new OSMEntitySpace(filteredEntities.size());
-        for(final OSMEntity entity : filteredEntities) {
-            if(entity.hasTag(StopArea.KEY_GTFS_CONFLICT)) {
-                debugEntitySpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null);
+        final OSMEntitySpace debugEntitySpace = new OSMEntitySpace(allStops.size());
+        for(final StopArea entity : allStops) {
+            if(entity.getPlatform().hasTag(StopArea.KEY_GTFS_CONFLICT)) {
+                debugEntitySpace.addEntity(entity.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null);
             }
         }
         debugEntitySpace.outputXml(destinationDir + "all_stops.osm");
     }
-    private static void createSubBoxesInRegion(final Region region, final double boxWidth, final double boxHeight, final List<OSMEntity> filteredEntities, final List<DividedBox> boxList) {
+    private static void createSubBoxesInRegion(final Region region, final double boxWidth, final double boxHeight, final List<StopArea> filteredEntities, final List<DividedBox> boxList) {
         final double boxWidthTolerance = boxWidth * 0.01, boxHeightTolerance = boxHeight * 0.01;
         for(double lon = region.origin.x; region.extent.x - lon > boxWidthTolerance; lon += boxWidth) {
             for(double lat = region.origin.y; region.extent.y - lat > boxHeightTolerance; lat += boxHeight) {
@@ -192,9 +182,9 @@ public class OSMTaskManagerExporter {
 
                 //create a sub-box if the boxRegion contains at least one of the desired node types
                 final DividedBox box = new DividedBox(boxRegion);
-                for(final OSMEntity entity : filteredEntities) {
-                    if(Region.intersects(boxRegion, entity.getBoundingBox())) {
-                        box.containedEntities.add(entity);
+                for(final StopArea entity : filteredEntities) {
+                    if(Region.intersects(boxRegion, entity.getPlatform().getBoundingBox())) {
+                        box.containedEntities.add(entity.getPlatform());
                     }
                 }
                 if(box.containedEntities.size() > 0) {

@@ -9,12 +9,12 @@ import OSM.Point;
 public class OSMLineSegment extends LineSegment {
     public WaySegments parentSegments = null;
 
-    public OSMLineSegment(WaySegments parentSegments, RouteConflator routeConflator, Point origin, Point destination, OSMNode originNode, OSMNode destinationNode, int segmentIndex, int nodeIndex) {
-        super(routeConflator, origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
+    public OSMLineSegment(WaySegments parentSegments, RouteConflator.LineComparisonOptions wayMatchingOptions, Point origin, Point destination, OSMNode originNode, OSMNode destinationNode, int segmentIndex, int nodeIndex) {
+        super(wayMatchingOptions, origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
         this.parentSegments = parentSegments;
     }
-    protected OSMLineSegment(OSMLineSegment segmentToCopy, RouteConflator routeConflator, Point destination, OSMNode destinationNode) {
-        super(routeConflator, segmentToCopy, destination, destinationNode);
+    protected OSMLineSegment(OSMLineSegment segmentToCopy, RouteConflator.LineComparisonOptions wayMatchingOptions, Point destination, OSMNode destinationNode) {
+        super(wayMatchingOptions, segmentToCopy, destination, destinationNode);
         this.parentSegments = segmentToCopy.getParent();
     }
 

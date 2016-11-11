@@ -7,7 +7,10 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Tracks the data on a particular route
@@ -46,7 +49,7 @@ public class Route {
         }
 
         this.stops = new ArrayList<>(stops);
-        routeLine = new RouteLineWaySegments(routePath, routeConflator);
+        routeLine = new RouteLineWaySegments(routePath, routeConflator.wayMatchingOptions);
         routePathFinder = new RoutePathFinder(this);
     }
 
@@ -63,7 +66,7 @@ public class Route {
         this.tripId = oldRoute.tripId;
         this.routeType = oldRoute.routeType;
         routeRelation = newEntitySpace.createRelation(oldRoute.routeRelation.getTags(), null);
-        routeLine = new RouteLineWaySegments(oldRoute.routeLine.way, routeConflator);
+        routeLine = new RouteLineWaySegments(oldRoute.routeLine.way, routeConflator.wayMatchingOptions);
 
         this.stops = new ArrayList<>(stops);
 
@@ -109,7 +112,7 @@ public class Route {
     /**
      * Outputs the segment ways to an OSM XML file
      */
-    public void debugOutputSegments(final OSMEntitySpace entitySpace, final Collection<OSMWaySegments> candidateLines) throws IOException, InvalidArgumentException {
+    public void debugOutputSegments(final RouteDataManager entitySpace) throws IOException, InvalidArgumentException {
         final OSMEntitySpace segmentSpace = new OSMEntitySpace(entitySpace.allWays.size() + entitySpace.allNodes.size());
         final DecimalFormat format = new DecimalFormat("#.###");
 
@@ -222,7 +225,7 @@ public class Route {
         }
 
         //output the cells generated to process the area
-        for(RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
+        for(RouteDataManager.Cell cell : RouteDataManager.Cell.allCells) {
             final Region bbox = cell.boundingBox;
             List<OSMNode> cellNodes = new ArrayList<>(5);
             final OSMNode oNode = segmentSpace.createNode(bbox.origin.x, bbox.origin.y, null);

@@ -1,13 +1,11 @@
 package NewPathFinding;
 
-import Conflation.LineSegment;
-import Conflation.OSMWaySegments;
-import Conflation.RouteConflator;
-import Conflation.RouteLineSegment;
+import Conflation.*;
 import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.stream.Collectors;
@@ -404,8 +402,9 @@ public class Path {
         }
         final List<PathSegment> divergingPathSegments = new ArrayList<>(junctionNode.containingWayCount - 1);
 
+        final HashMap<Long, OSMWaySegments> candidateLines = routeConflator.getWorkingEntitySpace().getCandidateLines();
         for(final OSMWay containingWay : junctionNode.containingWays.values()) {
-            final OSMWaySegments line = routeConflator.getCandidateLines().get(containingWay.osm_id);
+            final OSMWaySegments line = candidateLines.get(containingWay.osm_id);
             if(line == null) {
                 System.out.println("ERROR: no WaySegments found for " + containingWay);
                 continue;

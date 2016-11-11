@@ -46,8 +46,8 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
      */
     public final HashMap<Long,Map<Long, LineMatch>> lineMatchesByRouteLineSegmentId;
 
-    public RouteLineWaySegments(final OSMWay way, final RouteConflator routeConflator) {
-        super(way, routeConflator);
+    protected RouteLineWaySegments(final OSMWay way, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
+        super(way, wayMatchingOptions);
         lineMatchesByRouteLineSegmentId = new HashMap<>(segments.size());
 
         this.addObserver(this); //watch for changes to the contained segments
@@ -116,8 +116,8 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
             routeLineSegment = (RouteLineSegment) lineSegment;
 
             //get the cells which the routeLineSegment overlaps with...
-            final List<RouteConflator.Cell> segmentCells = new ArrayList<>(2);
-            for(final RouteConflator.Cell cell : RouteConflator.Cell.allCells) {
+            final List<RouteDataManager.Cell> segmentCells = new ArrayList<>(2);
+            for(final RouteDataManager.Cell cell : RouteDataManager.Cell.allCells) {
                 if (Region.intersects(routeLineSegment.searchAreaForMatchingOtherSegments, cell.expandedBoundingBox)) {
                     if (!segmentCells.contains(cell)) {
                         segmentCells.add(cell);
@@ -126,7 +126,7 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
             }
 
             //and check the ways contained in those cells for overlap with the segment
-            for (final RouteConflator.Cell candidateCell : segmentCells) {
+            for (final RouteDataManager.Cell candidateCell : segmentCells) {
                 for(final OSMWaySegments candidateLine : candidateCell.containedWays) {
                     totalIterations++;
 
@@ -179,8 +179,6 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
     private void matchSegmentsOnLine(final RouteLineSegment routeLineSegment, final OSMWaySegments candidateLine, final DebugMatchCounting matchCounting) {
         OSMLineSegment osmLineSegment;
         SegmentMatch currentMatch;
-        final RouteConflator routeConflator = parentRouteConflator.get();
-        final RouteConflator.LineComparisonOptions wayMatchingOptions = routeConflator != null ? routeConflator.wayMatchingOptions : null;
         //now check the given OSM way's segments against this segment
         for (final LineSegment candidateSegment : candidateLine.segments) {
             osmLineSegment = (OSMLineSegment) candidateSegment;
@@ -355,9 +353,6 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
 
     @Override
     public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment oldSegment, LineSegment[] newSegments) {
-        final RouteConflator routeConflator = parentRouteConflator.get();
-        final RouteConflator.LineComparisonOptions wayMatchingOptions = routeConflator != null ? routeConflator.wayMatchingOptions : null;
-
         if(waySegments instanceof RouteLineWaySegments) { //case when the RouteLine has been updated
             //argument casting
             final RouteLineSegment oldRouteLineSegment = (RouteLineSegment) oldSegment;
