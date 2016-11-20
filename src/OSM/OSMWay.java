@@ -18,20 +18,25 @@ public class OSMWay extends OSMEntity {
     private final static OSMType type = OSMType.way;
     private final static int INITIAL_CAPACITY_NODE = 32;
 
-    private final List<OSMNode> nodes = new ArrayList<>(INITIAL_CAPACITY_NODE);
+    private final List<OSMNode> nodes;
     private OSMNode firstNode = null, lastNode = null;
     private int completedNodeCount = 0;
 
     public OSMWay(final long id) {
         super(id);
+        nodes = new ArrayList<>(INITIAL_CAPACITY_NODE);
     }
 
     /**
      * Copy constructor
      * @param wayToCopy
+     * @param idOverride
      */
-    public OSMWay(final OSMWay wayToCopy, final Long idOverride) {
+    protected OSMWay(final OSMWay wayToCopy, final Long idOverride) {
         super(wayToCopy, idOverride);
+
+        nodes = new ArrayList<>(wayToCopy.nodes.size());
+        //copyNodes(wayToCopy.nodes); //note: this is handled in the entity space
     }
     @Override
     protected void downgradeToIncompleteEntity() {
