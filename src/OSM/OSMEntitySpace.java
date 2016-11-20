@@ -207,8 +207,8 @@ public class OSMEntitySpace {
     }
     /**
      * Create an incomplete (i.e. not fully-downloaded) way in this space
-     * @param osm_id
-     * @return
+     * @param osm_id the id of the entity
+     * @return the entity
      */
     public OSMWay addIncompleteWay(final long osm_id) {
         final OSMWay existingWay = allWays.get(osm_id);
@@ -247,9 +247,9 @@ public class OSMEntitySpace {
         return newRelation;
     }
     /**
-     * Creates a local copy of the given relation
-     * @param relationToCopy
-     * @return
+     * Creates a local instance of the given relation, if not already present
+     * @param relationToCopy the relation
+     * @return the local copy of the relation
      */
     private OSMRelation importRelation(final OSMRelation relationToCopy, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
         OSMRelation localRelation = allRelations.get(relationToCopy.osm_id);
@@ -651,6 +651,7 @@ public class OSMEntitySpace {
         }
 
         //and create the new split way(s), removing the new ways' non-intersecting nodes from originalWay
+        final List<OSMNode> originalNodeList = new ArrayList<>(originalWay.getNodes()); //make a copy to preserve the nodes to make it easier for post-split code to run comparisons etc
         final OSMWay[] allSplitWays = new OSMWay[splitWayCount];
         int splitWayIndex = 0;
         for(final List<OSMNode> wayNodes : splitWayNodes) {
@@ -679,7 +680,7 @@ public class OSMEntitySpace {
         int idx = 0;
         final ArrayList<OSMRelation> originalWayContainingRelations = new ArrayList<>(originalWay.containingRelations.values());
         for(final OSMRelation containingRelation : originalWayContainingRelations) {
-            containingRelation.handleMemberWaySplit(originalWay, allSplitWays, containingRelationValidity.get(idx++));
+            containingRelation.handleMemberWaySplit(originalWay, originalNodeList, allSplitWays, containingRelationValidity.get(idx++));
         }
 
         return allSplitWays;

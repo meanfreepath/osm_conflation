@@ -354,7 +354,7 @@ public class OSMRelation extends OSMEntity {
      * @param originalWay
      * @param allSplitWays
      */
-    public void handleMemberWaySplit(final OSMWay originalWay, final OSMWay[] allSplitWays, final boolean wasValidBeforeSplit) {
+    public void handleMemberWaySplit(final OSMWay originalWay, final List<OSMNode> originalNodeList, final OSMWay[] allSplitWays, final boolean wasValidBeforeSplit) {
         //get the relation's type, using the default handling if not set
         final String relationType = hasTag(OSMEntity.KEY_TYPE) ? getTag(OSMEntity.KEY_TYPE) : "";
         assert relationType != null;
@@ -394,72 +394,60 @@ public class OSMRelation extends OSMEntity {
             case "turnlanes:turns":
                 break;
             default: //all other types: just add the new ways to the relation, in the correct order if possible
-                //get the order of originalWay in the relation
-                final int index = indexOfMember(originalWay);
+                final OSMNode originalWayFirstNode = originalNodeList.get(0), originalWayLastNode = originalNodeList.get(originalNodeList.size() - 1);
+                final List<OSMWay> relationWays = new ArrayList<>(members.size());
+                for(final OSMRelationMember member : members) {
+                    if(member.member instanceof OSMWay) {
+                        relationWays.add((OSMWay) member.member);
+                    }
+                }
+
+                //get the order of originalWay in the relation, defaulting to adding in the forward direction
+                boolean addForward = true;
+                final int index = relationWays.indexOf(originalWay);
+                if(index > 0) { //if not the first way in list: use previous member's first/last nodes to check
+                    final OSMWay prevWay = relationWays.get(index - 1);
+                    if(originalWayLastNode == prevWay.getFirstNode() ||originalWayLastNode == prevWay.getLastNode()) {
+                        addForward = false;
+                    } else if(originalWayFirstNode == prevWay.getFirstNode() ||originalWayFirstNode == prevWay.getLastNode()) {
+                        addForward = true;
+                    }
+                } else {
+                    final OSMWay nextWay = relationWays.get(index + 1);
+                    if(originalWayLastNode == nextWay.getFirstNode() ||originalWayLastNode == nextWay.getLastNode()) {
+                        addForward = true;
+                    } else if(originalWayFirstNode == nextWay.getFirstNode() ||originalWayFirstNode == nextWay.getLastNode()) {
+                        addForward = false;
+                    }
+                }
+
                 final OSMRelation.OSMRelationMember originalWayMember = getMemberForEntity(originalWay);
 
-                //determine the order in which we should add the new ways to the relation, to ensure they are continuous
-                //check the previous member to determine the order
-                Boolean addForward = null;
-                if(index > 0) {
-                    final OSMRelation.OSMRelationMember previousMember = members.get(index - 1);
-                    if(previousMember.member instanceof OSMWay) {
-                        final OSMWay prevMember = (OSMWay) previousMember.member;
-                        //if the previous member connects with the first node of originalWay, the direction is forward.  If last, the direction is backward
-                        if(prevMember.getLastNode() == originalWay.getFirstNode() || prevMember.getFirstNode() == originalWay.getFirstNode()) {
-                            addForward = true;
-                        } else if(prevMember.getFirstNode() == originalWay.getLastNode() || prevMember.getLastNode() == originalWay.getLastNode()) {
-                            addForward = false;
-                        }
-                    }
-                }
+                /*System.out.format("SPLIT %s into %d ways, index %d:: %s\n", originalWay.getTag("name"), allSplitWays.length, index, addForward);
+                System.out.format("\tOrigin F/L nodes: %d/%d\n", originalWayFirstNode.osm_id, originalWayLastNode.osm_id);
+                for(final OSMWay splitWay : allSplitWays) {
+                    System.out.format("\tWay: %s\n", splitWay);
+                }*/
 
-                //if unable to determine the order by checking the previous member, try checking the next member
-                if(addForward == null && index < members.size() - 1) {
-                    final OSMRelation.OSMRelationMember nextMember = members.get(index + 1);
-                    if(nextMember.member instanceof OSMWay) {
-                        final OSMWay nexMember = (OSMWay) nextMember.member;
-                        //if the next member connects with the last node of originalWay, the direction is forward
-                        if(nexMember.getFirstNode() == originalWay.getLastNode() || nexMember.getLastNode() == originalWay.getLastNode()) {
-                            addForward = true;
-                        } else if(nexMember.getFirstNode() == originalWay.getFirstNode() || nexMember.getLastNode() == originalWay.getFirstNode()) {
-                            addForward = false;
-                        }
-                    }
-                }
 
-                //and add all the newly-split ways to the relation
-                if(addForward == null || addForward) { //add in the forward direction
-                    boolean hitOriginal = false;
-                    for (final OSMWay splitWay : allSplitWays) {
-                        if(splitWay == originalWay) { //don't re-add the originalWay
-                            hitOriginal = true;
-                            continue;
-                        }
-                        //System.out.println("Adding new originalWay FORWARD " + (hitOriginal ? "AFTER" : "BEFORE") + ": " + splitWay.getTag("name") + " to relation " + getTag("name"));
-                        if(hitOriginal) {
-                            insertAfterMember(splitWay, originalWayMember.role, originalWay);
-                        } else {
-                            insertBeforeMember(splitWay, originalWayMember.role, originalWay);
-                        }
-                    }
-                } else { //add in the backward direction
-                    final List<OSMWay> splitWaysForRelation = new ArrayList<>(allSplitWays.length);
-                    Collections.addAll(splitWaysForRelation, allSplitWays);
+                //and add all the newly-split ways to the relation:
+                final List<OSMWay> splitWaysForRelation = new ArrayList<>(allSplitWays.length);
+                Collections.addAll(splitWaysForRelation, allSplitWays);
+                if(!addForward) { //reverse the iteration order if adding in a backward direction
                     Collections.reverse(splitWaysForRelation);
+                }
 
-                    boolean hitOriginal = false;
-                    for (final OSMWay splitWay : splitWaysForRelation) {
-                        if(splitWay == originalWay) { //don't re-add the originalWay
-                            hitOriginal = true;
-                            continue;
-                        }
-                        //System.out.println("Adding new originalWay BACKWARD "  + (hitOriginal ? "AFTER" : "BEFORE") + splitWay.getTag("name") + " to relation " + getTag("name"));
-                        if(hitOriginal) {
-                            insertBeforeMember(splitWay, originalWayMember.role, originalWay);
-                        } else {
-                            insertAfterMember(splitWay, originalWayMember.role, originalWay);
-                        }
+                boolean hitOriginal = false;
+                for (final OSMWay splitWay : splitWaysForRelation) {
+                    if(splitWay == originalWay) { //don't re-add the originalWay
+                        hitOriginal = true;
+                        continue;
+                    }
+                    //System.out.format("\tAdding new splitWay (%d nodes) %s %s: %s to relation %s\n", splitWay.getNodes().size(), addForward ? "FORWARD" : "BACKWARD", hitOriginal ? "AFTER" : "BEFORE", splitWay.getTag("name"), getTag("name"));
+                    if(hitOriginal) {
+                        insertAfterMember(splitWay, originalWayMember.role, originalWay);
+                    } else {
+                        insertBeforeMember(splitWay, originalWayMember.role, originalWay);
                     }
                 }
                 break;
