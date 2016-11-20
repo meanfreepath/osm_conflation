@@ -219,6 +219,7 @@ public class RoutePathFinder {
         PathSegment previousPathSegment = null;
         for(final PathTree pathTree : routePathTrees) {
             if(pathTree.bestPath == null) {
+                previousPathSegment = null; //wipe so we don't try to connect ways over this PathTree's gap
                 continue;
             }
             //System.out.println("OUTPUT PATH FOR " + pathTree.parentPathFinder.route.routeRelation.osm_id + "::" + pathTree.bestPath);
