@@ -396,14 +396,14 @@ public class Path {
     }
 
     protected static List<PathSegment> determineOutgoingPathSegments(final RouteConflator routeConflator, final OSMNode junctionNode, final PathSegment incomingPathSegment) {
-        if(junctionNode.containingWayCount == 0) { //shouldn't happen unless dataset is out of sync
+        if(junctionNode.getContainingWayCount() == 0) { //shouldn't happen unless dataset is out of sync
             System.out.format("ERROR: no containing ways found for junction node %s\n", junctionNode);
             return new ArrayList<>();
         }
-        final List<PathSegment> divergingPathSegments = new ArrayList<>(junctionNode.containingWayCount - 1);
+        final List<PathSegment> divergingPathSegments = new ArrayList<>(junctionNode.getContainingWayCount() - 1);
 
         final HashMap<Long, OSMWaySegments> candidateLines = routeConflator.getWorkingEntitySpace().getCandidateLines();
-        for(final OSMWay containingWay : junctionNode.containingWays.values()) {
+        for(final OSMWay containingWay : junctionNode.getContainingWays().values()) {
             final OSMWaySegments line = candidateLines.get(containingWay.osm_id);
             if(line == null) {
                 System.out.println("ERROR: no WaySegments found for " + containingWay);

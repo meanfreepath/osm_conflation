@@ -57,7 +57,7 @@ public class OSMWay extends OSMEntity {
         if(complete) {
             nodes.addAll(nodesToCopy);
             for (final OSMNode addedNode : nodes) {
-                addedNode.didAddToWay(this);
+                addedNode.didAddToEntity(this);
                 if(addedNode.isComplete()) {
                     completedNodeCount++;
                 }
@@ -82,7 +82,7 @@ public class OSMWay extends OSMEntity {
         if(node.isComplete()) {
             completedNodeCount++;
         }
-        node.didAddToWay(this);
+        node.didAddToEntity(this);
         updateFirstAndLastNodes();
         boundingBox = null; //invalidate the bounding box
 
@@ -97,7 +97,7 @@ public class OSMWay extends OSMEntity {
         if(node.isComplete()) {
             completedNodeCount++;
         }
-        node.didAddToWay(this);
+        node.didAddToEntity(this);
         updateFirstAndLastNodes();
         boundingBox = null; //invalidate the bounding box
         markAsModified();
@@ -119,14 +119,14 @@ public class OSMWay extends OSMEntity {
                 if(newNode.isComplete()) {
                     completedNodeCount++;
                 }
-                newNode.didAddToWay(this);
+                newNode.didAddToEntity(this);
             } else {
                 nodes.remove(nodeIndex);
                 if(oldNode.isComplete()) {
                     completedNodeCount--;
                 }
             }
-            oldNode.didRemoveFromWay(this);
+            oldNode.didRemoveFromEntity(this, false);
             updateFirstAndLastNodes();
 
             boundingBox = null; //invalidate the bounding box
@@ -250,7 +250,7 @@ public class OSMWay extends OSMEntity {
     @Override
     public String toOSMXML() {
         if(debugEnabled) {
-            setTag("rcount", Short.toString(containingRelationCount));
+            setTag("rcount", Short.toString(getContainingRelationCount()));
             if(osm_id < 0) {
                 setTag("origid", Long.toString(osm_id));
             }
@@ -287,6 +287,39 @@ public class OSMWay extends OSMEntity {
                 return String.format(BASE_XML_TAG_FORMAT_EMPTY, osm_id, String.valueOf(visible));
             }
         }
+    }
+
+    @Override
+    public void didAddToEntity(OSMEntity entity) {
+        if(entity instanceof OSMRelation) {
+            addContainingRelation((OSMRelation) entity);
+        }
+    }
+    @Override
+    public void didRemoveFromEntity(OSMEntity entity, boolean entityWasDeleted) {
+        if(entity instanceof OSMRelation) {
+            removeContainingRelation((OSMRelation) entity);
+        }
+    }
+    @Override
+    public void containedEntityWasDeleted(OSMEntity entity) {
+        final OSMNode containedNode = (OSMNode) entity;
+        removeNode(containedNode);
+    }
+    @Override
+    public boolean didDelete(OSMEntitySpace fromSpace) {
+        final List<OSMNode> containedNodes = new ArrayList<>(nodes);
+        for(final OSMNode containedNode : containedNodes) {
+            removeNode(containedNode);
+            containedNode.didRemoveFromEntity(this, true);
+
+            //also delete any nodes that are untagged, and aren't a member of any other ways or relations
+            if((containedNode.getTags() == null || containedNode.getTags().isEmpty()) &&
+                    containedNode.getContainingWays().isEmpty() && containedNode.getContainingRelations().isEmpty()) {
+                fromSpace.deleteEntity(containedNode);
+            }
+        }
+        return super.didDelete(fromSpace);
     }
 
     /**

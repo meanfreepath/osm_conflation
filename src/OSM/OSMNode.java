@@ -1,6 +1,8 @@
 package OSM;
 
+import java.lang.ref.WeakReference;
 import java.util.HashMap;
+import java.util.Iterator;
 
 /**
  * Created by nick on 10/15/15.
@@ -14,8 +16,7 @@ public class OSMNode extends OSMEntity {
             BASE_XML_TAG_FORMAT_CLOSE = " </node>\n";
     private final static OSMType type = OSMType.node;
     private Point coordinate;
-    public final HashMap<Long, OSMWay> containingWays = new HashMap<>(4);
-    public short containingWayCount = 0;
+    private HashMap<Long, WeakReference<OSMWay>> containingWays = null;
 
     public OSMNode(final long id) {
         super(id);
@@ -37,31 +38,12 @@ public class OSMNode extends OSMEntity {
         setCoordinate(((OSMNode) completeEntity).coordinate);
 
         //notify the containing ways that this node is now complete
-        for(final OSMWay way : containingWays.values()) {
-            way.nodeWasMadeComplete(this);
+        if(containingWays != null) {
+            for (final OSMWay way : getContainingWays().values()) {
+                way.nodeWasMadeComplete(this);
+            }
         }
     }
-    /**
-     * Notifies this node it's been added to the given way's node list
-     * @param way
-     */
-    protected void didAddToWay(final OSMWay way) {
-        if(!containingWays.containsKey(way.osm_id)) {
-            containingWays.put(way.osm_id, way);
-            containingWayCount++;
-        }
-    }
-    /**
-     * Notifies this node it's been removed from the given way's node list
-     * @param way
-     */
-    protected void didRemoveFromWay(final OSMWay way) {
-        if(containingWays.containsKey(way.osm_id)) {
-            containingWays.remove(way.osm_id);
-            containingWayCount--;
-        }
-    }
-
     public void setCoordinate(final double x, final double y) {
         if(this.coordinate != null) { //mark as modified if changing (vs initial assignment)
             markAsModified();
@@ -75,6 +57,36 @@ public class OSMNode extends OSMEntity {
         }
         this.coordinate = new Point(coordinate);
         boundingBox = null; //invalidate the bounding box
+    }
+    public HashMap<Long, OSMWay> getContainingWays() {
+        if(containingWays == null) {
+            return new HashMap<>();
+        }
+        final HashMap<Long, OSMWay> activeWays = new HashMap<>(containingWays.size());
+        final Iterator<WeakReference<OSMWay>> wayIterator = containingWays.values().iterator();
+        WeakReference<OSMWay> curWayRef;
+        OSMWay containingWay;
+        while(wayIterator.hasNext()) {
+            curWayRef = wayIterator.next();
+            containingWay = curWayRef.get();
+            if(containingWay != null) {
+                activeWays.put(containingWay.osm_id, containingWay);
+            } else { //remove any expired containing ways on the fly
+                wayIterator.remove();
+            }
+        }
+        return activeWays;
+    }
+    public short getContainingWayCount() {
+        short containingWayCount = 0;
+        if(containingWays != null) {
+            for (final WeakReference<OSMWay> containingWay : containingWays.values()) {
+                if (containingWay.get() != null) {
+                    containingWayCount++;
+                }
+            }
+        }
+        return containingWayCount;
     }
 
     @Override
@@ -101,8 +113,8 @@ public class OSMNode extends OSMEntity {
     @Override
     public String toOSMXML() {
         if(debugEnabled) {
-            setTag("wcount", Short.toString(containingWayCount));
-            setTag("rcount", Short.toString(containingRelationCount));
+            setTag("wcount", Short.toString(getContainingWayCount()));
+            setTag("rcount", Short.toString(getContainingRelationCount()));
             if(osm_id < 0) {
                 setTag("origid", Long.toString(osm_id));
             }
@@ -130,6 +142,51 @@ public class OSMNode extends OSMEntity {
             }
         }
     }
+
+    @Override
+    public void didAddToEntity(OSMEntity entity) {
+        if(entity instanceof OSMWay) {
+            final OSMWay way = (OSMWay) entity;
+            if(containingWays == null) { //lazy init the containing ways
+                containingWays = new HashMap<>(4);
+            }
+            final WeakReference<OSMWay> existingWayRef = containingWays.get(way.osm_id);
+            if(existingWayRef == null || existingWayRef.get() == null) {
+                containingWays.put(way.osm_id, new WeakReference<>(way));
+            }
+        } else if(entity instanceof OSMRelation) {
+            addContainingRelation((OSMRelation) entity);
+        }
+    }
+
+    @Override
+    public void didRemoveFromEntity(OSMEntity entity, boolean entityWasDeleted) {
+        if(entity instanceof OSMWay) { //remove the way from the containedWays list
+            final OSMWay way = (OSMWay) entity;
+            if(containingWays != null && containingWays.containsKey(way.osm_id)) {
+                containingWays.remove(way.osm_id);
+            }
+        } else if(entity instanceof OSMRelation) {
+            removeContainingRelation((OSMRelation) entity);
+        }
+    }
+
+    @Override
+    public void containedEntityWasDeleted(OSMEntity entity) {
+        //nodes can't contain other entities
+    }
+
+    @Override
+    public boolean didDelete(OSMEntitySpace fromSpace) {
+        //remove this node from any containing ways
+        for(final OSMWay way : getContainingWays().values()) {
+            way.containedEntityWasDeleted(this);
+            didRemoveFromEntity(way, true);
+        }
+        return super.didDelete(fromSpace);
+    }
+
+    @Override
     public String toString() {
         return String.format("node@%d (id %d): %.01f,%.01f (%s)", hashCode(), osm_id, coordinate.x, coordinate.y, complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
     }

@@ -104,7 +104,7 @@ public class OSMRelation extends OSMEntity {
     @Override
     public String toOSMXML() {
         if(debugEnabled) {
-            setTag("rcount", Short.toString(containingRelationCount));
+            setTag("rcount", Short.toString(getContainingRelationCount()));
             if(osm_id < 0) {
                 setTag("origid", Long.toString(osm_id));
             }
@@ -144,16 +144,36 @@ public class OSMRelation extends OSMEntity {
             }
         }
     }
-    public void clearMembers() {
+
+    @Override
+    public void didAddToEntity(OSMEntity entity) {
+        if(entity instanceof OSMRelation) { //relations can only be added to other relations
+            addContainingRelation((OSMRelation) entity);
+        }
+    }
+    @Override
+    public void didRemoveFromEntity(OSMEntity entity, boolean entityWasDeleted) {
+        if(entity instanceof OSMRelation) {
+            removeContainingRelation((OSMRelation) entity);
+        }
+    }
+    @Override
+    public void containedEntityWasDeleted(OSMEntity entity) {
+        removeMember(entity, Integer.MAX_VALUE); //remove all instances of the entity from the member list
+    }
+
+    @Override
+    public boolean didDelete(OSMEntitySpace fromSpace) {
         if(members.size() > 0) {
             markAsModified();
         }
 
         for(final OSMRelationMember member : members) {
-            member.member.didRemoveFromRelation(this);
+            member.member.didRemoveFromEntity(this, true);
         }
         members.clear();
         completedMemberCount = 0;
+        return super.didDelete(fromSpace);
     }
 
     /**
@@ -217,7 +237,7 @@ public class OSMRelation extends OSMEntity {
                 if(relationMemberToRemove.member.isComplete()) {
                     completedMemberCount--;
                 }
-                relationMemberToRemove.member.didRemoveFromRelation(this);
+                relationMemberToRemove.member.didRemoveFromEntity(this, false);
                 return true;
             }
         }
@@ -260,7 +280,7 @@ public class OSMRelation extends OSMEntity {
         if(member.isComplete()) {
             completedMemberCount++;
         }
-        member.didAddToRelation(this);
+        member.didAddToEntity(this);
         if(markAsModified) {
             markAsModified();
         }
@@ -284,8 +304,8 @@ public class OSMRelation extends OSMEntity {
                 completedMemberCount++;
             }
 
-            oldMember.member.didRemoveFromRelation(this);
-            newMember.member.didAddToRelation(this);
+            oldMember.member.didRemoveFromEntity(this, false);
+            newMember.member.didAddToEntity(this);
 
             boundingBox = null; //invalidate the bounding box
             markAsModified();

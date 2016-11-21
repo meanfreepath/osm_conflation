@@ -2,9 +2,11 @@ package OSM;
 
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
+import java.lang.ref.WeakReference;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 /**
@@ -51,13 +53,39 @@ public abstract class OSMEntity {
     protected boolean complete = false;
 
     protected HashMap<String,String> tags;
-    public final HashMap<Long, OSMRelation> containingRelations = new HashMap<>(4);
-    public short containingRelationCount = 0;
+
+    private HashMap<Long, WeakReference<OSMRelation>> containingRelations = null;
 
     public abstract OSMType getType();
     public abstract Region getBoundingBox();
     public abstract Point getCentroid();
     public abstract String toOSMXML();
+
+    /**
+     * Notifies this entity it's been added to the given way's node list
+     * @param entity
+     */
+    public abstract void didAddToEntity(OSMEntity entity);
+    public abstract void didRemoveFromEntity(OSMEntity entity, boolean entityWasDeleted);
+    public abstract void containedEntityWasDeleted(OSMEntity entity);
+
+    /**
+     * Deletes this entity, removing if from any containing entities
+     * @return true if this entity needs to be deleted from the OSM server, false otherwise
+     */
+    public boolean didDelete(OSMEntitySpace fromSpace) {
+        //remove from any containing relations
+        for(final OSMRelation relation : getContainingRelations().values()) {
+            relation.containedEntityWasDeleted(this);
+        }
+
+        //mark as deleted if a previously-uploaded entity
+        if(version > 0) {
+            markAsDeleted();
+            return true;
+        }
+        return false;
+    }
 
     public OSMEntity(final long id) {
         osm_id = id;
@@ -97,8 +125,10 @@ public abstract class OSMEntity {
         copyMetadata(completeEntity, this);
 
         //and notify any containing relations that this member is now complete
-        for(final OSMRelation containingRelation : containingRelations.values()) {
-            containingRelation.memberWasMadeComplete(this);
+        if(containingRelations != null) {
+            for (final OSMRelation containingRelation : getContainingRelations().values()) {
+                containingRelation.memberWasMadeComplete(this);
+            }
         }
     }
     protected void downgradeToIncompleteEntity() {
@@ -286,31 +316,50 @@ public abstract class OSMEntity {
         return tags != null && tags.containsKey(name);
     }
 
-    /**
-     * Notifies this entity it's been added to the given relation's member list
-     * @param relation
-     */
-    protected void didAddToRelation(final OSMRelation relation) {
-        addContainingRelation(relation);
-    }
-    /**
-     * Notifies this entity it's been removed from the given relation's member list
-     * @param relation
-     */
-    protected void didRemoveFromRelation(final OSMRelation relation) {
-        removeContainingRelation(relation);
-    }
     protected void addContainingRelation(final OSMRelation relation) {
-        if(!containingRelations.containsKey(relation.osm_id)) {
-            containingRelations.put(relation.osm_id, relation);
-            containingRelationCount++;
+        if(containingRelations == null) { //lazy-init the containing relations
+            containingRelations = new HashMap<>(4);
+        }
+        final WeakReference<OSMRelation> existingRelationRef = containingRelations.get(relation.osm_id);
+        if(existingRelationRef == null || existingRelationRef.get() == null) {
+            containingRelations.put(relation.osm_id, new WeakReference<>(relation));
         }
     }
     protected void removeContainingRelation(final OSMRelation relation) {
-        if(containingRelations.containsKey(relation.osm_id)) {
+        if(containingRelations != null && containingRelations.containsKey(relation.osm_id)) {
             containingRelations.remove(relation.osm_id);
-            containingRelationCount--;
         }
+    }
+    public HashMap<Long, OSMRelation> getContainingRelations() {
+        if(containingRelations == null) {
+            return new HashMap<>();
+        }
+
+        final HashMap<Long, OSMRelation> activeRelations = new HashMap<>(containingRelations.size());
+        final Iterator<WeakReference<OSMRelation>> relationIterator = containingRelations.values().iterator();
+        WeakReference<OSMRelation> curRelationRef;
+        OSMRelation containingRelation;
+        while(relationIterator.hasNext()) {
+            curRelationRef = relationIterator.next();
+            containingRelation = curRelationRef.get();
+            if(containingRelation != null) {
+                activeRelations.put(containingRelation.osm_id, containingRelation);
+            } else { //remove any expired relations on the fly
+                relationIterator.remove();
+            }
+        }
+        return activeRelations;
+    }
+    public short getContainingRelationCount() {
+        short containingRelationCount = 0;
+        if(containingRelations != null) {
+            for (final WeakReference<OSMRelation> containingWay : containingRelations.values()) {
+                if (containingWay.get() != null) {
+                    containingRelationCount++;
+                }
+            }
+        }
+        return containingRelationCount;
     }
     public boolean isComplete() {
         return complete;

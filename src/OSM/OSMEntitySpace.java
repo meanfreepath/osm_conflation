@@ -424,48 +424,22 @@ public class OSMEntitySpace {
             localEntityToDelete = addEntity(entityToDelete, OSMEntity.TagMergeStrategy.keepTags, null);
         }
 
-        //entity subclass-specific operations
-        if(localEntityToDelete instanceof OSMNode) {
-            final OSMNode theNode = (OSMNode) localEntityToDelete;
-            //check way membership, removing the entity if possible
-            for(final OSMWay way : theNode.containingWays.values()) {
-                way.removeNode(theNode);
-            }
-        } else if(localEntityToDelete instanceof OSMWay) {
-            final OSMWay theWay = (OSMWay) localEntityToDelete;
-            //delete any nodes that are untagged, and aren't a member of any other ways or relations
-            final List<OSMNode> containedNodes = new ArrayList<>(theWay.getNodes());
-            for(final OSMNode containedNode : containedNodes) {
-                theWay.removeNode(containedNode);
-                if((containedNode.getTags() == null || containedNode.getTags().isEmpty()) &&
-                        containedNode.containingWays.isEmpty() && containedNode.containingRelations.isEmpty()) {
-                    deleteEntity(containedNode);
-                }
-            }
-        } else if(localEntityToDelete instanceof OSMRelation) {
-            final OSMRelation theRelation = (OSMRelation) localEntityToDelete;
-            theRelation.clearMembers(); //delete all memberships in the relation
-        }
-
-        //remove the instances of localEntityToDelete in any relations
-        final Map<Long, OSMRelation> containingRelations = new HashMap<>(localEntityToDelete.containingRelations);
-        for(final OSMRelation relation : containingRelations.values()) {
-            relation.removeMember(localEntityToDelete, Integer.MAX_VALUE);
-        }
-
-        //and remove all references from the main data arrays
-        if(localEntityToDelete instanceof OSMNode) {
-            allNodes.remove(localEntityToDelete.osm_id);
-        } else if(localEntityToDelete instanceof OSMWay) {
-            allWays.remove(localEntityToDelete.osm_id);
-        } else if(localEntityToDelete instanceof OSMRelation) {
-            allRelations.remove(localEntityToDelete.osm_id);
+        //remove all references from the main data arrays
+        switch (localEntityToDelete.getType()) {
+            case node:
+                allNodes.remove(localEntityToDelete.osm_id);
+                break;
+            case way:
+                allWays.remove(localEntityToDelete.osm_id);
+                break;
+            case relation:
+                allRelations.remove(localEntityToDelete.osm_id);
+                break;
         }
         allEntities.remove(localEntityToDelete.osm_id);
 
-        //and mark the entity as deleted if it's on the OSM server
-        if(entityToDelete.version > 0) {
-            localEntityToDelete.markAsDeleted();
+        //and mark the entity as deleted if it's already on the OSM server
+        if(localEntityToDelete.didDelete(this)) {
             deletedEntities.put(localEntityToDelete.osm_id, localEntityToDelete);
         }
         return true;
@@ -500,7 +474,7 @@ public class OSMEntitySpace {
                 final OSMNode theNode = (OSMNode) theEntity;
                 targetEntity = new OSMNode(theNode, withEntityId);
                 //replace all ways' references to the original node with the new node
-                for(final OSMWay containingWay : theNode.containingWays.values()) {
+                for(final OSMWay containingWay : theNode.getContainingWays().values()) {
                     containingWay.replaceNode(theNode, (OSMNode) targetEntity);
                 }
             } else if (theEntity instanceof OSMWay) { //TODO not tested
@@ -510,7 +484,7 @@ public class OSMEntitySpace {
             }
 
             //and add targetEntity to any relations theEntity is involved in
-            for(final OSMRelation containingRelation : theEntity.containingRelations.values()) {
+            for(final OSMRelation containingRelation : theEntity.getContainingRelations().values()) {
                 containingRelation.replaceMember(theEntity, targetEntity);
             }
 
@@ -527,7 +501,7 @@ public class OSMEntitySpace {
         //if merging nodes, add the localnode to any ways that the withNode belongs to
         if(targetEntity instanceof OSMNode && withEntity instanceof OSMNode) {
             final OSMNode targetNode = (OSMNode) targetEntity, withNode = (OSMNode) withEntity;
-            final Map<Long, OSMWay> containingWays = new HashMap<>(withNode.containingWays);
+            final Map<Long, OSMWay> containingWays = new HashMap<>(withNode.getContainingWays());
             for (final OSMWay containingWay : containingWays.values()) {
                 containingWay.replaceNode(withNode, targetNode);
             }
@@ -535,7 +509,7 @@ public class OSMEntitySpace {
         }
 
         //also replace the incoming entity's relation memberships with the target entity
-        final Map<Long, OSMRelation> containingRelations = new HashMap<>(withEntity.containingRelations);
+        final Map<Long, OSMRelation> containingRelations = new HashMap<>(withEntity.getContainingRelations());
         for(final OSMRelation containingRelation : containingRelations.values()) {
             containingRelation.replaceMember(withEntity, targetEntity);
         }
@@ -645,8 +619,8 @@ public class OSMEntitySpace {
         assert oldWayNewNodes != null;
 
         //Check if the originalWay's containing relations are valid PRIOR to the split
-        final ArrayList<Boolean> containingRelationValidity = new ArrayList<>(originalWay.containingRelations.size());
-        for(final OSMRelation containingRelation : originalWay.containingRelations.values()) {
+        final ArrayList<Boolean> containingRelationValidity = new ArrayList<>(originalWay.getContainingRelations().size());
+        for(final OSMRelation containingRelation : originalWay.getContainingRelations().values()) {
             containingRelationValidity.add(containingRelation.isValid());
         }
 
@@ -678,7 +652,7 @@ public class OSMEntitySpace {
 
         //now we need to handle membership of any relations, to ensure they're updated with the correct ways
         int idx = 0;
-        final ArrayList<OSMRelation> originalWayContainingRelations = new ArrayList<>(originalWay.containingRelations.values());
+        final ArrayList<OSMRelation> originalWayContainingRelations = new ArrayList<>(originalWay.getContainingRelations().values());
         for(final OSMRelation containingRelation : originalWayContainingRelations) {
             containingRelation.handleMemberWaySplit(originalWay, originalNodeList, allSplitWays, containingRelationValidity.get(idx++));
         }

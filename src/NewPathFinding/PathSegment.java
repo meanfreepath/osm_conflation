@@ -234,7 +234,7 @@ public class PathSegment implements WaySegmentsObserver {
             if(nodeToCheck == parentPathTree.destinationStop.getStopPosition(parentPathTree.route.routeType)) {
                 setEndNode(nodeToCheck, ProcessingStatus.reachedDestination);
                 return processingStatus;
-            } else if(nodeToCheck == endingWayNode || nodeToCheck.containingWayCount > 1) { //reached the end of the way, or this node is a possible junction node
+            } else if(nodeToCheck == endingWayNode || nodeToCheck.getContainingWayCount() > 1) { //reached the end of the way, or this node is a possible junction node
                 setEndNode(nodeToCheck, ProcessingStatus.complete);
                 return processingStatus;
             }
