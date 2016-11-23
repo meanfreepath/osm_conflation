@@ -1,34 +1,108 @@
 package com.company;
 
 import Conflation.*;
-import OSM.*;
+import OSM.OSMEntity;
+import OSM.OSMEntitySpace;
+import OSM.OSMRelation;
 import PathFinding.PathTree;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.*;
+import java.io.*;
+import java.nio.file.FileSystemException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.ListIterator;
 
 public class Main {
-    private final static boolean debugEnabled = false;
+    private static boolean debugEnabled = false;
+    private static String getHelpText() {
+        Main m = new Main();
+        InputStream f = m.getClass().getResourceAsStream("/cli_help.txt");
+        BufferedReader r = new BufferedReader(new InputStreamReader(f));
+        StringBuilder helpBuffer = new StringBuilder(1024);
+        try {
+            for(int c; (c = r.read()) != -1;) {
+                helpBuffer.append((char) c);
+            }
+            r.close();
+            f.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return "Error loading help text!\n";
+        }
+        return helpBuffer.toString();
+    }
     public static void main(String[] args) {
-        if(args.length == 0) {
-            System.err.println("Missing file name argument!");
-            return;
+        //check command line args
+        String importFileName = "routes.osm";
+        String configPath = "./config.txt";
+        List<String> selectedRoutes = null;
+        boolean outputStopsToTaskingManager = false;
+
+        List<String> argList = new ArrayList<>(args.length);
+        Collections.addAll(argList, args);
+       // argList.add("-h");
+        ListIterator<String> argIterator = argList.listIterator();
+        while(argIterator.hasNext()) {
+            switch (argIterator.next()) {
+                case "f": //path to the processed GTFS file
+                case "-gtfs":
+                    importFileName = argIterator.next();
+                    break;
+                case "-c": //config file path
+                case "--config":
+                    configPath = argIterator.next();
+                    break;
+                case "-r": //requested routes
+                case "--routes":
+                    String gtfsRoutes[] = argIterator.next().split(",");
+                    selectedRoutes = new ArrayList<>(gtfsRoutes.length);
+                    Collections.addAll(selectedRoutes, gtfsRoutes);
+                    break;
+                case "-h": //help
+                case "--help":
+                    System.out.println(getHelpText());
+                    System.exit(0);
+                    break;
+                case "-t":
+                case "--taskmgr":
+                    outputStopsToTaskingManager = true;
+                    break;
+                case "-d":
+                case "--debug":
+                    debugEnabled = true;
+                    break;
+            }
         }
 
-        OSMEntitySpace importSpace = new OSMEntitySpace(262144);
+        if(selectedRoutes == null) {
+            System.out.format("FATAL: Please include at least 1 GTFS route id, using the -r option\n%s", getHelpText());
+            System.exit(1);
+        }
+        File importFile = new File(importFileName);
+        if(!importFile.exists()) {
+            System.out.format("FATAL: Unable to open import file “%s”\n", importFileName);
+            System.exit(1);
+        }
 
-        //define the options for the comparison routines
+        //load config, which also creates the working directories if needed
         final RouteConflator.LineComparisonOptions matchingOptions = new RouteConflator.LineComparisonOptions();
-        matchingOptions.segmentSearchBoxSize = 65.0;
-        matchingOptions.maxSegmentLength = 10.0;
-        matchingOptions.setMaxSegmentAngle(50.0);
-        matchingOptions.setMaxFutureVectorAngle(75.0);
-        matchingOptions.maxSegmentOrthogonalDistance = 15.0;
-        matchingOptions.maxSegmentMidPointDistance = Math.sqrt(matchingOptions.maxSegmentOrthogonalDistance * matchingOptions.maxSegmentOrthogonalDistance + 4.0 * matchingOptions.maxSegmentLength * matchingOptions.maxSegmentLength);
+        try {
+            Config.initWithConfigFile(configPath);
+            //define the options for the comparison routines TODO load from config
+            matchingOptions.segmentSearchBoxSize = 65.0;
+            matchingOptions.maxSegmentLength = 10.0;
+            matchingOptions.setMaxSegmentAngle(50.0);
+            matchingOptions.setMaxFutureVectorAngle(75.0);
+            matchingOptions.maxSegmentOrthogonalDistance = 15.0;
+            matchingOptions.maxSegmentMidPointDistance = Math.sqrt(matchingOptions.maxSegmentOrthogonalDistance * matchingOptions.maxSegmentOrthogonalDistance + 4.0 * matchingOptions.maxSegmentLength * matchingOptions.maxSegmentLength);
+        } catch (FileNotFoundException | FileSystemException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
 
         //propagate the debug value as needed
         RouteDataManager.debugEnabled = debugEnabled;
@@ -38,63 +112,54 @@ public class Main {
         OSMEntity.debugEnabled = debugEnabled;
         PathTree.debugEnabled = debugEnabled;
 
-        final String importFileName = args[0];
-
-        final ArrayList<String> selectedRoutes = new ArrayList<>();
-        //selectedRoutes.add("100224");
-        //selectedRoutes.add("100173"); //Route 3: multiple issues (looping, etc)
-        //selectedRoutes.add("100221");
-        //selectedRoutes.add("100062"); //errors splitting
-        //selectedRoutes.add("102581"); //D-Line: not preferring matching trunk_link near NB stop "15th Ave NW & NW Leary Way"
-        //selectedRoutes.add("102615"); // E-Line
-        //selectedRoutes.add("102576"); //C-Line: oneway busway issue at Seneca St (northbound), detour issue on Alaskan Way southbound
-        //selectedRoutes.add("100512"); //A-Line
-        //selectedRoutes.add("102548"); //B-Line
-        //selectedRoutes.add("102619"); //F-Line
-        //selectedRoutes.add("102623"); //894: Mercer Island loopy route
-        //selectedRoutes.add("100184"); //31
-        //selectedRoutes.add("100221"); //41
-        selectedRoutes.add("100214"); //372
-
         try {
+            OSMEntitySpace importSpace = new OSMEntitySpace(262144);
             importSpace.loadFromXML(importFileName);
 
             //create the working entity space for all data
             final RouteDataManager routeDataManager = new RouteDataManager(65536);
 
             //output all the stops in a format that works with the OSM Task Manager
-            /*final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace, routeDataManager, RouteConflator.RouteType.bus);
-            exporter.conflateStops(routeDataManager);
-            exporter.outputForOSMTaskingManager("boxes", "https://www.meanfreepath.com/kcstops/");
-            if(Math.random() < 2) {
-                return;
-            }//*/
+            if(outputStopsToTaskingManager) {
+                System.out.println("Processing all stops from GTFS import file…");
+                final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace, routeDataManager, RouteConflator.RouteType.bus);
+                exporter.conflateStops(routeDataManager);
+                exporter.outputForOSMTaskingManager(Config.sharedInstance.outputDirectory, Config.sharedInstance.taskingManagerBaseUrl);
+                System.exit(0);
+            }
 
             //create a list of all the route_master relations in the import dataset
             final List<OSMRelation> importRouteMasterRelations = new ArrayList<>(importSpace.allRelations.size());
             String relationType;
             for(final OSMRelation relation : importSpace.allRelations.values()) {
                 relationType = relation.getTag(OSMEntity.KEY_TYPE);
-                if(relationType != null && relationType.equals(OSMEntity.TAG_ROUTE_MASTER)) {
+                final String gtfsRouteId = relation.getTag(RouteConflator.GTFS_ROUTE_ID);
+                if(relationType != null && relationType.equals(OSMEntity.TAG_ROUTE_MASTER) && selectedRoutes.contains(gtfsRouteId)) {
+                    selectedRoutes.remove(gtfsRouteId);
                     importRouteMasterRelations.add(relation);
                 }
             }
             importSpace = null; //import data no longer needed
 
+            if(selectedRoutes.size() > 0) {
+                System.out.format("WARNING: No data found for routes: " + String.join(", ", selectedRoutes));
+                if(importRouteMasterRelations.size() == 0) { //bail if no routes to process
+                    System.out.format("FATAL: No valid routes to process\n");
+                    System.exit(1);
+                }
+            }
+
             //loop through the route masters, processing their subroutes in one entity space
             final List<RouteConflator> routeConflators = new ArrayList<>(importRouteMasterRelations.size());
             try {
                 for (final OSMRelation importRouteMaster : importRouteMasterRelations) {
-                    if (!selectedRoutes.contains(importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID))) {
-                        continue;
-                    }
 
                     //output an OSM XML file with only the current route data
                     System.out.format("Processing route %s (ref %s, GTFS id %s), %d trips…\n", importRouteMaster.getTag(OSMEntity.KEY_NAME), importRouteMaster.getTag(OSMEntity.KEY_REF), importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID), importRouteMaster.getMembers().size());
                     if (debugEnabled) {
                         OSMEntitySpace originalRouteSpace = new OSMEntitySpace(2048);
                         originalRouteSpace.addEntity(importRouteMaster, OSMEntity.TagMergeStrategy.keepTags, null);
-                        originalRouteSpace.outputXml("gtfsroute_" + importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID) + ".osm");
+                        originalRouteSpace.outputXml(Config.sharedInstance.outputDirectory + "/gtfsroute_" + importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID) + ".osm");
                         originalRouteSpace = null;
                     }
 
@@ -102,7 +167,12 @@ public class Main {
                     routeConflators.add(new RouteConflator(importRouteMaster, routeDataManager, matchingOptions));
                 }
             } catch(InvalidArgumentException e) {
-                e.printStackTrace();
+                System.out.format("WARNING: %s\n", e.getMessage());
+            }
+
+            //bail if no valid routes to process
+            if(routeConflators.size() == 0) {
+                System.out.format("FATAL: no valid routes to process\n");
                 System.exit(1);
             }
 
@@ -130,12 +200,9 @@ public class Main {
                     }
                 }
                 relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null);
-                relationSpace.outputXml("relation_" + routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_REF) + ".osm");
+                relationSpace.outputXml(Config.sharedInstance.outputDirectory + "relation_" + routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_REF) + ".osm");
             }
             //importSpace.outputXml("newresult.osm");
-        } catch (FileNotFoundException e) {
-            System.err.println("Cannot find file \"" + importFileName + "\", exiting...");
-            System.exit(1);
         } catch (IOException | ParserConfigurationException | SAXException | InvalidArgumentException e) {
             e.printStackTrace();
         }

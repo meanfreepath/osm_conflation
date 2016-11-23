@@ -3,6 +3,7 @@ package Conflation;
 import NewPathFinding.PathTree;
 import NewPathFinding.RoutePathFinder;
 import OSM.*;
+import com.company.Config;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
@@ -239,7 +240,7 @@ public class Route {
             cellWay.setTag("name", cell.toString());
         }
 
-        segmentSpace.outputXml("segments" + tripMarker + ".osm");
+        segmentSpace.outputXml(Config.sharedInstance.debugDirectory + "/segments" + tripMarker + ".osm");
     }
     private static void debugCreateSegmentWay(final SegmentMatch osmSegmentMatch, final int totalMatchCount, final String nodeMatchFormat, final String wayMatchFormat, final Map<String, OSMNode> nodeSpaceMap, final Map<String, OSMWay> waySpaceMap, final OSMEntitySpace entitySpace, final OSMEntitySpace segmentSpace) {
         OSMNode matchOriginNode, matchLastNode;

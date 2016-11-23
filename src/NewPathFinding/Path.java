@@ -1,6 +1,9 @@
 package NewPathFinding;
 
-import Conflation.*;
+import Conflation.LineSegment;
+import Conflation.OSMWaySegments;
+import Conflation.RouteConflator;
+import Conflation.RouteLineSegment;
 import OSM.*;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 

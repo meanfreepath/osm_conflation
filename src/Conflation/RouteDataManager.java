@@ -2,6 +2,7 @@ package Conflation;
 
 import OSM.*;
 import Overpass.OverpassConverter;
+import com.company.Config;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
@@ -120,7 +121,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
                 SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss");
                 converter.getEntitySpace().name = String.format("download_%s_%d", dateFormat.format(now), downloadIdx++);
                 try {
-                    converter.getEntitySpace().outputXml("./cache/" + converter.getEntitySpace().name + ".osm");
+                    converter.getEntitySpace().outputXml(Config.sharedInstance.cacheDirectory + "/" + converter.getEntitySpace().name + ".osm");
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -387,7 +388,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
 
         if(debugEnabled) {
             try {
-                existingStopsSpace.outputXml("stopdownload.osm");
+                existingStopsSpace.outputXml(Config.sharedInstance.debugDirectory + "/stopdownload.osm");
             } catch (IOException e) {
                 e.printStackTrace();
             }

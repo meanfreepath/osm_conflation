@@ -2,12 +2,12 @@ package NewPathFinding;
 
 import Conflation.*;
 import OSM.*;
+import com.company.Config;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -279,7 +279,7 @@ public class RoutePathFinder {
         }
 
         try {
-            segmentSpace.outputXml("pathdebug" + route.routeRelation.osm_id + ".osm");
+            segmentSpace.outputXml(Config.sharedInstance.debugDirectory + "/pathdebug" + route.routeRelation.osm_id + ".osm");
         } catch (IOException e) {
             e.printStackTrace();
         }

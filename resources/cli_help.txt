@@ -1,0 +1,12 @@
+
+GTFS Importer for OpenStreetMap
+
+Usage: LineConflator [OPTIONS] -r [ROUTE IDS]
+
+ -c, --config   Path to the config file (default: config.txt)
+ -f, --gtfs     Path to the processed GTFS file (default: routes.osm)
+ -h, --help
+ -r, --routes   Comma-separated list of GTFS route ids
+ -t, --taskmgr  Downloads and conflates all existing stops in the area covered by the GTFS file
+                with data from the OpenStreetMap server, outputting in a format usable by the
+                OpenStreetMap Tasking Manager (https://github.com/hotosm/osm-tasking-manager2)

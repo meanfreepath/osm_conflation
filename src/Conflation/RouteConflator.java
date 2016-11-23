@@ -1,10 +1,8 @@
 package Conflation;
 
 import NewPathFinding.PathTree;
-import OSM.OSMEntity;
-import OSM.OSMNode;
-import OSM.OSMRelation;
-import OSM.OSMWay;
+import OSM.*;
+import com.company.Config;
 import com.sun.istack.internal.NotNull;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 
@@ -135,7 +133,17 @@ public class RouteConflator {
 
             importRoutes.add(new Route(subRoute, routePath, routeStops, this));
         }
+
+        //output the GTFS route to its own file
+        final OSMEntitySpace gtfsOutputSpace = new OSMEntitySpace(1024);
+        gtfsOutputSpace.addEntity(importRouteMaster, OSMEntity.TagMergeStrategy.copyTags, null);
+        try {
+            gtfsOutputSpace.outputXml(String.format("%s/gtfsroute_%s_ref%s.osm", Config.sharedInstance.outputDirectory, importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID), importRouteMaster.getTag(OSMEntity.KEY_REF)));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
+
 
     /**
      * Define the search tags for the ways for the given route type
@@ -469,7 +477,7 @@ public class RouteConflator {
 
             if(debugEnabled) {
                 try {
-                    workingEntitySpace.outputXml("newresult" + route.routeRelation.osm_id + ".osm");
+                    workingEntitySpace.outputXml(Config.sharedInstance.debugDirectory + "/newresult" + route.routeRelation.osm_id + ".osm");
                     route.routePathFinder.debugOutputPaths(workingEntitySpace);
                 } catch (IOException e) {
                     e.printStackTrace();
