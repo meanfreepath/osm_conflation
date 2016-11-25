@@ -1,10 +1,9 @@
 package Conflation;
 
-import OSM.OSMEntity;
-import OSM.OSMNode;
-import OSM.Point;
-import OSM.Region;
+import OSM.*;
+import com.company.Config;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -174,6 +173,25 @@ public class StopConflator {
             /*if(stopArea.bestWayMatch.line. == null) {
                 System.out.println("No sufficient match found for stop " + stopArea);
             }*/
+        }
+    }
+
+    /**
+     * Outputs the stop platforms/positions for the given route masters into an OSM XML file
+     * @param routeConflators
+     * @throws IOException
+     */
+    public void outputStopsForRoutes(final List<RouteConflator> routeConflators) throws IOException {
+        for(final RouteConflator routeConflator : routeConflators) {
+            final OSMEntitySpace stopPlatformSpace = new OSMEntitySpace(2048);
+            for (final StopArea stop : routeConflator.getAllRouteStops()) {
+                stopPlatformSpace.addEntity(stop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null);
+                final OSMNode stopPosition = stop.getStopPosition(routeConflator.routeType);
+                if (stopPosition != null) {
+                    stopPlatformSpace.addEntity(stopPosition, OSMEntity.TagMergeStrategy.keepTags, null);
+                }
+            }
+            stopPlatformSpace.outputXml(String.format("%s/route_stops_%s.osm", Config.sharedInstance.outputDirectory, routeConflator.gtfsRouteId));
         }
     }
 }

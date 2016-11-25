@@ -40,11 +40,10 @@ public class Main {
         String importFileName = "routes.osm";
         String configPath = "./config.txt";
         List<String> selectedRoutes = null;
-        boolean outputStopsToTaskingManager = false;
+        boolean outputStopsToTaskingManager = false, processStopsOnly = false;
 
         List<String> argList = new ArrayList<>(args.length);
         Collections.addAll(argList, args);
-       // argList.add("-h");
         ListIterator<String> argIterator = argList.listIterator();
         while(argIterator.hasNext()) {
             switch (argIterator.next()) {
@@ -66,6 +65,10 @@ public class Main {
                 case "--help":
                     System.out.println(getHelpText());
                     System.exit(0);
+                    break;
+                case "-s":
+                case "--stopsonly":
+                    processStopsOnly = true;
                     break;
                 case "-t":
                 case "--taskmgr":
@@ -176,12 +179,21 @@ public class Main {
                 System.exit(1);
             }
 
-            //fetch all ways from OSM that are within the routes' bounding boxes
-            routeDataManager.downloadRegionsForImportDataset(routeConflators, matchingOptions);
-
             //fetch all existing stops from OSM in the entire route's bounding box, and match them with the route's stops
             final StopConflator stopConflator = new StopConflator();
-            routeDataManager.conflateStopsWithOSM(routeConflators);
+
+            //if processing stops only, output them to an OSM XML file and bail
+            if(processStopsOnly) {
+                for(final RouteConflator routeConflator : routeConflators) {
+                    routeConflator.generateStopAreas();
+                }
+                routeDataManager.conflateStopsWithOSM(routeConflators);
+                stopConflator.outputStopsForRoutes(routeConflators);
+                System.exit(0);
+            } else { //otherwise, fetch all ways from OSM that are within the routes' bounding boxes
+                routeDataManager.downloadRegionsForImportDataset(routeConflators, matchingOptions);
+                routeDataManager.conflateStopsWithOSM(routeConflators);
+            }
 
             //now run the conflation algorithms on each route_master
             for(final RouteConflator routeConflator : routeConflators) {
