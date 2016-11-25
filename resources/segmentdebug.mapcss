@@ -1,3 +1,13 @@
+meta {
+    title: "GTFS Importer";   /* title shown in the menu */
+/*    icon: "images/logo.png";  /* small icon shown in the menu next to the title */
+    version: "1.0";           /* the version of the style */
+    description: "Styles to make reviewing imported data easier";       /* one or two sentences of describing the style */
+    author: "Nick Baicoianu";            /* the author(s) of the style */
+/*    link: "http://...";       /* URL to the web page of the style */
+ /*   min-josm-version: 6789;   /* the minimum JOSM version where this style works */
+}
+
 way[matchcount > 0] {
 	set tmcount;
 	left-casing-color: #ff8800;
@@ -30,4 +40,27 @@ way.tmcount {
 	right-casing-width: 4;
 	left-casing-opacity: 0.6;
 	right-casing-opacity: 0.6;
+}
+
+
+node[public_transport=platform] {
+    set platformicon;
+    symbol-stroke-color: #00ff00;
+    text-color: #00ff00;
+}
+node[public_transport=platform]:new {
+    set platformicon;
+    symbol-stroke-color: #ffff00;
+    text-color: #ffff00;
+}
+node[public_transport=platform]["gtfs:conflict"="yes"] {
+    set platformicon;
+    symbol-stroke-color: #ff0000;
+    text-color: #ff0000;
+}
+
+node.platformicon {
+    /*icon-image: none;*/
+    symbol-stroke-width: 8;
+    symbol-stroke-opacity: 0.8;
 }
