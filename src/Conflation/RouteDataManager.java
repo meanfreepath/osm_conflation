@@ -182,19 +182,18 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
         final Date t0 = new Date();
         for (final OSMWay way : allWays.values()) {
             //only include completely-downloaded ways, with all their nodes present and complete
-            if (!way.areAllNodesComplete()) {
+            if (way.getCompletionStatus() != OSMEntity.CompletionStatus.membersComplete) {
                 purgeEntity(way);
                 continue;
             }
-            if (way.isComplete()) {
-                final OSMWaySegments line = new OSMWaySegments(way, wayMatchingOptions);
-                candidateLines.put(way.osm_id, line);
-                line.addObserver(this);
 
-                for (final Cell cell : Cell.allCells) {
-                    if (Region.intersects(cell.boundingBox, way.getBoundingBox())) {
-                        cell.addWay(line);
-                    }
+            final OSMWaySegments line = new OSMWaySegments(way, wayMatchingOptions);
+            candidateLines.put(way.osm_id, line);
+            line.addObserver(this);
+
+            for (final Cell cell : Cell.allCells) {
+                if (Region.intersects(cell.boundingBox, way.getBoundingBox())) {
+                    cell.addWay(line);
                 }
             }
         }
@@ -396,7 +395,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
         //and another list of stops in the existing OSM data
         final ArrayList<OSMEntity> importedExistingStops = new ArrayList<>(existingStopsSpace.allEntities.size());
         for(final OSMEntity existingStop : existingStopsSpace.allEntities.values()) {
-            importedExistingStops.add(addEntity(existingStop, OSMEntity.TagMergeStrategy.keepTags, null));
+            importedExistingStops.add(addEntity(existingStop, OSMEntity.TagMergeStrategy.keepTags, null, true));
         }
 
         //and compare them to the existing OSM data

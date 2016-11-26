@@ -185,10 +185,10 @@ public class StopConflator {
         for(final RouteConflator routeConflator : routeConflators) {
             final OSMEntitySpace stopPlatformSpace = new OSMEntitySpace(2048);
             for (final StopArea stop : routeConflator.getAllRouteStops()) {
-                stopPlatformSpace.addEntity(stop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null);
+                stopPlatformSpace.addEntity(stop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null, true);
                 final OSMNode stopPosition = stop.getStopPosition(routeConflator.routeType);
                 if (stopPosition != null) {
-                    stopPlatformSpace.addEntity(stopPosition, OSMEntity.TagMergeStrategy.keepTags, null);
+                    stopPlatformSpace.addEntity(stopPosition, OSMEntity.TagMergeStrategy.keepTags, null, true);
                 }
             }
             stopPlatformSpace.outputXml(String.format("%s/route_stops_%s.osm", Config.sharedInstance.outputDirectory, routeConflator.gtfsRouteId));

@@ -55,7 +55,7 @@ public class OSMEntitySpace {
     public String name;
     public final HashMap<Long, OSMEntity> debugEntities = new HashMap<>(8);
 
-    private ArrayList<Long> debugEntityIds = new ArrayList<>();
+    public ArrayList<Long> debugEntityIds = new ArrayList<>();
 
     public void setCanUpload(boolean canUpload) {
         this.canUpload = canUpload;
@@ -112,7 +112,7 @@ public class OSMEntitySpace {
     public OSMNode createNode(final double x, final double y, final Map<String, String> withTags) {
         final OSMNode newNode = new OSMNode(--osmIdSequence);
         newNode.setCoordinate(x, y);
-        newNode.setComplete(true);
+        newNode.setComplete(OSMEntity.CompletionStatus.self);
         newNode.markAsModified();
 
         if(withTags != null) {
@@ -130,7 +130,8 @@ public class OSMEntitySpace {
      * @return
      */
     private OSMNode importNode(final OSMNode nodeToCopy, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
-        OSMNode localNode = allNodes.get(nodeToCopy.osm_id);
+        //first check if we have a local copy of the node
+        final OSMNode localNode = allNodes.get(nodeToCopy.osm_id);
         if(localNode == nodeToCopy) {
             return localNode;
         } else if(localNode != null) {
@@ -138,7 +139,7 @@ public class OSMEntitySpace {
             return localNode;
         }
 
-        //otherwise, create an exact copy of the node in the local space
+        //if not, create an exact copy of the node in the local space
         final OSMNode newNode = new OSMNode(nodeToCopy, null);
         addNodeToSpaceList(newNode);
         return newNode;
@@ -168,7 +169,7 @@ public class OSMEntitySpace {
      */
     public OSMWay createWay(final Map<String, String> withTags, final List<OSMNode> withNodes) {
         final OSMWay newWay = new OSMWay(--osmIdSequence);
-        newWay.setComplete(true);
+        newWay.setComplete(OSMEntity.CompletionStatus.memberList);
         newWay.markAsModified();
 
         if(withTags != null) {
@@ -177,9 +178,7 @@ public class OSMEntitySpace {
             }
         }
         if(withNodes != null) {
-            for(final OSMNode node : withNodes) {
-                newWay.appendNode(node);
-            }
+            newWay.copyNodes(withNodes);
         }
         addWayToSpaceList(newWay);
         return newWay;
@@ -187,23 +186,59 @@ public class OSMEntitySpace {
 
     /**
      * Creates a local copy of the given way
-     * @param wayToCopy
-     * @return
+     * @param wayToCopy the way to copy
+     * @param addChildNodes whether to add the child nodes of the way as complete entities
+     * @return the local copy of the way
      */
-    private OSMWay importWay(final OSMWay wayToCopy, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
-        OSMWay localWay = allWays.get(wayToCopy.osm_id);
+    private OSMWay importWay(final OSMWay wayToCopy, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities, final boolean addChildNodes) {
+        final OSMWay localWay = allWays.get(wayToCopy.osm_id);
         if(localWay == wayToCopy) { //ways are the same object, just return
             return localWay;
         } else if(localWay != null) { //ways are different objects: check if anything needs to be merged
-            handleMerge(wayToCopy, localWay, mergeStrategy, conflictingEntities);
+            if(addChildNodes) {
+                handleMerge(wayToCopy, localWay, mergeStrategy, conflictingEntities);
+            }
             return localWay;
         }
 
         //otherwise, create an exact copy of the way in the local space
-        final OSMWay newWay = new OSMWay(wayToCopy, null);
-        importExternalWayNodes(wayToCopy, newWay);
-        addWayToSpaceList(newWay);
+        final OSMWay newWay;
+        if(addChildNodes || wayToCopy.action != OSMEntity.ChangeAction.none) {
+            newWay = new OSMWay(wayToCopy, null);
+            importExternalWayNodes(wayToCopy, newWay);
+            addWayToSpaceList(newWay);
+        } else {
+            newWay = addIncompleteWay(wayToCopy.osm_id);
+        }
         return newWay;
+    }
+    private void upgradeIncompleteNodes(final OSMWay externalWay, final OSMWay localWay) {
+        for(final OSMNode node : localWay.getNodes()) {
+            if(node.complete == OSMEntity.CompletionStatus.incomplete) { //if the local node is incomplete, scan the external way's nodes for it
+                for(final OSMNode externalNode : externalWay.getNodes()) {
+                    if(externalNode.osm_id == node.osm_id) {
+                        if(externalNode.complete != OSMEntity.CompletionStatus.incomplete) {
+                            addEntity(externalNode, OSMEntity.TagMergeStrategy.keepTags, null, true);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    private void upgradeIncompleteMembers(final OSMRelation externalRelation, final OSMRelation localRelation) {
+        for(final OSMRelation.OSMRelationMember member : localRelation.members) {
+            if(member.member.complete == OSMEntity.CompletionStatus.incomplete) { //if the local member is incomplete, scan the external relations's members for it
+                for(final OSMRelation.OSMRelationMember externalMember : externalRelation.members) {
+                    if(externalMember.member.osm_id == member.member.osm_id) {
+                        if(externalMember.member.complete != OSMEntity.CompletionStatus.incomplete) {
+                            addEntity(externalMember.member, OSMEntity.TagMergeStrategy.keepTags, null, true);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
     }
     /**
      * Create an incomplete (i.e. not fully-downloaded) way in this space
@@ -224,12 +259,12 @@ public class OSMEntitySpace {
     /**
      * Create a new Relation in this space
      * @param withTags tags to add to the relation, if any
-     * @param withMembers members to add to the relation, if any
+     * @param withMembers memberList to add to the relation, if any
      * @return the new relation
      */
     public OSMRelation createRelation(final Map<String, String> withTags, final List<OSMRelation.OSMRelationMember> withMembers) {
         final OSMRelation newRelation = new OSMRelation(--osmIdSequence);
-        newRelation.setComplete(true);
+        newRelation.setComplete(OSMEntity.CompletionStatus.memberList);
         newRelation.markAsModified();
 
         if(withTags != null) {
@@ -238,9 +273,7 @@ public class OSMEntitySpace {
             }
         }
         if(withMembers != null) {
-            for(final OSMRelation.OSMRelationMember member: withMembers) {
-                newRelation.addMember(member.member, member.role);
-            }
+            newRelation.copyMembers(withMembers);
         }
 
         addRelationToSpaceList(newRelation);
@@ -249,20 +282,25 @@ public class OSMEntitySpace {
     /**
      * Creates a local instance of the given relation, if not already present
      * @param relationToCopy the relation
+     * @param mergeStrategy the tag merge strategy to use
+     * @param conflictingEntities the conflicting entities arising from this operation, if any
+     * @param addChildMembers whether to add the memberList as complete entities
      * @return the local copy of the relation
      */
-    private OSMRelation importRelation(final OSMRelation relationToCopy, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
+    private OSMRelation importRelation(final OSMRelation relationToCopy, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities, final boolean addChildMembers) {
         OSMRelation localRelation = allRelations.get(relationToCopy.osm_id);
         if(localRelation == relationToCopy) { //relations are the same object, just return
             return localRelation;
         } else if(localRelation != null) { //relations are different objects: check if anything needs to be merged
-            handleMerge(relationToCopy, localRelation, mergeStrategy, conflictingEntities);
+            if(addChildMembers) {
+                handleMerge(relationToCopy, localRelation, mergeStrategy, conflictingEntities);
+            }
             return localRelation;
         }
 
-        //otherwise, create an exact copy of the relation in the local space
+        //otherwise, create an exact copy of the relation in the local space (members will be incomplete if addChildMembers is false)
         final OSMRelation newRelation = new OSMRelation(relationToCopy, null);
-        importExternalRelationMembers(relationToCopy, newRelation);
+        importExternalRelationMembers(relationToCopy, newRelation, addChildMembers);
 
         addRelationToSpaceList(newRelation);
         return newRelation;
@@ -286,7 +324,7 @@ public class OSMEntitySpace {
         allEntities.put(newNode.osm_id, newNode);
 
         if(debugEnabled && debugEntityIds.contains(newNode.osm_id)) {
-            System.out.println(name + " CREATE " + (newNode.isComplete() ? "COMPLETE" : "**INCOMPLETE**") + " NODE " + newNode);
+            System.out.println(name + " CREATE " + newNode.complete.toString() + " NODE " + newNode);
             debugEntities.put(newNode.osm_id, newNode);
         }
     }
@@ -295,7 +333,7 @@ public class OSMEntitySpace {
         allEntities.put(newWay.osm_id, newWay);
 
         if(debugEnabled && debugEntityIds.contains(newWay.osm_id)) {
-            System.out.println(name + " CREATE " + (newWay.isComplete() ? "COMPLETE" : "**INCOMPLETE**") + " WAY " + newWay);
+            System.out.println(name + " CREATE " + newWay.complete.toString() + " WAY " + newWay);
             debugEntities.put(newWay.osm_id, newWay);
         }
     }
@@ -304,7 +342,7 @@ public class OSMEntitySpace {
         allEntities.put(newRelation.osm_id, newRelation);
 
         if(debugEnabled && debugEntityIds.contains(newRelation.osm_id)) {
-            System.out.println(name + " CREATE " + (newRelation.isComplete() ? "COMPLETE" : "**INCOMPLETE**") + " RELATION " + newRelation);
+            System.out.println(name + " CREATE " + newRelation.complete.toString() + " RELATION " + newRelation);
             debugEntities.put(newRelation.osm_id, newRelation);
         }
     }
@@ -318,10 +356,10 @@ public class OSMEntitySpace {
      * @return TRUE if a new entity should be created, FALSE if it has been merged
      */
     private void handleMerge(final OSMEntity entity, final OSMEntity existingEntity, final OSMEntity.TagMergeStrategy mergeStrategy, List<OSMEntity> conflictingEntities) {
-        if(!entity.isComplete()) { //no merging can happen if incoming entity is incomplete
+        if(entity.complete == OSMEntity.CompletionStatus.incomplete) { //no merging can happen if incoming entity is incomplete
             return;
         }
-        if(existingEntity.isComplete()) { //existingEntity is complete: just update tags
+        if(existingEntity.complete != OSMEntity.CompletionStatus.incomplete) { //existingEntity is complete: just update tags
             switch (mergeStrategy) {
                 case keepTags:
                 case replaceTags:
@@ -336,13 +374,22 @@ public class OSMEntitySpace {
                     }
                     break;
             }
+
+            //for ways and relations, check if the local entity needs to import any of its child members
+            if(existingEntity.complete != OSMEntity.CompletionStatus.membersComplete) {
+                if (existingEntity instanceof OSMWay) {
+                    upgradeIncompleteNodes((OSMWay) entity, (OSMWay) existingEntity);
+                } else if (existingEntity instanceof OSMRelation) {
+                    upgradeIncompleteMembers((OSMRelation) entity, (OSMRelation) existingEntity);
+                }
+            }
         } else { //if existing entity is not complete, we need to "upgrade" it without altering the base object pointer (which would screw up a lot of dependencies)
-            existingEntity.upgradeToCompleteEntity(entity);
+            existingEntity.upgradeCompletionStatus(entity);
             //handle entity-specific cases here
             if(entity instanceof OSMWay) {
                 importExternalWayNodes((OSMWay) entity, (OSMWay) existingEntity);
             } else if(entity instanceof OSMRelation) {
-                importExternalRelationMembers((OSMRelation) entity, (OSMRelation) existingEntity);
+                importExternalRelationMembers((OSMRelation) entity, (OSMRelation) existingEntity, true);
             }
 
             if(debugEnabled && debugEntityIds.contains(entity.osm_id)) {
@@ -352,19 +399,24 @@ public class OSMEntitySpace {
     }
     /**
      * Add the given OSM entity to the space, as well as any entities it contains
-     * @param entity
-     * @param mergeStrategy
-     * @return
+     * @param entity the entity to add
+     * @param mergeStrategy the tag merging strategy to use
+     * @param addChildEntities when TRUE, import child entities (ways' nodes, relation memberList).  When FALSE, will import child entities as incomplete entities.
+     * @return this entitySpace's copy of the entity
      */
-    public OSMEntity addEntity(final OSMEntity entity, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities) {
+    public OSMEntity addEntity(final OSMEntity entity, final OSMEntity.TagMergeStrategy mergeStrategy, final List<OSMEntity> conflictingEntities, boolean addChildEntities) {
         final OSMEntity.ChangeAction originalEntityChangeAction = entity.action;
         final OSMEntity addedEntity;
         if(entity instanceof OSMNode) {
-            addedEntity = importNode((OSMNode) entity, mergeStrategy, conflictingEntities);
+            if(addChildEntities) {
+                addedEntity = importNode((OSMNode) entity, mergeStrategy, conflictingEntities);
+            } else {
+                addedEntity = addIncompleteNode(entity.osm_id);
+            }
         } else if(entity instanceof OSMWay) {
-            addedEntity = importWay((OSMWay) entity, mergeStrategy, conflictingEntities);
+            addedEntity = importWay((OSMWay) entity, mergeStrategy, conflictingEntities, addChildEntities);
         } else if(entity instanceof OSMRelation) {
-            addedEntity = importRelation((OSMRelation) entity, mergeStrategy, conflictingEntities);
+            addedEntity = importRelation((OSMRelation) entity, mergeStrategy, conflictingEntities, addChildEntities);
         } else { //shouldn't reach here!
             addedEntity = null;
         }
@@ -374,22 +426,34 @@ public class OSMEntitySpace {
         addedEntity.action = originalEntityChangeAction;
         return addedEntity;
     }
-    private OSMWay importExternalWayNodes(final OSMWay externalWay, final OSMWay localWay) {
+
+    /**
+     * Copy the nodes from externalWay into this entity space and onto localWay
+     * @param externalWay the external way whose nodes we want to copy
+     * @param localWay the local copy of the way
+     */
+    private void importExternalWayNodes(final OSMWay externalWay, final OSMWay localWay) {
         //make sure all the nodes on the incoming completed way are in this way's entitySpace
         final List<OSMNode> localNodes = new ArrayList<>(externalWay.getNodes().size());
         for(final OSMNode node : externalWay.getNodes()) {
-            localNodes.add((OSMNode) addEntity(node, OSMEntity.TagMergeStrategy.keepTags, null));
+            localNodes.add((OSMNode) addEntity(node, OSMEntity.TagMergeStrategy.keepTags, null, true));
         }
 
         //and add them onto the local way
         localWay.copyNodes(localNodes);
-        return localWay;
     }
-    private OSMRelation importExternalRelationMembers(final OSMRelation externalRelation, final OSMRelation localRelation) {
+
+    /**
+     * Copy the memberList from externalRelation into this entity space and onto localRelation
+     * @param externalRelation the external way whose nodes we want to copy
+     * @param localRelation the local copy of the way
+     * @param asComplete whether to add the nodes as complete entities or not
+     */
+    private OSMRelation importExternalRelationMembers(final OSMRelation externalRelation, final OSMRelation localRelation, final boolean asComplete) {
         //add all the member entities of the relation, then add the relation itself
         final List<OSMRelation.OSMRelationMember> localMembers = new ArrayList<>(externalRelation.members.size());
         for(final OSMRelation.OSMRelationMember member : externalRelation.members) {
-            final OSMEntity addedEntity = addEntity(member.member, OSMEntity.TagMergeStrategy.keepTags, null);
+            final OSMEntity addedEntity = addEntity(member.member, OSMEntity.TagMergeStrategy.keepTags, null, asComplete);
             localMembers.add(new OSMRelation.OSMRelationMember(addedEntity, member.role));
         }
         localRelation.copyMembers(localMembers);
@@ -421,7 +485,7 @@ public class OSMEntitySpace {
 
         //if the local entity to delete doesn't exist in this space, we need to add it before beginning the deletion process
         if(localEntityToDelete == null) {
-            localEntityToDelete = addEntity(entityToDelete, OSMEntity.TagMergeStrategy.keepTags, null);
+            localEntityToDelete = addEntity(entityToDelete, OSMEntity.TagMergeStrategy.keepTags, null, true);
         }
 
         //remove all references from the main data arrays
@@ -519,7 +583,7 @@ public class OSMEntitySpace {
 
         //if the target entity is a new entity (with withEntity's id), add it to this space now that withEntity is deleted (to avoid osm_id conflicts)
         if(entityReplaced) {
-            addEntity(targetEntity, OSMEntity.TagMergeStrategy.keepTags, null);
+            addEntity(targetEntity, OSMEntity.TagMergeStrategy.keepTags, null, true);
         }
         return targetEntity;
     }
@@ -698,26 +762,26 @@ public class OSMEntitySpace {
                 switch (qName) {
                     case tagNode: //nodes are simply added to the entity array
                         final OSMNode curNode = new OSMNode(Long.parseLong(attributes.getValue(keyId)));
-                        curNode.setComplete(true);
+                        curNode.setComplete(OSMEntity.CompletionStatus.self);
                         curNode.setCoordinate(SphericalMercator.latLonToMercator(Double.parseDouble(attributes.getValue("lat")), Double.parseDouble(attributes.getValue("lon"))));
                         processBaseValues(curNode, attributes);
 
-                        final OSMNode addedNode = (OSMNode) addEntity(curNode, OSMEntity.TagMergeStrategy.keepTags, null);
+                        final OSMNode addedNode = (OSMNode) addEntity(curNode, OSMEntity.TagMergeStrategy.keepTags, null, true);
                         entityStack.push(addedNode);
                         break;
                     case tagWay:
                         final OSMWay curWay = new OSMWay(Long.parseLong(attributes.getValue(keyId)));
-                        curWay.setComplete(true);
+                        curWay.setComplete(OSMEntity.CompletionStatus.memberList);
                         processBaseValues(curWay, attributes);
 
-                        final OSMWay addedWay = (OSMWay) addEntity(curWay, OSMEntity.TagMergeStrategy.keepTags, null);
+                        final OSMWay addedWay = (OSMWay) addEntity(curWay, OSMEntity.TagMergeStrategy.keepTags, null, true);
                         entityStack.push(addedWay);
                         break;
                     case tagRelation:
                         final OSMRelation curRelation = new OSMRelation(Long.parseLong(attributes.getValue(keyId)));
-                        curRelation.setComplete(true);
+                        curRelation.setComplete(OSMEntity.CompletionStatus.memberList);
                         processBaseValues(curRelation, attributes);
-                        final OSMRelation addedRelation = (OSMRelation) addEntity(curRelation, OSMEntity.TagMergeStrategy.keepTags, null);
+                        final OSMRelation addedRelation = (OSMRelation) addEntity(curRelation, OSMEntity.TagMergeStrategy.keepTags, null, true);
                         entityStack.push(addedRelation);
                         break;
                     case tagTag: //tag for a node/way/relation
@@ -728,10 +792,12 @@ public class OSMEntitySpace {
                         long nodeId = Long.parseLong(attributes.getValue(keyRef));
                         final OSMNode wayNode = allNodes.get(nodeId);
                         final OSMWay curWayToAdd = (OSMWay) entityStack.peek();
+                        curWayToAdd.setComplete(OSMEntity.CompletionStatus.memberList);
                         curWayToAdd.appendNode(wayNode);
                         break;
                     case tagRelationMember:
                         final OSMRelation relationToAdd = (OSMRelation) entityStack.peek();
+                        relationToAdd.setComplete(OSMEntity.CompletionStatus.memberList);
                         final long memberId = Long.parseLong(attributes.getValue(keyRef));
                         final OSMEntity memberEntity;
                         switch (attributes.getValue(keyType)) {
@@ -834,17 +900,20 @@ public class OSMEntitySpace {
         }
 
         for(final OSMNode node: allNodes.values()) {
-            if(node.isComplete()) {
+            if(node.complete != OSMEntity.CompletionStatus.incomplete) {
                 writer.write(node.toOSMXML());
             }
         }
         for(final OSMWay way: allWays.values()) {
-            if(way.isComplete()) {
+            if(way.complete.compareTo(OSMEntity.CompletionStatus.memberList) >= 0) {
                 writer.write(way.toOSMXML());
             }
         }
-        for(final OSMRelation relation: sortedRelations) {
-            if(relation.isComplete()) {
+
+        //NOTE: sortedRelations will be null if the Graph is unable to order them (i.e. cyclical relation)
+        final Collection<OSMRelation> relationList = sortedRelations != null ? sortedRelations : allRelations.values();
+        for(final OSMRelation relation: relationList) {
+            if(relation.complete.compareTo(OSMEntity.CompletionStatus.memberList) >= 0) {
                 writer.write(relation.toOSMXML());
             }
         }
@@ -869,7 +938,7 @@ public class OSMEntitySpace {
 
         //merge in the entities
         for(final OSMEntity otherSpaceEntity : otherSpace.allEntities.values()) {
-            addEntity(otherSpaceEntity, mergeStrategy, conflictingEntities);
+            addEntity(otherSpaceEntity, mergeStrategy, conflictingEntities, true);
         }
 
         //and delete any entities that were marked as deleted in the other space

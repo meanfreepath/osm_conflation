@@ -37,6 +37,9 @@ public abstract class OSMEntity {
     public enum ChangeAction {
         none, modify, delete
     }
+    public enum CompletionStatus {
+        incomplete, self, memberList, membersComplete
+    }
 
     public static boolean debugEnabled = false;
 
@@ -50,7 +53,7 @@ public abstract class OSMEntity {
 
 
     protected Region boundingBox;
-    protected boolean complete = false;
+    protected CompletionStatus complete = CompletionStatus.incomplete;
 
     protected HashMap<String,String> tags;
 
@@ -111,9 +114,10 @@ public abstract class OSMEntity {
 
         copyMetadata(entityToCopy, this);
     }
-    protected void upgradeToCompleteEntity(final OSMEntity completeEntity) {
-        if(complete || osm_id != completeEntity.osm_id) {
+    protected void upgradeCompletionStatus(final OSMEntity completeEntity) {
+        if(complete != CompletionStatus.incomplete || osm_id != completeEntity.osm_id) {
             System.out.println("BAD UPGRADE " + osm_id + "/" + completeEntity.osm_id);
+            return;
         }
         complete = completeEntity.complete;
         action = completeEntity.action;
@@ -131,13 +135,17 @@ public abstract class OSMEntity {
             }
         }
     }
+    /**
+     * Wipes all the local tag and metadata from this entity, resetting its modification status in the process
+     */
     protected void downgradeToIncompleteEntity() {
-        complete = false;
+        complete = CompletionStatus.incomplete;
         boundingBox = null;
         tags = null;
 
         uid = version = changeset = -1;
         user = timestamp = null;
+        action = ChangeAction.none;
     }
 
     /**
@@ -166,7 +174,7 @@ public abstract class OSMEntity {
      * @throws InvalidArgumentException
      */
     public void addTag(final String name, final String value) throws InvalidArgumentException {
-        if(!complete) { //can't set a tag on an incomplete entity
+        if(complete == CompletionStatus.incomplete) { //can't set a tag on an incomplete entity
             return;
         }
         if(tags == null) {
@@ -186,23 +194,25 @@ public abstract class OSMEntity {
      * @param name
      * @param value
      */
-    public void setTag(final String name, final String value) {
-        if(!complete) { //can't set a tag on an incomplete entity
-            System.out.println("ADDING TAG TO INCOMPLETE " + osm_id);
-            return;
+    public boolean setTag(final String name, final String value) {
+        if(complete == CompletionStatus.incomplete) { //can't set a tag on an incomplete entity
+            return false;
         }
         if(tags == null) {
             tags = new HashMap<>();
         }
+        boolean didModify = false;
         if(value != null) {
             final String oldValue = tags.get(name), newValue = value.trim();
             if(oldValue == null || !oldValue.equals(newValue)) { //update the tag if it's different
                 tags.put(name, newValue);
                 markAsModified();
+                didModify = true;
             }
         } else {
-            removeTag(name);
+            didModify = removeTag(name);
         }
+        return didModify;
     }
     /**
      * Sets the multiple tags on this entity, replacing the previous value (if present)
@@ -214,7 +224,7 @@ public abstract class OSMEntity {
         }
     }
     public boolean removeTag(final String name) {
-        if(!complete) { //can't set a tag on an incomplete entity
+        if(complete == CompletionStatus.incomplete) { //can't set a tag on an incomplete entity
             return false;
         }
         if(tags == null) {
@@ -234,10 +244,10 @@ public abstract class OSMEntity {
      * @return Any tags that conflict (if checkForConflicts is TRUE), null otherwise
      */
     public Map<String, String> copyTagsFrom(final OSMEntity otherEntity, final TagMergeStrategy mergeStrategy) {
-        if(!complete) { //can't set a tag on an incomplete entity
+        if(complete == CompletionStatus.incomplete) { //can't set a tag on an incomplete entity
             return null;
         }
-        if(!otherEntity.complete || otherEntity.tags == null) { //bail here if other entity isn't complete or has no tags
+        if(otherEntity.complete == CompletionStatus.incomplete || otherEntity.tags == null) { //bail here if other entity isn't complete or has no tags
             return null;
         }
         if(tags == null) {
@@ -364,12 +374,12 @@ public abstract class OSMEntity {
         }
         return containingRelationCount;
     }
-    public boolean isComplete() {
+    public CompletionStatus getCompletionStatus() {
         return complete;
     }
-    public void setComplete(boolean complete) {
-        if(!this.complete && complete) { //can't set a node back to incomplete
-            this.complete = true;
+    public void setComplete(CompletionStatus complete) {
+        if(this.complete == CompletionStatus.incomplete && complete != CompletionStatus.incomplete) { //can't set a node back to incomplete
+            this.complete = complete;
         }
     }
     public static String escapeForXML(final String str){

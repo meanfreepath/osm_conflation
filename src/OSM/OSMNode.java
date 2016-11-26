@@ -28,13 +28,13 @@ public class OSMNode extends OSMEntity {
      */
     public OSMNode(final OSMNode nodeToCopy, final Long idOverride) {
         super(nodeToCopy, idOverride);
-        if(complete) {
+        if(complete != CompletionStatus.incomplete) {
             setCoordinate(nodeToCopy.coordinate);
         }
     }
     @Override
-    protected void upgradeToCompleteEntity(final OSMEntity completeEntity) {
-        super.upgradeToCompleteEntity(completeEntity);
+    protected void upgradeCompletionStatus(final OSMEntity completeEntity) {
+        super.upgradeCompletionStatus(completeEntity);
         setCoordinate(((OSMNode) completeEntity).coordinate);
 
         //notify the containing ways that this node is now complete
@@ -96,7 +96,7 @@ public class OSMNode extends OSMEntity {
 
     @Override
     public Region getBoundingBox() {
-        if(!complete) {
+        if(complete == CompletionStatus.incomplete) {
             return null;
         }
         if(boundingBox == null) {
@@ -188,6 +188,10 @@ public class OSMNode extends OSMEntity {
 
     @Override
     public String toString() {
-        return String.format("node@%d (id %d): %.01f,%.01f (%s)", hashCode(), osm_id, coordinate.x, coordinate.y, complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
+        if(complete != CompletionStatus.incomplete) {
+            return String.format("node@%d (id %d): %.01f,%.01f (%s): [%s/%s]", hashCode(), osm_id, coordinate.x, coordinate.y, getTag(OSMEntity.KEY_NAME), complete, action);
+        } else {
+            return String.format("node@%d (id %d): [%s]", hashCode(), osm_id, complete);
+        }
     }
 }

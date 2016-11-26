@@ -2,10 +2,7 @@ package OSM;
 
 import com.sun.istack.internal.NotNull;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 /**
  * Created by nick on 10/15/15.
@@ -21,7 +18,16 @@ public class OSMRelation extends OSMEntity {
     private final static OSMType type = OSMType.relation;
 
     protected final ArrayList<OSMRelationMember> members = new ArrayList<>();
-    protected int completedMemberCount = 0;
+
+    public int getCompletedMemberCount() {
+        int completedMemberCount = 0;
+        for(final OSMRelationMember member : members) {
+            if(member.member.complete != CompletionStatus.incomplete) {
+                completedMemberCount++;
+            }
+        }
+        return completedMemberCount;
+    }
 
     public static class OSMRelationMember {
         public final OSMEntity member;
@@ -50,27 +56,33 @@ public class OSMRelation extends OSMEntity {
     @Override
     protected void downgradeToIncompleteEntity() {
         super.downgradeToIncompleteEntity();
-        final List<OSMRelationMember> membersToRemove = new ArrayList<>(members);
-        for(final OSMRelationMember member : membersToRemove) {
-            removeMember(member.member, Integer.MAX_VALUE);
+
+        //flush the members
+        final ListIterator<OSMRelationMember> memberListIterator = members.listIterator();
+        while (memberListIterator.hasNext()) {
+            final OSMRelationMember member = memberListIterator.next();
+            memberListIterator.remove();
+            member.member.didRemoveFromEntity(this, false);
         }
-        completedMemberCount = 0;
     }
-    protected void copyMembers(final List<OSMRelationMember> membersToCopy) {
-        if(complete) {
+    public void copyMembers(final List<OSMRelationMember> membersToCopy) {
+        if(complete != CompletionStatus.incomplete) {
             for(final OSMRelationMember member : membersToCopy) {
                 addMemberInternal(member.member, member.role, members.size(), false);
-                if(member.member.isComplete()) {
-                    completedMemberCount++;
-                }
             }
+            updateCompletionStatus();
         }
     }
     protected void memberWasMadeComplete(final OSMEntity memberEntity) {
-        completedMemberCount++;
+        updateCompletionStatus();
     }
+
+    /**
+     * Whether all the members of this relation are fully downloaded
+     * @return TRUE if all members are fully downloaded, or no members present, FALSE if this relation is incomplete or 1 or more member is incomplete
+     */
     public boolean areAllMembersComplete() {
-        return completedMemberCount == members.size();
+        return complete.compareTo(CompletionStatus.memberList) >= 0 && getCompletedMemberCount() == members.size();
     }
 
     @Override
@@ -172,7 +184,6 @@ public class OSMRelation extends OSMEntity {
             member.member.didRemoveFromEntity(this, true);
         }
         members.clear();
-        completedMemberCount = 0;
         return super.didDelete(fromSpace);
     }
 
@@ -234,9 +245,6 @@ public class OSMRelation extends OSMEntity {
         for(final OSMRelationMember relationMemberToRemove : relationMembersToRemove) {
             if(members.remove(relationMemberToRemove)) {
                 markAsModified();
-                if(relationMemberToRemove.member.isComplete()) {
-                    completedMemberCount--;
-                }
                 relationMemberToRemove.member.didRemoveFromEntity(this, false);
                 return true;
             }
@@ -251,7 +259,11 @@ public class OSMRelation extends OSMEntity {
      * @return
      */
     public boolean addMember(final OSMEntity member, final String role) {
-        return addMemberInternal(member, role, members.size(), true);
+        final boolean status = addMemberInternal(member, role, members.size(), true);
+        if(status) {
+            updateCompletionStatus();
+        }
+        return status;
     }
     /**
      * Add a new member before the given existing member in the member list
@@ -262,7 +274,11 @@ public class OSMRelation extends OSMEntity {
      */
     public boolean insertBeforeMember(final OSMEntity member, final String role, final OSMEntity existingMember) {
         final int existingMemberIndex = existingMember != null ? indexOfMember(existingMember) : 0; //default to the first if no existingMember provided
-        return addMemberInternal(member, role, existingMemberIndex, true);
+        final boolean status = addMemberInternal(member, role, existingMemberIndex, true);
+        if(status) {
+            updateCompletionStatus();
+        }
+        return status;
     }
     /**
      * Add a new member after the given existing member in the member list
@@ -273,18 +289,22 @@ public class OSMRelation extends OSMEntity {
      */
     public boolean insertAfterMember(final OSMEntity member, final String role, final OSMEntity existingMember) {
         final int existingMemberIndex = existingMember != null ? indexOfMember(existingMember) : members.size() - 2; //default to the last if no existingMember provided
-        return addMemberInternal(member, role, existingMemberIndex + 1, true);
+        final boolean status = addMemberInternal(member, role, existingMemberIndex + 1, true);
+        if(status) {
+            updateCompletionStatus();
+        }
+        return status;
     }
     private boolean addMemberInternal(final OSMEntity member, final String role, final int index, final boolean markAsModified) {
         members.add(index, new OSMRelationMember(member, role));
-        if(member.isComplete()) {
-            completedMemberCount++;
-        }
         member.didAddToEntity(this);
         if(markAsModified) {
             markAsModified();
         }
         return true;
+    }
+    private void updateCompletionStatus() {
+        complete = areAllMembersComplete() ? CompletionStatus.membersComplete : CompletionStatus.memberList;
     }
     /**
      * Replace the old member with the new member
@@ -297,18 +317,13 @@ public class OSMRelation extends OSMEntity {
             final OSMRelationMember oldMember = members.get(memberIndex);
             final OSMRelationMember newMember = new OSMRelationMember(newEntity, oldMember.role);
             members.set(memberIndex, newMember);
-            if(oldMember.member.isComplete()) {
-                completedMemberCount--;
-            }
-            if(newMember.member.isComplete()) {
-                completedMemberCount++;
-            }
 
             oldMember.member.didRemoveFromEntity(this, false);
             newMember.member.didAddToEntity(this);
 
             boundingBox = null; //invalidate the bounding box
             markAsModified();
+            updateCompletionStatus();
         }
     }
     public List<OSMRelationMember> getMembers() {
@@ -473,7 +488,12 @@ public class OSMRelation extends OSMEntity {
                 break;
         }
     }
+    @Override
     public String toString() {
-        return String.format("relation@%d (id %d): %d/%d members (%s)", hashCode(), osm_id, completedMemberCount, members.size(), complete ? getTag(OSMEntity.KEY_NAME) : "incomplete");
+        if(complete == CompletionStatus.incomplete) {
+            return String.format("relation@%d (id %d): %s", hashCode(), osm_id, complete);
+        } else {
+            return String.format("relation@%d (id %d): %d/%d members (%s): %s", hashCode(), osm_id, getCompletedMemberCount(), members.size(), getTag(OSMEntity.KEY_NAME), complete);
+        }
     }
 }

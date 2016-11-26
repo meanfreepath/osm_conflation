@@ -295,7 +295,7 @@ public class Path {
     }*/
     public void debugOutputPathSegments(final OSMEntitySpace entitySpace, final int pathIndex) {
         int segmentIndex = 0;
-        final OSMNode pathBeginNode = (OSMNode) entitySpace.addEntity(parentPathTree.originStop.getStopPosition(parentPathTree.route.routeType), OSMEntity.TagMergeStrategy.keepTags, null);
+        final OSMNode pathBeginNode = (OSMNode) entitySpace.addEntity(parentPathTree.originStop.getStopPosition(parentPathTree.route.routeType), OSMEntity.TagMergeStrategy.keepTags, null, true);
         OSMNode matchOriginNode = pathBeginNode, matchLastNode;
         for (final PathSegment pathSegment : pathSegments) {
             final OSMRelation pathRelation = entitySpace.createRelation(null, null);
@@ -321,7 +321,7 @@ public class Path {
                     }
 
                     if (lineSegment.destinationNode != null) {
-                        matchLastNode = (OSMNode) entitySpace.addEntity(lineSegment.destinationNode, OSMEntity.TagMergeStrategy.keepTags, null);
+                        matchLastNode = (OSMNode) entitySpace.addEntity(lineSegment.destinationNode, OSMEntity.TagMergeStrategy.keepTags, null, true);
                     } else {
                         matchLastNode = entitySpace.createNode(lineSegment.destinationPoint.x, lineSegment.destinationPoint.y, null);
                     }
@@ -358,7 +358,7 @@ public class Path {
                     }
 
                     if (lineSegment.originNode != null) {
-                        matchLastNode = (OSMNode) entitySpace.addEntity(lineSegment.originNode, OSMEntity.TagMergeStrategy.keepTags, null);
+                        matchLastNode = (OSMNode) entitySpace.addEntity(lineSegment.originNode, OSMEntity.TagMergeStrategy.keepTags, null, true);
                     } else {
                         matchLastNode = entitySpace.createNode(lineSegment.originPoint.x, lineSegment.originPoint.y, null);
                     }

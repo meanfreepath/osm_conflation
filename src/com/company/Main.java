@@ -12,10 +12,7 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
 import java.nio.file.FileSystemException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.ListIterator;
+import java.util.*;
 
 public class Main {
     private static boolean debugEnabled = false;
@@ -145,11 +142,11 @@ public class Main {
 
                         //add to the working import space
                         if (relationType != null && relationType.equals(OSMEntity.TAG_ROUTE_MASTER) && selectedGTFSRouteId.equals(gtfsRouteId)) {
-                            workingImportSpace.addEntity(relation, OSMEntity.TagMergeStrategy.copyTags, null);
+                            workingImportSpace.addEntity(relation, OSMEntity.TagMergeStrategy.copyTags, null, true);
 
                             //also save the route's data to an OSM file
                             OSMEntitySpace routeImportSpace = new OSMEntitySpace(2048);
-                            routeImportSpace.addEntity(relation, OSMEntity.TagMergeStrategy.copyTags, null);
+                            routeImportSpace.addEntity(relation, OSMEntity.TagMergeStrategy.copyTags, null, true);
                             routeImportSpace.outputXml(routeFileName);
                         }
                     }
@@ -225,6 +222,7 @@ public class Main {
 
             //now run the conflation algorithms on each route_master, adding the conflated path data to an output space
             final OSMEntitySpace relationSpace = new OSMEntitySpace(65536);
+            relationSpace.name = "routeoutput";
             final List<String> routeIds = new ArrayList<>(routeConflators.size());
             int successfullyMatchedRouteMasters = 0;
             for(final RouteConflator routeConflator : routeConflators) {
@@ -235,23 +233,23 @@ public class Main {
                     successfullyMatchedRouteMasters++;
                 }
 
-                //finally, add the completed relations to the output file for review and upload
-                for(final Route route: routeConflator.getExportRoutes()) {
-                    relationSpace.addEntity(route.routeRelation, OSMEntity.TagMergeStrategy.keepTags, null);
-                }
-                relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null);
-            }
+                //finally, add the completed route relation to the output file for review and upload
+                relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null, true);
 
-            //also include any entities that were changed during the process
-            for(final OSMEntity changedEntity : routeDataManager.allEntities.values()) {
-                if(changedEntity.getAction() == OSMEntity.ChangeAction.modify) {
-                    if(changedEntity instanceof OSMRelation) {
-                        System.out.println("ADD MOD" + changedEntity);
+                /*also add any other relations that contain any of the route's memberList, to prevent membership conflicts if the user edits the output file.
+                  This will also by default include any entities that were modified during the matching process
+                 */
+                for(final Route route : routeConflator.getExportRoutes()) {
+                    for(final OSMRelation.OSMRelationMember routeMember : route.routeRelation.getMembers()) {
+                        final Collection<OSMRelation> containingRelations = routeMember.member.getContainingRelations().values();
+                        for (final OSMRelation containingRelation : containingRelations) {
+                            relationSpace.addEntity(containingRelation, OSMEntity.TagMergeStrategy.keepTags, null, false);
+                        }
                     }
-                    relationSpace.addEntity(changedEntity, OSMEntity.TagMergeStrategy.keepTags, null);
                 }
             }
 
+            //and finally set the "upload" flag and output to a .osm file
             relationSpace.setCanUpload(successfullyMatchedRouteMasters == routeConflators.size());
             relationSpace.outputXml(String.format("%s/relations_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
             //allGTFSRoutesSpace.outputXml("newresult.osm");

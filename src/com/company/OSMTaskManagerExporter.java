@@ -107,7 +107,7 @@ public class OSMTaskManagerExporter {
         for(final DividedBox box : subBoxes) {
             final OSMEntitySpace boxSpace = new OSMEntitySpace(box.containedEntities.size());
             for(final OSMEntity entity : box.containedEntities) {
-                boxSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null);
+                boxSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null, true);
             }
 
             try {
@@ -169,7 +169,7 @@ public class OSMTaskManagerExporter {
         final OSMEntitySpace debugEntitySpace = new OSMEntitySpace(allStops.size());
         for(final StopArea entity : allStops) {
             if(entity.getPlatform().hasTag(StopArea.KEY_GTFS_CONFLICT)) {
-                debugEntitySpace.addEntity(entity.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null);
+                debugEntitySpace.addEntity(entity.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null, true);
             }
         }
         debugEntitySpace.outputXml(destinationDir + "all_stops.osm");

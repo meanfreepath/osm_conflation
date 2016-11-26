@@ -5,8 +5,10 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Created by nick on 11/5/15.
@@ -66,7 +68,7 @@ public class OverpassConverter {
                 final String elementType = curElement.getString("type");
                 if(elementType.equals(OSMEntity.OSMType.node.name())) {
                     final OSMNode node = new OSMNode(curElement.getLong(keyId));
-                    node.setComplete(true);
+                    node.setComplete(OSMEntity.CompletionStatus.self);
                     node.setCoordinate(SphericalMercator.latLonToMercator(curElement.getDouble("lat"), curElement.getDouble("lon")));
 
                     if(curElement.has(keyTags)) {
@@ -75,39 +77,46 @@ public class OverpassConverter {
                     if(curElement.has(keyVersion)) {
                         addMetadata(curElement,node);
                     }
-                    entitySpace.addEntity(node, OSMEntity.TagMergeStrategy.keepTags, null);
+                    entitySpace.addEntity(node, OSMEntity.TagMergeStrategy.keepTags, null, true);
                 } else if(elementType.equals(OSMEntity.OSMType.way.name())) {
                     OSMWay way = new OSMWay(curElement.getLong(keyId));
-                    way.setComplete(true);
+                    way.setComplete(OSMEntity.CompletionStatus.self);
                     if(curElement.has(keyTags)) {
                         addTags(curElement, way);
                     }
                     if(curElement.has(keyVersion)) {
                         addMetadata(curElement, way);
                     }
-                    way = (OSMWay) entitySpace.addEntity(way, OSMEntity.TagMergeStrategy.keepTags, null);
-                    JSONArray wayNodes = curElement.getJSONArray("nodes");
-                    OSMNode curNode;
-                    for(int nodeIdx=0;nodeIdx<wayNodes.length();nodeIdx++) {
-                        long nodeId = wayNodes.getLong(nodeIdx);
-                        curNode = entitySpace.allNodes.get(nodeId);
-                        if(curNode == null) { //create an incomplete (undownloaded) node if not found
-                            curNode = entitySpace.addIncompleteNode(nodeId);
+                    way = (OSMWay) entitySpace.addEntity(way, OSMEntity.TagMergeStrategy.keepTags, null, true);
+                    if(curElement.has("nodes")) {
+                        way.setComplete(OSMEntity.CompletionStatus.memberList);
+                        JSONArray wayNodes = curElement.getJSONArray("nodes");
+                        OSMNode curNode;
+                        final List<OSMNode> nodeList = new ArrayList<>(wayNodes.length());
+                        for (int nodeIdx = 0; nodeIdx < wayNodes.length(); nodeIdx++) {
+                            final long nodeId = wayNodes.getLong(nodeIdx);
+                            curNode = entitySpace.allNodes.get(nodeId);
+                            if (curNode == null) { //create an incomplete (undownloaded) node if not found
+                                curNode = entitySpace.addIncompleteNode(nodeId);
+                            }
+                            nodeList.add(curNode);
                         }
-                        way.appendNode(curNode);
+                        way.copyNodes(nodeList);
                     }
                 } else if(elementType.equals(OSMEntity.OSMType.relation.name())) {
                     OSMRelation relation = new OSMRelation(curElement.getLong(keyId));
-                    relation.setComplete(true);
+                    relation.setComplete(OSMEntity.CompletionStatus.self);
                     if(curElement.has(keyTags)) {
                         addTags(curElement, relation);
                     }
                     if(curElement.has(keyVersion)) {
                         addMetadata(curElement, relation);
                     }
-                    relation = (OSMRelation) entitySpace.addEntity(relation, OSMEntity.TagMergeStrategy.keepTags, null);
+                    relation = (OSMRelation) entitySpace.addEntity(relation, OSMEntity.TagMergeStrategy.keepTags, null, true);
                     if(curElement.has("members")) { //NOTE: relations are last in the Overpass
-                        JSONArray members = curElement.getJSONArray("members");
+                        relation.setComplete(OSMEntity.CompletionStatus.memberList);
+                        final JSONArray members = curElement.getJSONArray("members");
+                        final List<OSMRelation.OSMRelationMember> relationMembers = new ArrayList<>(members.length());
                         for(int memberIdx=0;memberIdx<members.length();memberIdx++) {
                             JSONObject curMember = members.getJSONObject(memberIdx);
                             final long memberId = curMember.getLong("ref");
@@ -137,9 +146,10 @@ public class OverpassConverter {
                                     break;
                             }
                             if(memberEntity != null) {
-                                relation.addMember(memberEntity, memberRole);
+                                relationMembers.add(new OSMRelation.OSMRelationMember(memberEntity, memberRole));
                             }
                         }
+                        relation.copyMembers(relationMembers);
                     }
                 }
             }

@@ -361,13 +361,13 @@ public class RouteConflator {
                 //copy over the tags from the GTFS trip object
                 existingRouteRelation.copyTagsFrom(importRoute.routeRelation, OSMEntity.TagMergeStrategy.copyTags);
 
-                //remove all existing members from the route relation - will be substituted with matched data later
+                //remove all existing memberList from the route relation - will be substituted with matched data later
                 final List<OSMRelation.OSMRelationMember> existingRouteMembers = new ArrayList<>(existingRouteRelation.getMembers());
                 for(final OSMRelation.OSMRelationMember member : existingRouteMembers) {
                     existingRouteRelation.removeMember(member.member, Integer.MAX_VALUE);
                 }
                 final OSMWay importRoutePath = (OSMWay) importRoute.routeRelation.getMembers("").get(0).member;
-                final OSMRelation exportRouteRelation = (OSMRelation) workingEntitySpace.addEntity(existingRouteRelation, OSMEntity.TagMergeStrategy.copyTags, null);
+                final OSMRelation exportRouteRelation = (OSMRelation) workingEntitySpace.addEntity(existingRouteRelation, OSMEntity.TagMergeStrategy.copyTags, null, true);
                 exportRoute = new Route(exportRouteRelation, importRoutePath, exportRouteStops, this);
             } else {
                 exportRoute = new Route(importRoute, exportRouteStops, workingEntitySpace);
@@ -412,9 +412,9 @@ public class RouteConflator {
             existingStop = allRouteStops.get(stop.getPlatform().osm_id);
 
             if(existingStop == null) {
-                newStopPlatform = workingEntitySpace.addEntity(stop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null);
+                newStopPlatform = workingEntitySpace.addEntity(stop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null, true);
                 if (stop.getStopPosition(routeType) != null) {
-                    newStopPosition = (OSMNode) workingEntitySpace.addEntity(stop.getStopPosition(routeType), OSMEntity.TagMergeStrategy.keepTags, null);
+                    newStopPosition = (OSMNode) workingEntitySpace.addEntity(stop.getStopPosition(routeType), OSMEntity.TagMergeStrategy.keepTags, null, true);
                 } else {
                     newStopPosition = null;
                 }
