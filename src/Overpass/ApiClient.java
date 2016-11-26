@@ -38,7 +38,9 @@ public class ApiClient {
 
     public ApiClient(String[] args, HashMap<String, String> kwArgs) {
         //responseFormat = kwArgs.get("responseformat");
-        debug = kwArgs.get("debug").equals("1");
+        if(kwArgs.containsKey("debug")) {
+            debug = kwArgs.get("debug").equals("1");
+        }
         status = 0;
 
         if(debug) { //set connection debug
