@@ -4,6 +4,7 @@ import Conflation.*;
 import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMRelation;
+import Overpass.OverpassConverter;
 import PathFinding.PathTree;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.xml.sax.SAXException;
@@ -40,7 +41,7 @@ public class Main {
         String importFileName = "routes.osm";
         String configPath = "./config.txt";
         List<String> selectedRoutes = null;
-        boolean outputStopsToTaskingManager = false, processStopsOnly = false;
+        boolean outputStopsToTaskingManager = false, processStopsOnly = false, overpassCachingEnabled = true;
 
         List<String> argList = new ArrayList<>(args.length);
         Collections.addAll(argList, args);
@@ -65,6 +66,10 @@ public class Main {
                 case "--help":
                     System.out.println(getHelpText());
                     System.exit(0);
+                    break;
+                case "-n":
+                case "--nocache":
+                    overpassCachingEnabled = false;
                     break;
                 case "-s":
                 case "--stopsonly":
@@ -114,6 +119,7 @@ public class Main {
         StopArea.debugEnabled = debugEnabled;
         OSMEntity.debugEnabled = debugEnabled;
         PathTree.debugEnabled = debugEnabled;
+        OverpassConverter.debugEnabled = debugEnabled;
 
         try {
             OSMEntitySpace importSpace = new OSMEntitySpace(262144);
@@ -126,7 +132,7 @@ public class Main {
             if(outputStopsToTaskingManager) {
                 System.out.println("Processing all stops from GTFS import file…");
                 final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace, routeDataManager, RouteConflator.RouteType.bus);
-                exporter.conflateStops(routeDataManager);
+                exporter.conflateStops(routeDataManager, overpassCachingEnabled);
                 exporter.outputForOSMTaskingManager(Config.sharedInstance.outputDirectory, Config.sharedInstance.taskingManagerBaseUrl);
                 System.exit(0);
             }
@@ -187,12 +193,12 @@ public class Main {
                 for(final RouteConflator routeConflator : routeConflators) {
                     routeConflator.generateStopAreas();
                 }
-                routeDataManager.conflateStopsWithOSM(routeConflators);
+                routeDataManager.conflateStopsWithOSM(routeConflators, overpassCachingEnabled);
                 stopConflator.outputStopsForRoutes(routeConflators);
                 System.exit(0);
             } else { //otherwise, fetch all ways from OSM that are within the routes' bounding boxes
-                routeDataManager.downloadRegionsForImportDataset(routeConflators, matchingOptions);
-                routeDataManager.conflateStopsWithOSM(routeConflators);
+                routeDataManager.downloadRegionsForImportDataset(routeConflators, matchingOptions, overpassCachingEnabled);
+                routeDataManager.conflateStopsWithOSM(routeConflators, overpassCachingEnabled);
             }
 
             //now run the conflation algorithms on each route_master
@@ -212,7 +218,7 @@ public class Main {
                     }
                 }
                 relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null);
-                relationSpace.outputXml(Config.sharedInstance.outputDirectory + "relation_" + routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_REF) + ".osm");
+                relationSpace.outputXml(Config.sharedInstance.outputDirectory + "/relation_" + routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_REF) + ".osm");
             }
             //importSpace.outputXml("newresult.osm");
         } catch (IOException | ParserConfigurationException | SAXException | InvalidArgumentException e) {

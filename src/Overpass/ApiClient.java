@@ -1,5 +1,6 @@
 package Overpass;
 
+import com.company.Config;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
@@ -22,12 +23,17 @@ public class ApiClient {
     public final static String ENDPOINT_URL = "http://overpass-api.de/api/interpreter";
     private final static String QUERY_TEMPLATE = "[out:%s];%sout meta;", GEOJSON_QUERY_TEMPLATE = "[out:%s];%sout body geom;";
 
+    /**
+     * The maximum age (in ms) of cached data files
+     */
+    private long maxCacheAge = 900000;
+
     public enum ResponseFormat {
         json, xml
     }
 
     public ResponseFormat responseFormat = ResponseFormat.json;
-    public boolean debug = false, cachingEnabled = true;
+    public boolean debug = false;
     public int status;
 
     public ApiClient(String[] args, HashMap<String, String> kwArgs) {
@@ -47,21 +53,25 @@ public class ApiClient {
             requests_log.propagate = True*/
         }
     }
+    private static String generateCacheFileName(final String query) throws NoSuchAlgorithmException {
+        final MessageDigest md5 = MessageDigest.getInstance("MD5");
+        final byte[] digest = md5.digest(query.getBytes(Charset.forName("UTF-8")));
+        return String.format("%s/cache_%s.txt", Config.sharedInstance.cacheDirectory, Base64.getUrlEncoder().encodeToString(digest));
+    }
     /**
      * Pass in an Overpass query in Overpass QL
      */
-    public JSONArray get(String query, boolean asGeoJSON) throws Exceptions.UnknownOverpassError {
+    public JSONArray get(String query, boolean asGeoJSON, boolean cachingEnabled) throws Exceptions.UnknownOverpassError {
         final String fullQuery = constructQLQuery(query, asGeoJSON);
 
         File cacheFile = null;
-        if(cachingEnabled) {
-            try {
-                final MessageDigest md5 = MessageDigest.getInstance("MD5");
-                final byte[] digest = md5.digest(fullQuery.getBytes(Charset.forName("UTF-8")));
-                final String fileName = "./cache/cache_" + Base64.getUrlEncoder().encodeToString(digest) + ".txt";
-                //System.out.println("FETCH " + fileName);
-                cacheFile = new File(fileName);
-                if (cacheFile.exists()) {
+        try {
+            final String fileName = generateCacheFileName(fullQuery);
+            //get a handle on the cache file, if any, and check its age
+            cacheFile = new File(fileName);
+            if (cacheFile.exists()) {
+                //use the cache file if caching is enabled
+                if(cachingEnabled && System.currentTimeMillis() - cacheFile.lastModified() <= maxCacheAge) {
                     final FileInputStream fStream = new FileInputStream(cacheFile.getAbsoluteFile());
                     BufferedReader in = new BufferedReader(new InputStreamReader(fStream));
                     StringBuilder contents = new StringBuilder();
@@ -70,10 +80,12 @@ public class ApiClient {
                     }
                     JSONObject response = new JSONObject(contents.toString());
                     return response.getJSONArray("elements");
+                } else {
+                    cacheFile.delete();
                 }
-            } catch (NoSuchAlgorithmException | IOException e) {
-                e.printStackTrace();
             }
+        } catch (NoSuchAlgorithmException | IOException e) {
+            e.printStackTrace();
         }
 
         JSONObject response = null;
@@ -216,6 +228,9 @@ public class ApiClient {
 
         return geojson.FeatureCollection(features);*/
         return features;
+    }
+    public void setMaxCacheAge(long maxCacheAge) {
+        this.maxCacheAge = maxCacheAge;
     }
 }
 

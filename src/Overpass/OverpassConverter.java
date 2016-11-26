@@ -16,6 +16,7 @@ public class OverpassConverter {
     private final static String WAY_QUERY_FORMAT = "(way%s(%.04f,%.04f,%.04f,%.04f);>;<);";
     private final static String ALL_QUERY_FORMAT = "(node%s(%.04f,%.04f,%.04f,%.04f);way%s(%.04f,%.04f,%.04f,%.04f);relation%s(%.04f,%.04f,%.04f,%.04f););(._;>;);";
     private OSMEntitySpace entitySpace;
+    public static boolean debugEnabled = false;
 
     public OSMEntitySpace getEntitySpace() {
         return entitySpace;
@@ -43,13 +44,15 @@ public class OverpassConverter {
                 return String.format(ALL_QUERY_FORMAT, tagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude, tagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude, tagQuery, expandedBoundingBox.origin.latitude, expandedBoundingBox.origin.longitude, expandedBoundingBox.extent.latitude, expandedBoundingBox.extent.longitude);
         }
     }
-    public void fetchFromOverpass(final String query) throws InvalidArgumentException {
+    public void fetchFromOverpass(final String query, final boolean cachingEnabled) throws InvalidArgumentException {
         HashMap<String, String> apiConfig = new HashMap<>(1);
-        apiConfig.put("debug", "1");
+        if(debugEnabled) {
+            apiConfig.put("debug", "1");
+        }
         final ApiClient overpassClient = new ApiClient(null, apiConfig);
         try {
 
-            final JSONArray elements = overpassClient.get(query, false);
+            final JSONArray elements = overpassClient.get(query, false, cachingEnabled);
             final int elementLength = elements.length();
 
             //init the entity space to contain the fetched OSM data

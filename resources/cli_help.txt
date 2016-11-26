@@ -6,6 +6,8 @@ Usage: LineConflator [OPTIONS] -r [ROUTE IDS]
  -c, --config       Path to the config file (default: config.txt)
  -f, --gtfs         Path to the processed GTFS file (default: routes.osm)
  -h, --help
+ -n, --nocache      Don't use the locally cached data when fetching from Overpass.  Also flushes existing
+                    cached data for the selected routes.
  -r, --routes       Comma-separated list of GTFS route ids
  -s, --stopsonly    Downloads and conflates all existing stops for the provided routes only, outputting them
                     to a .osm file for review and upload.

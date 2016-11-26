@@ -75,7 +75,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
         name = "Working space";
     }
 
-    public boolean downloadRegionsForImportDataset(final List<RouteConflator> routeConflators, final RouteConflator.LineComparisonOptions wayMatchingOptions) throws InvalidArgumentException {
+    public boolean downloadRegionsForImportDataset(final List<RouteConflator> routeConflators, final RouteConflator.LineComparisonOptions wayMatchingOptions, final boolean cachingEnabled) throws InvalidArgumentException {
 
         //get a handle on the route path geometries for the subroutes
         final List<OSMWay> routePaths = new ArrayList<>(routeConflators.size() * 4);
@@ -116,7 +116,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
             //TODO: works fine for now, but if a route requires multiple search *keys*, will create excessive queries
             for(final Map.Entry<String,List<String>> searchKeys : RouteConflator.wayTagsForRouteType(routeType).entrySet()) {
                 final String query = converter.queryForBoundingBox(String.format(queryFormat, searchKeys.getKey(), String.join("|", searchKeys.getValue())), downloadRegion, 0.0, OSMEntity.OSMType.way);
-                converter.fetchFromOverpass(query);
+                converter.fetchFromOverpass(query, cachingEnabled);
                 final Date now = new Date();
                 SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss");
                 converter.getEntitySpace().name = String.format("download_%s_%d", dateFormat.format(now), downloadIdx++);
@@ -136,7 +136,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
                 String.format("relation[\"type\"=\"route\"][\"route\"=\"%s\"](%.07f,%.07f,%.07f,%.07f)", routeType, routePathsRegionLL.origin.latitude, routePathsRegionLL.origin.longitude, routePathsRegionLL.extent.latitude, routePathsRegionLL.extent.longitude),
         };
         final String relationQuery = "(" + String.join(";", relationQueryComponents) + ";rel(br););";
-        relationConverter.fetchFromOverpass(relationQuery);
+        relationConverter.fetchFromOverpass(relationQuery, cachingEnabled);
         mergeWithSpace(relationConverter.getEntitySpace(), OSMEntity.TagMergeStrategy.keepTags, null);
 
         System.out.format("INFO: Begin processing with entity space: %s\n", this);
@@ -308,7 +308,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
      * @param routeConflators the list of route_masters we're conflating the stops for
      * @throws InvalidArgumentException
      */
-    public void conflateStopsWithOSM(final List<RouteConflator> routeConflators) throws InvalidArgumentException {
+    public void conflateStopsWithOSM(final List<RouteConflator> routeConflators, final boolean cachingEnabled) throws InvalidArgumentException {
         if (routeConflators.size() == 0) {
             return;
         }
@@ -328,9 +328,9 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
             }
         }
 
-        conflateStopsWithOSM(uniqueStops.values(), routeType);
+        conflateStopsWithOSM(uniqueStops.values(), routeType, cachingEnabled);
     }
-    public void conflateStopsWithOSM(final Collection<StopArea> allStops, final RouteConflator.RouteType routeType) throws InvalidArgumentException {
+    public void conflateStopsWithOSM(final Collection<StopArea> allStops, final RouteConflator.RouteType routeType, final boolean cachingEnabled) throws InvalidArgumentException {
 
         //fetch all possible useful entities that intersect the route's stops' combined bounding box
         final Point[] includedStops = new Point[allStops.size()];
@@ -376,7 +376,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
                 default:
                     return;
             }
-            converter.fetchFromOverpass(query);
+            converter.fetchFromOverpass(query, cachingEnabled);
         } catch (InvalidArgumentException e) {
             e.printStackTrace();
             return;

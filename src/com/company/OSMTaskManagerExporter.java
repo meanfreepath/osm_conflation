@@ -48,7 +48,7 @@ public class OSMTaskManagerExporter {
         allStops = new ArrayList<>(importEntitySpace.allEntities.size());
     }
 
-    public void conflateStops(RouteDataManager routeDataManager) throws InvalidArgumentException {
+    public void conflateStops(final RouteDataManager routeDataManager, final boolean cachingEnabled) throws InvalidArgumentException {
         allStops.clear();
         if(routeType == RouteConflator.RouteType.bus) {
             for (final OSMEntity entity : importEntitySpace.allNodes.values()) {
@@ -58,7 +58,7 @@ public class OSMTaskManagerExporter {
             }
         } //TODO: implement other route types
 
-        routeDataManager.conflateStopsWithOSM(allStops, routeType);
+        routeDataManager.conflateStopsWithOSM(allStops, routeType, cachingEnabled);
     }
 
     /**
