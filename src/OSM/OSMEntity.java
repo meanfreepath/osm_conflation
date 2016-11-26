@@ -237,8 +237,11 @@ public abstract class OSMEntity {
         if(!complete) { //can't set a tag on an incomplete entity
             return null;
         }
+        if(!otherEntity.complete || otherEntity.tags == null) { //bail here if other entity isn't complete or has no tags
+            return null;
+        }
         if(tags == null) {
-            tags = new HashMap<>();
+            tags = new HashMap<>(otherEntity.tags.size());
         }
 
         HashMap<String, String> conflictingTags = null;
