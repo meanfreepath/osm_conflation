@@ -53,7 +53,7 @@ node[public_transport=platform]:new {
     symbol-stroke-color: #ffff00;
     text-color: #ffff00;
 }
-node[public_transport=platform]["gtfs:conflict"="yes"] {
+node[public_transport=platform]["gtfs:conflict"] {
     set platformicon;
     symbol-stroke-color: #ff0000;
     text-color: #ff0000;
