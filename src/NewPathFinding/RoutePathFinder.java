@@ -284,4 +284,8 @@ public class RoutePathFinder {
             e.printStackTrace();
         }
     }
+    @Override
+    public String toString() {
+        return String.format("RoutePathFinder for route %s", route);
+    }
 }

@@ -339,8 +339,6 @@ public class PathSegment implements WaySegmentsObserver {
 
             //and add the newly-created PathSegments (if any) to this PathSegment's containing Path objects
             if(pathSegmentsToCreate.size() > 0) {
-                System.out.println("SPLIT CREATE " + pathSegmentsToCreate.size() + " PS");
-
                 //add the new PathSegments to this PathSegment's containing Path objects
                 PathSegment previousPathSegment = this;
                 for(final PathSegment newPathSegment : pathSegmentsToCreate) {

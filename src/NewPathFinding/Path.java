@@ -152,8 +152,6 @@ public class Path {
         if(index < 0) {
             System.out.format("WARNING: %s not in pathSegments array!\n", afterPathSegment);
             return;
-        } else {
-            System.out.println("ADDED PATHSEGMENT " + newPathSegment);
         }
         addPathSegment(newPathSegment, index + 1);
     }

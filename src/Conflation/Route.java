@@ -354,4 +354,8 @@ public class Route {
 
         System.out.format("INFO: Match Index counts after “%s”:\n\tSegmentMatch: %d global, %d in RouteLineSegments, %d/%d/%d Total/RL/OSM in LineMatches.\n\tLineMatch: %d/%d OSM/RLSeg-based objects\n", message, SegmentMatch.totalCount, routeLineSegmentMatchCount, overallLineMatchCounts, lineMatchByRouteLineCounts, lineMatchByOSMLineCounts, lineMatchCountByOSM, lineMatchCountByRLSeg);
     }
+    @Override
+    public String toString() {
+        return String.format("Route “%s” (ref %s, GTFS Trip Marker %s)", name, ref, tripMarker);
+    }
 }
