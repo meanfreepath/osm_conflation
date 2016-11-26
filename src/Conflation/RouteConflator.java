@@ -135,17 +135,11 @@ public class RouteConflator {
 
             importRoutes.add(new Route(subRoute, routePath, routeStops, this));
         }
-
-        //output the GTFS route to its own file
-        final OSMEntitySpace gtfsOutputSpace = new OSMEntitySpace(1024);
-        gtfsOutputSpace.addEntity(importRouteMaster, OSMEntity.TagMergeStrategy.copyTags, null);
-        try {
-            gtfsOutputSpace.outputXml(String.format("%s/gtfsroute_%s_ref%s.osm", Config.sharedInstance.outputDirectory, gtfsRouteId, importRouteMaster.getTag(OSMEntity.KEY_REF)));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
+    public static String gtfsFileNameForRoute(final String gtfsRouteId) {
+        return String.format("%s/gtfsroute_%s.osm", Config.sharedInstance.outputDirectory, gtfsRouteId);
+    }
 
     /**
      * Define the search tags for the ways for the given route type
@@ -432,7 +426,7 @@ public class RouteConflator {
         }
         return exportRouteStops;
     }
-    public void conflateRoutePaths(final StopConflator stopConflator) {
+    public boolean conflateRoutePaths(final StopConflator stopConflator) {
         for(final Route route : exportRoutes) {
             System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
             if (debugTripMarker != null && !route.tripMarker.equals(debugTripMarker)) {
@@ -457,6 +451,7 @@ public class RouteConflator {
         }
 
         //with the candidate lines determined, begin the pathfinding stage to lock down the path between the route's stops
+        int successfullyMatchedRoutes = 0;
         for(final Route route : exportRoutes) {
             final Date t0 = new Date();
             System.out.format("INFO: Begin PathFinding for subroute “%s” (tripMarker %s)\n", route.routeRelation.getTag(OSMEntity.KEY_NAME), route.tripMarker);
@@ -508,7 +503,14 @@ public class RouteConflator {
                     e.printStackTrace();
                 }
             }
+
+            //return TRUE if all patchs were successful
+            boolean routeSuccessful = route.routePathFinder.getSuccessfulPaths() == route.routePathFinder.routePathTrees.size();
+            if(routeSuccessful) {
+                successfullyMatchedRoutes++;
+            }
         }
+        return successfullyMatchedRoutes == exportRoutes.size();
     }
     public Collection<StopArea> getAllRouteStops() {
         return allRouteStops.values();

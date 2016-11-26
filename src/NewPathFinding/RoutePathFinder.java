@@ -152,6 +152,11 @@ public class RoutePathFinder {
     public void findPaths(final RouteConflator routeConflator) {
         for(final PathTree pathTree : routePathTrees) {
             pathTree.findPaths(routeConflator);
+            if(pathTree.bestPath != null) {
+                successfulPaths++;
+            } else {
+                failedPaths++;
+            }
         }
 
 

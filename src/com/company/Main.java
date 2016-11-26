@@ -122,8 +122,39 @@ public class Main {
         OverpassConverter.debugEnabled = debugEnabled;
 
         try {
-            OSMEntitySpace importSpace = new OSMEntitySpace(262144);
-            importSpace.loadFromXML(importFileName);
+            OSMEntitySpace allGTFSRoutesSpace = new OSMEntitySpace(262144), workingImportSpace = new OSMEntitySpace(65536);
+            allGTFSRoutesSpace.loadFromXML(importFileName);
+
+            /*check if there is a separate GTFS route .osm file for the routes, and if so merge their data into the main import space.
+              Allows the user to make fixes or adjustments to the GTFS data to improve matching.
+             */
+            for(final String selectedGTFSRouteId : selectedRoutes) {
+                final String routeFileName = RouteConflator.gtfsFileNameForRoute(selectedGTFSRouteId);
+                final File routeFile = new File(routeFileName);
+                if (routeFile.exists()) { //if the file exists, merge its data into the main import space
+                    System.out.format("INFO: GTFS .osm file exists for route %s: using it instead of main import file.\n", selectedGTFSRouteId);
+                    OSMEntitySpace routeImportSpace = new OSMEntitySpace(2048);
+                    routeImportSpace.loadFromXML(routeFileName);
+                    workingImportSpace.mergeWithSpace(routeImportSpace, OSMEntity.TagMergeStrategy.copyTags, null);
+                } else { //otherwise, extract the route's data from the global import space into the augmented space
+                    System.out.format("INFO: No GTFS .osm file exists for route %s: creating new file.  This file can be edited to improve route matching.\n", selectedGTFSRouteId);
+                    String relationType, gtfsRouteId;
+                    for (final OSMRelation relation : allGTFSRoutesSpace.allRelations.values()) {
+                        relationType = relation.getTag(OSMEntity.KEY_TYPE);
+                        gtfsRouteId = relation.getTag(RouteConflator.GTFS_ROUTE_ID);
+
+                        //add to the working import space
+                        if (relationType != null && relationType.equals(OSMEntity.TAG_ROUTE_MASTER) && selectedGTFSRouteId.equals(gtfsRouteId)) {
+                            workingImportSpace.addEntity(relation, OSMEntity.TagMergeStrategy.copyTags, null);
+
+                            //also save the route's data to an OSM file
+                            OSMEntitySpace routeImportSpace = new OSMEntitySpace(2048);
+                            routeImportSpace.addEntity(relation, OSMEntity.TagMergeStrategy.copyTags, null);
+                            routeImportSpace.outputXml(routeFileName);
+                        }
+                    }
+                }
+            }
 
             //create the working entity space for all data
             final RouteDataManager routeDataManager = new RouteDataManager(65536);
@@ -131,16 +162,16 @@ public class Main {
             //output all the stops in a format that works with the OSM Task Manager
             if(outputStopsToTaskingManager) {
                 System.out.println("Processing all stops from GTFS import file…");
-                final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(importSpace, routeDataManager, RouteConflator.RouteType.bus);
+                final OSMTaskManagerExporter exporter = new OSMTaskManagerExporter(allGTFSRoutesSpace, routeDataManager, RouteConflator.RouteType.bus);
                 exporter.conflateStops(routeDataManager, overpassCachingEnabled);
                 exporter.outputForOSMTaskingManager(Config.sharedInstance.outputDirectory, Config.sharedInstance.taskingManagerBaseUrl);
                 System.exit(0);
             }
 
             //create a list of all the route_master relations in the import dataset
-            final List<OSMRelation> importRouteMasterRelations = new ArrayList<>(importSpace.allRelations.size());
+            final List<OSMRelation> importRouteMasterRelations = new ArrayList<>(workingImportSpace.allRelations.size());
             String relationType;
-            for(final OSMRelation relation : importSpace.allRelations.values()) {
+            for(final OSMRelation relation : workingImportSpace.allRelations.values()) {
                 relationType = relation.getTag(OSMEntity.KEY_TYPE);
                 final String gtfsRouteId = relation.getTag(RouteConflator.GTFS_ROUTE_ID);
                 if(relationType != null && relationType.equals(OSMEntity.TAG_ROUTE_MASTER) && selectedRoutes.contains(gtfsRouteId)) {
@@ -148,7 +179,7 @@ public class Main {
                     importRouteMasterRelations.add(relation);
                 }
             }
-            importSpace = null; //import data no longer needed
+            allGTFSRoutesSpace = workingImportSpace = null; //import data no longer needed
 
             if(selectedRoutes.size() > 0) {
                 System.out.format("WARNING: No data found for routes: " + String.join(", ", selectedRoutes));
@@ -162,16 +193,7 @@ public class Main {
             final List<RouteConflator> routeConflators = new ArrayList<>(importRouteMasterRelations.size());
             try {
                 for (final OSMRelation importRouteMaster : importRouteMasterRelations) {
-
-                    //output an OSM XML file with only the current route data
-                    System.out.format("Processing route %s (ref %s, GTFS id %s), %d trips…\n", importRouteMaster.getTag(OSMEntity.KEY_NAME), importRouteMaster.getTag(OSMEntity.KEY_REF), importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID), importRouteMaster.getMembers().size());
-                    if (debugEnabled) {
-                        OSMEntitySpace originalRouteSpace = new OSMEntitySpace(2048);
-                        originalRouteSpace.addEntity(importRouteMaster, OSMEntity.TagMergeStrategy.keepTags, null);
-                        originalRouteSpace.outputXml(Config.sharedInstance.outputDirectory + "/gtfsroute_" + importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID) + ".osm");
-                        originalRouteSpace = null;
-                    }
-
+                    System.out.format("Processing route “%s” (ref %s, GTFS id %s), %d trips…\n", importRouteMaster.getTag(OSMEntity.KEY_NAME), importRouteMaster.getTag(OSMEntity.KEY_REF), importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID), importRouteMaster.getMembers().size());
                     //create an object to handle the processing of the data for this route_master
                     routeConflators.add(new RouteConflator(importRouteMaster, routeDataManager, matchingOptions));
                 }
@@ -201,26 +223,38 @@ public class Main {
                 routeDataManager.conflateStopsWithOSM(routeConflators, overpassCachingEnabled);
             }
 
-            //now run the conflation algorithms on each route_master
+            //now run the conflation algorithms on each route_master, adding the conflated path data to an output space
+            final OSMEntitySpace relationSpace = new OSMEntitySpace(65536);
+            final List<String> routeIds = new ArrayList<>(routeConflators.size());
+            int successfullyMatchedRouteMasters = 0;
             for(final RouteConflator routeConflator : routeConflators) {
-                //and match the subroutes' routePath to the downloaded OSM ways.  Also matches the stops in the route to their nearest matching way
-                routeConflator.conflateRoutePaths(stopConflator);
+                routeIds.add(routeConflator.gtfsRouteId);
 
-                //finally, add the completed relations to their own separate file for review and upload
-                final OSMEntitySpace relationSpace = new OSMEntitySpace(65536);
+                //and match the subroutes' routePath to the downloaded OSM ways.  Also matches the stops in the route to their nearest matching way
+                if(routeConflator.conflateRoutePaths(stopConflator)) {
+                    successfullyMatchedRouteMasters++;
+                }
+
+                //finally, add the completed relations to the output file for review and upload
                 for(final Route route: routeConflator.getExportRoutes()) {
                     relationSpace.addEntity(route.routeRelation, OSMEntity.TagMergeStrategy.keepTags, null);
                 }
-                //also include any entities that were changed during the process
-                for(final OSMEntity changedEntity : routeDataManager.allEntities.values()) {
-                    if(changedEntity.getAction() == OSMEntity.ChangeAction.modify) {
-                        relationSpace.addEntity(changedEntity, OSMEntity.TagMergeStrategy.keepTags, null);
-                    }
-                }
                 relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null);
-                relationSpace.outputXml(Config.sharedInstance.outputDirectory + "/relation_" + routeConflator.getExportRouteMaster().getTag(OSMEntity.KEY_REF) + ".osm");
             }
-            //importSpace.outputXml("newresult.osm");
+
+            //also include any entities that were changed during the process
+            for(final OSMEntity changedEntity : routeDataManager.allEntities.values()) {
+                if(changedEntity.getAction() == OSMEntity.ChangeAction.modify) {
+                    if(changedEntity instanceof OSMRelation) {
+                        System.out.println("ADD MOD" + changedEntity);
+                    }
+                    relationSpace.addEntity(changedEntity, OSMEntity.TagMergeStrategy.keepTags, null);
+                }
+            }
+
+            relationSpace.setCanUpload(successfullyMatchedRouteMasters == routeConflators.size());
+            relationSpace.outputXml(String.format("%s/relations_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
+            //allGTFSRoutesSpace.outputXml("newresult.osm");
         } catch (IOException | ParserConfigurationException | SAXException | InvalidArgumentException e) {
             e.printStackTrace();
         }
