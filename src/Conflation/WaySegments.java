@@ -345,6 +345,6 @@ public abstract class WaySegments {
         return splitWaySegments;
     }
     public String toString() {
-        return "WaySegments " + way.getTag(OSMEntity.KEY_NAME) + "(" + way.osm_id + ":" + way.getFirstNode().osm_id + "->" + way.getLastNode().osm_id + "): " + segments.size() + " segments";
+        return String.format("WaySegments @%d: way #%d (%s): [%d->%d], %d segments", hashCode(), way.osm_id, way.getTag(OSMEntity.KEY_NAME), way.getFirstNode().osm_id, way.getLastNode().osm_id, segments.size());
     }
 }
