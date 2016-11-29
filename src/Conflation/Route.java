@@ -240,7 +240,9 @@ public class Route {
             cellWay.setTag("name", cell.toString());
         }
 
-        segmentSpace.outputXml(Config.sharedInstance.debugDirectory + "/segments" + tripMarker + ".osm");
+        final String fileName = String.format("%s/segments_%s.osm", Config.sharedInstance.debugDirectory, tripMarker);
+        segmentSpace.outputXml(fileName);
+        System.out.format("INFO: debug segments file output to %s\n", fileName);
     }
     private static void debugCreateSegmentWay(final SegmentMatch osmSegmentMatch, final int totalMatchCount, final String nodeMatchFormat, final String wayMatchFormat, final Map<String, OSMNode> nodeSpaceMap, final Map<String, OSMWay> waySpaceMap, final OSMEntitySpace entitySpace, final OSMEntitySpace segmentSpace) {
         OSMNode matchOriginNode, matchLastNode;
