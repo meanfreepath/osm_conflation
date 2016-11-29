@@ -26,6 +26,7 @@ public class PathTree {
     public final static int MAX_PATHS_TO_CONSIDER = 320;
     private final static short NUMBER_OF_FUTURE_SEGMENTS = 5;
     private final static long debugPathTreeId = 0L;
+    public static boolean debugEnabled = false;
 
     public final long id;
     public final int pathTreeIndex;
@@ -44,7 +45,6 @@ public class PathTree {
     public final List<Path> successfulPaths = new ArrayList<>(MAX_PATHS_TO_CONSIDER);
     public final List<Path> failedPaths = new ArrayList<>(MAX_PATHS_TO_CONSIDER);
     public Path bestPath = null;
-    public static boolean debugEnabled = false;
 
     public static long idForParameters(final int index, final StopArea fromStop, final StopArea toStop) {
         idGenerator.reset();
@@ -275,7 +275,7 @@ public class PathTree {
     }
     @Override
     public String toString() {
-        final OSMNode originStopPosition = originStop.getStopPosition(route.routeType), destinationStopPosition = originStop.getStopPosition(route.routeType);
+        final OSMNode originStopPosition = originStop.getStopPosition(route.routeType), destinationStopPosition = destinationStop.getStopPosition(route.routeType);
         return String.format("PathTree #%d (idx %d) from %s/%s (%s:%s) to %s/%s (%s:%s): status %d, %s segments", id, pathTreeIndex, originStop.getPlatform().osm_id, originStopPosition != null ? Long.toString(originStopPosition.osm_id) : "N/A", originStop.getPlatform().getTag(OSMEntity.KEY_REF), originStop.getPlatform().getTag(OSMEntity.KEY_NAME), destinationStop != null ? Long.toString(destinationStop.getPlatform().osm_id) : "N/A", destinationStop != null && destinationStopPosition != null ? Long.toString(destinationStopPosition.osm_id) : "N/A", destinationStop != null ? destinationStop.getPlatform().getTag(OSMEntity.KEY_REF) : "N/A", destinationStop != null ? destinationStop.getPlatform().getTag(OSMEntity.KEY_NAME) : "N/A", matchStatus, routeLineSegments != null ? Integer.toString(routeLineSegments.size()) : "N/A");
     }
 }
