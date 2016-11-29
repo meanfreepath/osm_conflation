@@ -236,9 +236,7 @@ public class Main {
                 //finally, add the completed route relation to the output file for review and upload
                 relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null, true);
 
-                /*also add any other relations that contain any of the route's memberList, to prevent membership conflicts if the user edits the output file.
-                  This will also by default include any entities that were modified during the matching process
-                 */
+                //also add any other relations that contain any of the route's memberList, to prevent membership conflicts if the user edits the output file.
                 for(final Route route : routeConflator.getExportRoutes()) {
                     for(final OSMRelation.OSMRelationMember routeMember : route.routeRelation.getMembers()) {
                         final Collection<OSMRelation> containingRelations = routeMember.member.getContainingRelations().values();
@@ -246,6 +244,13 @@ public class Main {
                             relationSpace.addEntity(containingRelation, OSMEntity.TagMergeStrategy.keepTags, null, false);
                         }
                     }
+                }
+            }
+
+            //now add any entities that were created or modified during the matching process
+            for(final OSMEntity entity : routeDataManager.allEntities.values()) {
+                if(entity.getAction() != OSMEntity.ChangeAction.none) {
+                    relationSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null, true);
                 }
             }
 
