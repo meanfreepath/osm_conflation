@@ -226,7 +226,7 @@ public class Route {
         }
 
         //output the cells generated to process the area
-        for(RouteDataManager.Cell cell : RouteDataManager.Cell.allCells) {
+        for(final Cell cell : Cell.allCells) {
             final Region bbox = cell.boundingBox;
             List<OSMNode> cellNodes = new ArrayList<>(5);
             final OSMNode oNode = segmentSpace.createNode(bbox.origin.x, bbox.origin.y, null);

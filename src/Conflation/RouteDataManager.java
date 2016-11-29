@@ -18,58 +18,6 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
 
     protected HashMap<Long, OSMWaySegments> candidateLines = null;
 
-    /**
-     * Class used for indexing OSMWays in the downloaded region into subregions, for more efficient
-     * bounding box checks
-     */
-    protected static class Cell {
-        public final static List<Cell> allCells = new ArrayList<>(128);
-        public final static double cellSizeInMeters = 500.0;
-        private static double cellSize;
-        private static double searchBuffer = 0.0;
-
-        private static void initCellsForBounds(final Region bounds, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
-            //wipe any existing cells (i.e. from a previous run)
-            allCells.clear();
-
-            //and prepare the region, including a buffer zone equal to the greatest of the various search/bounding box dimensions
-            cellSize = SphericalMercator.metersToCoordDelta(cellSizeInMeters, bounds.getCentroid().y);
-            searchBuffer = -SphericalMercator.metersToCoordDelta(Math.max(wayMatchingOptions.segmentSearchBoxSize, Math.max(StopArea.duplicateStopPlatformBoundingBoxSize, StopArea.waySearchAreaBoundingBoxSize)), bounds.getCentroid().y);
-
-            //generate the cells needed to fill the entire bounds (plus the searchBuffer)
-            final Region baseCellRegion = bounds.regionInset(searchBuffer, searchBuffer);
-            for(double y = baseCellRegion.origin.y; y <= baseCellRegion.extent.y; y += Cell.cellSize) {
-                for(double x = baseCellRegion.origin.x; x <= baseCellRegion.extent.x; x += Cell.cellSize) {
-                    createCellForPoint(new Point(x, y));
-                }
-            }
-        }
-        private static Cell createCellForPoint(final Point point) {
-            Cell cell = new Cell(point);
-            allCells.add(cell);
-            return cell;
-        }
-
-        public final Region boundingBox, expandedBoundingBox;
-        public final List<OSMWaySegments> containedWays = new ArrayList<>(1024); //contains OSM ways only
-        //public final List<StopArea> containedStops = new ArrayList<>(64); //contains stop platforms only
-
-        private Cell(final Point origin) {
-            boundingBox = new Region(origin, new Point(origin.x + cellSize, origin.y + cellSize));
-            expandedBoundingBox = boundingBox.regionInset(searchBuffer, searchBuffer);
-        }
-        public void addWay(final OSMWaySegments entity) {
-            if(!containedWays.contains(entity)) {
-                containedWays.add(entity);
-            }
-        }
-        @Override
-        public String toString() {
-            //return String.format("Cell %s (%d ways, %d stops)", boundingBox, containedWays.size(), containedStops.size());
-            return String.format("Cell %s (%d ways)", boundingBox, containedWays.size());
-        }
-    }
-
     public RouteDataManager(int capacity) {
         super(capacity);
         name = "Working space";

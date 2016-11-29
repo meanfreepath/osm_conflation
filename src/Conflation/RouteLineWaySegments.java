@@ -116,8 +116,8 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
             routeLineSegment = (RouteLineSegment) lineSegment;
 
             //get the cells which the routeLineSegment overlaps with...
-            final List<RouteDataManager.Cell> segmentCells = new ArrayList<>(2);
-            for(final RouteDataManager.Cell cell : RouteDataManager.Cell.allCells) {
+            final List<Cell> segmentCells = new ArrayList<>(2);
+            for(final Cell cell : Cell.allCells) {
                 if (Region.intersects(routeLineSegment.searchAreaForMatchingOtherSegments, cell.expandedBoundingBox)) {
                     if (!segmentCells.contains(cell)) {
                         segmentCells.add(cell);
@@ -126,8 +126,8 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
             }
 
             //and check the ways contained in those cells for overlap with the segment
-            for (final RouteDataManager.Cell candidateCell : segmentCells) {
-                for(final OSMWaySegments candidateLine : candidateCell.containedWays) {
+            for (final Cell candidateCell : segmentCells) {
+                for(final OSMWaySegments candidateLine : candidateCell.containedLines) {
                     totalIterations++;
 
                     //check the tags of the way, to ensure only valid ways are considered for the current route's type
