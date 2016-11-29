@@ -182,14 +182,23 @@ public class StopConflator {
      * @param outputSpace
      */
     public void outputStopsForRoutes(final RouteConflator.RouteType routeType, final OSMEntitySpace outputSpace) {
-        System.out.println(RouteConflator.allStops.size() + " STOPPPPS");
+        int newStops = 0, existingStops = 0;
+        OSMEntity platform;
         for (final StopArea stop : RouteConflator.allStops.values()) {
-            System.out.format("PLAT %s (ref %s), SP: %s\n", stop.getPlatform(), stop.getPlatform().getTag("ref"), stop.getStopPosition(routeType));
-            outputSpace.addEntity(stop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null, true);
+            platform = stop.getPlatform();
+            outputSpace.addEntity(platform, OSMEntity.TagMergeStrategy.keepTags, null, true);
+            if(platform.osm_id > 0) {
+                existingStops++;
+            } else {
+                newStops++;
+            }
+
+            //add the stop position, if present
             final OSMNode stopPosition = stop.getStopPosition(routeType);
             if (stopPosition != null) {
                 outputSpace.addEntity(stopPosition, OSMEntity.TagMergeStrategy.keepTags, null, true);
             }
         }
+        System.out.format("INFO: %d new, %d existing stops (%d total)\n", newStops, existingStops, newStops + existingStops);
     }
 }
