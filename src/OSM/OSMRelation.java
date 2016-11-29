@@ -19,14 +19,28 @@ public class OSMRelation extends OSMEntity {
 
     protected final ArrayList<OSMRelationMember> members = new ArrayList<>();
 
-    public int getCompletedMemberCount() {
-        int completedMemberCount = 0;
+    /**
+     * Gets the completion counts of this relation's members
+     * @return array of completion counts, in this order: incomplete, partially complete, fully complete members
+     */
+    public int[] getCompletedMemberCounts() {
+        int completedMemberCount = 0, partiallyCompleteMemberCount = 0, incompleteMemberCount = 0;
         for(final OSMRelationMember member : members) {
-            if(member.member.complete != CompletionStatus.incomplete) {
+            if(member.member instanceof OSMNode) {
+                if(member.member.complete != CompletionStatus.incomplete) {
+                    completedMemberCount++;
+                } else {
+                    incompleteMemberCount++;
+                }
+            } else if(member.member.complete == CompletionStatus.membersComplete) {
                 completedMemberCount++;
+            } else if(member.member.complete == CompletionStatus.memberList) {
+                partiallyCompleteMemberCount++;
+            } else {
+                incompleteMemberCount++;
             }
         }
-        return completedMemberCount;
+        return new int[]{incompleteMemberCount, partiallyCompleteMemberCount, completedMemberCount};
     }
 
     public static class OSMRelationMember {
@@ -75,14 +89,6 @@ public class OSMRelation extends OSMEntity {
     }
     protected void memberWasMadeComplete(final OSMEntity memberEntity) {
         updateCompletionStatus();
-    }
-
-    /**
-     * Whether all the members of this relation are fully downloaded
-     * @return TRUE if all members are fully downloaded, or no members present, FALSE if this relation is incomplete or 1 or more member is incomplete
-     */
-    public boolean areAllMembersComplete() {
-        return complete.compareTo(CompletionStatus.memberList) >= 0 && getCompletedMemberCount() == members.size();
     }
 
     @Override
@@ -304,7 +310,8 @@ public class OSMRelation extends OSMEntity {
         return true;
     }
     private void updateCompletionStatus() {
-        complete = areAllMembersComplete() ? CompletionStatus.membersComplete : CompletionStatus.memberList;
+        boolean allMembersComplete = complete.compareTo(CompletionStatus.memberList) >= 0 && getCompletedMemberCounts()[2] == members.size();
+        complete = allMembersComplete ? CompletionStatus.membersComplete : CompletionStatus.memberList;
     }
     /**
      * Replace the old member with the new member
@@ -350,9 +357,9 @@ public class OSMRelation extends OSMEntity {
         switch (relationType) {
             case "restriction":
                 //first validate the restriction
-                final List<OSMRelation.OSMRelationMember> viaEntities = getMembers("via");
-                final List<OSMRelation.OSMRelationMember> fromWays = getMembers("from");
-                final List<OSMRelation.OSMRelationMember> toWays = getMembers("to");
+                final List<OSMRelation.OSMRelationMember> viaEntities = getMembers(KEY_VIA);
+                final List<OSMRelation.OSMRelationMember> fromWays = getMembers(KEY_FROM);
+                final List<OSMRelation.OSMRelationMember> toWays = getMembers(KEY_TO);
 
                 //restrictions should only have 1 each of "from", "via", and "to"  members
                 boolean restrictionIsValid = viaEntities.size() == 1 && fromWays.size() == 1 && toWays.size() == 1;
@@ -391,28 +398,28 @@ public class OSMRelation extends OSMEntity {
      */
     public void handleMemberWaySplit(final OSMWay originalWay, final List<OSMNode> originalNodeList, final OSMWay[] allSplitWays, final boolean wasValidBeforeSplit) {
         //get the relation's type, using the default handling if not set
-        final String relationType = hasTag(OSMEntity.KEY_TYPE) ? getTag(OSMEntity.KEY_TYPE) : "";
+        final String relationType = hasTag(KEY_TYPE) ? getTag(KEY_TYPE) : "";
         assert relationType != null;
         switch (relationType) {
             case "restriction": //turn restriction: use the way that contains the "via" node
                 //if the restriction is valid, check if the new way should be added to it or not
-                if(wasValidBeforeSplit) {
-                    final OSMEntity viaEntity = getMembers("via").get(0).member;
+                if(wasValidBeforeSplit || complete != CompletionStatus.membersComplete) { //TODO: ideally include an "incomplete" flag in the original validity check
+                    final OSMEntity viaEntity = getMembers(KEY_VIA).get(0).member;
                     //"via" member is a node
                     if(viaEntity instanceof OSMNode && !originalWay.getNodes().contains(viaEntity)) {
                         //check which splitWay contains the via node, and update the relation membership as needed
                         for(final OSMWay splitWay : allSplitWays) {
-                            if(splitWay != originalWay && splitWay.getNodes().contains(viaEntity)) {
+                            if(splitWay.complete == CompletionStatus.membersComplete && splitWay != originalWay && splitWay.getNodes().contains(viaEntity)) {
                                 replaceMember(originalWay, splitWay);
                                 break;
                             }
                         }
-                    } else if(viaEntity instanceof OSMWay) { //"via" member is a originalWay
+                    } else if(viaEntity instanceof OSMWay) { //"via" member is a way
                         final OSMWay viaWay = (OSMWay) viaEntity;
 
-                        //check which splitWay intersects the "via" way, replace the old originalWay with it in the relation
+                        //check which splitWay intersects the "via" way, replace the old way with it in the relation
                         for(final OSMWay splitWay : allSplitWays) {
-                            if(splitWay != originalWay && splitWay.getNodes().contains(splitWay.getFirstNode()) || splitWay.getNodes().contains(splitWay.getLastNode())) {
+                            if(splitWay != originalWay && splitWay.complete == CompletionStatus.membersComplete && (splitWay.getNodes().contains(viaWay.getFirstNode()) || splitWay.getNodes().contains(viaWay.getLastNode()))) {
                                 replaceMember(originalWay, splitWay);
                                 break;
                             }
@@ -493,7 +500,8 @@ public class OSMRelation extends OSMEntity {
         if(complete == CompletionStatus.incomplete) {
             return String.format("relation@%d (id %d): %s", hashCode(), osm_id, complete);
         } else {
-            return String.format("relation@%d (id %d): %d/%d members (%s): %s", hashCode(), osm_id, getCompletedMemberCount(), members.size(), getTag(OSMEntity.KEY_NAME), complete);
+            final int[] completedMemberCounts = getCompletedMemberCounts();
+            return String.format("relation@%d (id %d): %d/%d/%d/%d inc/pc/cpl/total members (%s): %s", hashCode(), osm_id, completedMemberCounts[0], completedMemberCounts[1], completedMemberCounts[2], members.size(), getTag(OSMEntity.KEY_NAME), complete);
         }
     }
 }
