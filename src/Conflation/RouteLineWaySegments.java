@@ -244,6 +244,7 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
         //and delete the lineMatch from this WaySegments' indexes if it no longer has any SegmentMatches
         if(routeLineMatch.matchingSegments.size() == 0) {
             lineMatchesByOSMWayId.remove(candidateLine.way.osm_id);
+            candidateLine.removeObserver(this);
 
             //remove the LineMatch from the index keyed by the RouteLineSegment's id
             final Map<Long, LineMatch> rlSegmentLineMatches = lineMatchesByRouteLineSegmentId.get(match.mainSegment.id);
@@ -263,6 +264,9 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
         for(final LineSegment segment : segments) {
             final RouteLineSegment routeLineSegment = (RouteLineSegment) segment;
             routeLineSegment.flushMatches();
+        }
+        for(final LineMatch lineMatch : lineMatchesByOSMWayId.values()) {
+            lineMatch.osmLine.removeObserver(this);
         }
         lineMatchesByOSMWayId.clear();
         lineMatchesByRouteLineSegmentId.clear();
@@ -284,10 +288,6 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
             lineMatchesByOSMWayId.remove(id);
         }
     }*/
-    public SegmentMatch getBestMatchForLineSegment(final OSMLineSegment segment) {
-        //final List<SegmentMatch> matches = matchingOSMSegments.get(segment.id);
-        return null; //TODO 222
-    }
     public LineMatch getMatchForWay(final long wayOsmId) {
         return lineMatchesByOSMWayId.get(wayOsmId);
     }
