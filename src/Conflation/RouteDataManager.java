@@ -305,31 +305,14 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
     /**
      * Downloads all OSM stops in the given stop list's area, and conflates them with the given stop list's stops
      * @param routeConflators the list of route_masters we're conflating the stops for
-     * @throws InvalidArgumentException
      */
-    public void conflateStopsWithOSM(final List<RouteConflator> routeConflators, final boolean cachingEnabled) throws InvalidArgumentException {
+    public void conflateStopsWithOSM(final List<RouteConflator> routeConflators, final boolean cachingEnabled) {
         if (routeConflators.size() == 0) {
             return;
         }
-
-        //generate the full list of stops from the routeConflators
-        RouteConflator.RouteType routeType = null;
-        final HashMap<Long, StopArea> uniqueStops = new HashMap<>(routeConflators.size() * 64);
-        for (final RouteConflator routeConflator : routeConflators) {
-            if (routeType == null) {
-                routeType = routeConflator.routeType;
-            } else if (routeType != routeConflator.routeType) {
-                final String[] errMsg = {"All routes must be of the same routeType"};
-                throw new InvalidArgumentException(errMsg);
-            }
-            for (final StopArea stop : routeConflator.getAllRouteStops()) {
-                uniqueStops.put(stop.getPlatform().osm_id, stop);
-            }
-        }
-
-        conflateStopsWithOSM(uniqueStops.values(), routeType, cachingEnabled);
+        conflateStopsWithOSM(RouteConflator.allStops.values(), routeConflators.get(0).routeType, cachingEnabled);
     }
-    public void conflateStopsWithOSM(final Collection<StopArea> allStops, final RouteConflator.RouteType routeType, final boolean cachingEnabled) throws InvalidArgumentException {
+    public void conflateStopsWithOSM(final Collection<StopArea> allStops, final RouteConflator.RouteType routeType, final boolean cachingEnabled) {
 
         //fetch all possible useful entities that intersect the route's stops' combined bounding box
         final Point[] includedStops = new Point[allStops.size()];

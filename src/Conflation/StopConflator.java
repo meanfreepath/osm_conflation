@@ -178,20 +178,18 @@ public class StopConflator {
 
     /**
      * Outputs the stop platforms/positions for the given route masters into an OSM XML file
-     * @param routeConflators
-     * @throws IOException
+     * @param routeType
+     * @param outputSpace
      */
-    public void outputStopsForRoutes(final List<RouteConflator> routeConflators) throws IOException {
-        for(final RouteConflator routeConflator : routeConflators) {
-            final OSMEntitySpace stopPlatformSpace = new OSMEntitySpace(2048);
-            for (final StopArea stop : routeConflator.getAllRouteStops()) {
-                stopPlatformSpace.addEntity(stop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null, true);
-                final OSMNode stopPosition = stop.getStopPosition(routeConflator.routeType);
-                if (stopPosition != null) {
-                    stopPlatformSpace.addEntity(stopPosition, OSMEntity.TagMergeStrategy.keepTags, null, true);
-                }
+    public void outputStopsForRoutes(final RouteConflator.RouteType routeType, final OSMEntitySpace outputSpace) {
+        System.out.println(RouteConflator.allStops.size() + " STOPPPPS");
+        for (final StopArea stop : RouteConflator.allStops.values()) {
+            System.out.format("PLAT %s (ref %s), SP: %s\n", stop.getPlatform(), stop.getPlatform().getTag("ref"), stop.getStopPosition(routeType));
+            outputSpace.addEntity(stop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null, true);
+            final OSMNode stopPosition = stop.getStopPosition(routeType);
+            if (stopPosition != null) {
+                outputSpace.addEntity(stopPosition, OSMEntity.TagMergeStrategy.keepTags, null, true);
             }
-            stopPlatformSpace.outputXml(String.format("%s/route_stops_%s.osm", Config.sharedInstance.outputDirectory, routeConflator.gtfsRouteId));
         }
     }
 }

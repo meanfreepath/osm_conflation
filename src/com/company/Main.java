@@ -187,19 +187,14 @@ public class Main {
             }
 
             //loop through the route masters, processing their subroutes in one entity space
-            final List<RouteConflator> routeConflators = new ArrayList<>(importRouteMasterRelations.size());
             try {
-                for (final OSMRelation importRouteMaster : importRouteMasterRelations) {
-                    System.out.format("Processing route “%s” (ref %s, GTFS id %s), %d trips…\n", importRouteMaster.getTag(OSMEntity.KEY_NAME), importRouteMaster.getTag(OSMEntity.KEY_REF), importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID), importRouteMaster.getMembers().size());
-                    //create an object to handle the processing of the data for this route_master
-                    routeConflators.add(new RouteConflator(importRouteMaster, routeDataManager, matchingOptions));
-                }
+                RouteConflator.createConflatorsForRouteMasters(importRouteMasterRelations, routeDataManager, matchingOptions);
             } catch(InvalidArgumentException e) {
                 System.out.format("WARNING: %s\n", e.getMessage());
             }
 
             //bail if no valid routes to process
-            if(routeConflators.size() == 0) {
+            if(RouteConflator.allConflators.size() == 0) {
                 System.out.format("FATAL: no valid routes to process\n");
                 System.exit(1);
             }
@@ -208,26 +203,24 @@ public class Main {
             final StopConflator stopConflator = new StopConflator();
 
             //if processing stops only, output them to an OSM XML file and bail
+            final List<String> routeIds = RouteConflator.getRouteMasterIds();
             if(processStopsOnly) {
-                for(final RouteConflator routeConflator : routeConflators) {
-                    routeConflator.generateStopAreas();
-                }
-                routeDataManager.conflateStopsWithOSM(routeConflators, overpassCachingEnabled);
-                stopConflator.outputStopsForRoutes(routeConflators);
+                routeDataManager.conflateStopsWithOSM(RouteConflator.allConflators, overpassCachingEnabled);
+                final OSMEntitySpace stopPlatformSpace = new OSMEntitySpace(2048);
+                stopConflator.outputStopsForRoutes(RouteConflator.allConflators.get(0).routeType, stopPlatformSpace);
+                stopPlatformSpace.setCanUpload(true);
+                stopPlatformSpace.outputXml(String.format("%s/routestops_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
                 System.exit(0);
             } else { //otherwise, fetch all ways from OSM that are within the routes' bounding boxes
-                routeDataManager.downloadRegionsForImportDataset(routeConflators, matchingOptions, overpassCachingEnabled);
-                routeDataManager.conflateStopsWithOSM(routeConflators, overpassCachingEnabled);
+                routeDataManager.downloadRegionsForImportDataset(RouteConflator.allConflators, matchingOptions, overpassCachingEnabled);
+                routeDataManager.conflateStopsWithOSM(RouteConflator.allConflators, overpassCachingEnabled);
             }
 
             //now run the conflation algorithms on each route_master, adding the conflated path data to an output space
             final OSMEntitySpace relationSpace = new OSMEntitySpace(65536);
             relationSpace.name = "routeoutput";
-            final List<String> routeIds = new ArrayList<>(routeConflators.size());
             int successfullyMatchedRouteMasters = 0;
-            for(final RouteConflator routeConflator : routeConflators) {
-                routeIds.add(routeConflator.gtfsRouteId);
-
+            for(final RouteConflator routeConflator : RouteConflator.allConflators) {
                 //and match the subroutes' routePath to the downloaded OSM ways.  Also matches the stops in the route to their nearest matching way
                 if(routeConflator.conflateRoutePaths(stopConflator)) {
                     successfullyMatchedRouteMasters++;
@@ -255,9 +248,9 @@ public class Main {
             }
 
             //and finally set the "upload" flag and output to a .osm file
-            relationSpace.setCanUpload(successfullyMatchedRouteMasters == routeConflators.size());
+            relationSpace.setCanUpload(successfullyMatchedRouteMasters == RouteConflator.allConflators.size());
             relationSpace.outputXml(String.format("%s/relations_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
-            //allGTFSRoutesSpace.outputXml("newresult.osm");
+            routeDataManager.outputXml(String.format("%s/fullresult_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
         } catch (IOException | ParserConfigurationException | SAXException | InvalidArgumentException e) {
             e.printStackTrace();
         }

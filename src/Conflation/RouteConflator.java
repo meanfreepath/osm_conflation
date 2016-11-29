@@ -83,6 +83,12 @@ public class RouteConflator {
         }
     }
 
+    /**
+     * Global list of ALL stops on this processing run
+     */
+    protected static Map<String, StopArea> allStops = new HashMap<>(256);
+    public static List<RouteConflator> allConflators = new ArrayList<>(16);
+
     @NotNull
     public final RouteType routeType;
     public final String gtfsRouteId;
@@ -90,12 +96,50 @@ public class RouteConflator {
     protected final List<Route> importRoutes;
     private OSMRelation exportRouteMaster;
     private List<Route> exportRoutes;
-    private HashMap<Long, StopArea> allRouteStops;
+    private final HashMap<String, StopArea> allRouteStops; //represents all the stops on the route_master
     public static boolean debugEnabled = false;
     public final String debugTripMarker = null;//"10673026:1";
     private RouteDataManager workingEntitySpace = null;
     public final LineComparisonOptions wayMatchingOptions;
     public final Map<String, List<String>> allowedRouteTags, allowedPlatformTags;
+
+    /**
+     * Init RouteConflator objects for the given OSM route relations
+     * @param importRouteMasterRelations - the relations we'd like to import
+     * @param routeDataManager - the working entity space for the RouteConflators
+     * @param matchingOptions
+     * @throws InvalidArgumentException
+     */
+    public static void createConflatorsForRouteMasters(final List<OSMRelation> importRouteMasterRelations, final RouteDataManager routeDataManager, final LineComparisonOptions matchingOptions) throws InvalidArgumentException {
+        //first ensure the routes are all of the same type
+        String routeType = null;
+        for (final OSMRelation routeMasterRelation : importRouteMasterRelations) {
+            if (routeType == null) {
+                routeType = routeMasterRelation.getTag(OSMEntity.KEY_ROUTE);
+            } else if (!routeType.equals(routeMasterRelation.getTag(OSMEntity.KEY_ROUTE))) {
+                final String[] errMsg = {"All routes must be of the same routeType"};
+                throw new InvalidArgumentException(errMsg);
+            }
+        }
+
+        for (final OSMRelation importRouteMaster : importRouteMasterRelations) {
+            System.out.format("Processing route “%s” (ref %s, GTFS id %s), %d trips…\n", importRouteMaster.getTag(OSMEntity.KEY_NAME), importRouteMaster.getTag(OSMEntity.KEY_REF), importRouteMaster.getTag(RouteConflator.GTFS_ROUTE_ID), importRouteMaster.getMembers().size());
+            //create an object to handle the processing of the data for this route_master
+            allConflators.add(new RouteConflator(importRouteMaster, routeDataManager, matchingOptions));
+        }
+    }
+
+    /**
+     * Generates a simple list of the GTFS route ids for all the route masters
+     * @return the GTFS route ids
+     */
+    public static List<String> getRouteMasterIds() {
+        final List<String> routeIds = new ArrayList<>(allConflators.size());
+        for(final RouteConflator routeConflator : allConflators) {
+            routeIds.add(routeConflator.gtfsRouteId);
+        }
+        return routeIds;
+    }
 
     public RouteConflator(final OSMRelation routeMaster, final RouteDataManager dataManager, LineComparisonOptions lineComparisonOptions) throws InvalidArgumentException {
         importRouteMaster = routeMaster;
@@ -114,6 +158,7 @@ public class RouteConflator {
         //generate the list of subroutes to process
         final List<OSMRelation.OSMRelationMember> subRoutes = routeMaster.getMembers();
         importRoutes = new ArrayList<>(subRoutes.size());
+        allRouteStops = new HashMap<>(subRoutes.size() * 64);
         for(final OSMRelation.OSMRelationMember member : subRoutes) {
             if (!(member.member instanceof OSMRelation)) { //should always be the case
                 continue;
@@ -129,8 +174,23 @@ public class RouteConflator {
 
             //create a list of StopArea objects to represent the stops on the route
             final ArrayList<StopArea> routeStops = new ArrayList<>(Route.INITIAL_STOPS_CAPACITY);
+            OSMNode importPlatform;
             for(final OSMRelation.OSMRelationMember stopMember : subRoute.getMembers(OSMEntity.TAG_PLATFORM)) {
-                routeStops.add(new StopArea(stopMember.member));
+                //check if the stop has already got a global representation
+                final String gtfsStopId = stopMember.member.getTag(GTFS_STOP_ID);
+                StopArea stopArea = allStops.get(gtfsStopId);
+                if(stopArea == null) {
+                    //add the import platform node to the working entity space (may be replaced later when conflating stops with existing data)
+                    importPlatform = (OSMNode) dataManager.addEntity(stopMember.member, OSMEntity.TagMergeStrategy.keepTags, null, true);
+                    stopArea = new StopArea(importPlatform);
+                    allStops.put(gtfsStopId, stopArea);
+                }
+
+                //and add to the route's list
+                routeStops.add(stopArea);
+
+                //and the route_master's list
+                allRouteStops.put(gtfsStopId, stopArea);
             }
 
             importRoutes.add(new Route(subRoute, routePath, routeStops, this));
@@ -318,7 +378,6 @@ public class RouteConflator {
 
         //now iterate over the GTFS import routes (trips), matching them to the existing routes (or creating them if no match made)
         exportRoutes = new ArrayList<>(importRoutes.size());
-        allRouteStops = new HashMap<>(importRoutes.size() * 64);
         for(final Route importRoute : importRoutes) {
             //System.out.println("CHECK subroute \"" + importRoute.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + importRoute.routeRelation.osm_id + ")");
             //first try to match up the import route (trip) with the matching routes, using the GTFS trip_marker
@@ -352,9 +411,6 @@ public class RouteConflator {
                 }
             }
 
-            //now create the list of stops for the route
-            final ArrayList<StopArea> exportRouteStops = generateStopAreasForRoute(importRoute);
-
             //and add the stops to the existing route relation
             final Route exportRoute;
             if(existingRouteRelation != null) {
@@ -368,9 +424,9 @@ public class RouteConflator {
                 }
                 final OSMWay importRoutePath = (OSMWay) importRoute.routeRelation.getMembers("").get(0).member;
                 final OSMRelation exportRouteRelation = (OSMRelation) workingEntitySpace.addEntity(existingRouteRelation, OSMEntity.TagMergeStrategy.copyTags, null, true);
-                exportRoute = new Route(exportRouteRelation, importRoutePath, exportRouteStops, this);
+                exportRoute = new Route(exportRouteRelation, importRoutePath, importRoute.stops, this);
             } else {
-                exportRoute = new Route(importRoute, exportRouteStops, workingEntitySpace);
+                exportRoute = new Route(importRoute, importRoute.stops, workingEntitySpace);
             }
             exportRoutes.add(exportRoute);
             exportRouteMaster.addMember(exportRoute.routeRelation, OSMEntity.MEMBERSHIP_DEFAULT);
@@ -384,51 +440,9 @@ public class RouteConflator {
             }
         }
     }
-
-    /**
-     * Used for generating the full list of StopAreas for this route, only when just outputting stops
-     * @return
-     */
-    public ArrayList<StopArea> generateStopAreas() {
-        allRouteStops = new HashMap<>(64 * importRoutes.size());
-        final ArrayList<StopArea> allStops = new ArrayList<>(allRouteStops.size());
-        for(final Route importRoute : importRoutes) {
-            allStops.addAll(generateStopAreasForRoute(importRoute));
-        }
-        return allStops;
-    }
-
-    /**
-     * Generates the StopArea objects for the given import route
-     * @param importRoute the GTFS route to create the StopAreas for
-     * @return
-     */
-    private ArrayList<StopArea> generateStopAreasForRoute(final Route importRoute) {
-        final ArrayList<StopArea> exportRouteStops = new ArrayList<>(importRoute.stops.size());
-        StopArea existingStop;
-        OSMEntity newStopPlatform;
-        OSMNode newStopPosition;
-        for(final StopArea stop : importRoute.stops) {
-            existingStop = allRouteStops.get(stop.getPlatform().osm_id);
-
-            if(existingStop == null) {
-                newStopPlatform = workingEntitySpace.addEntity(stop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null, true);
-                if (stop.getStopPosition(routeType) != null) {
-                    newStopPosition = (OSMNode) workingEntitySpace.addEntity(stop.getStopPosition(routeType), OSMEntity.TagMergeStrategy.keepTags, null, true);
-                } else {
-                    newStopPosition = null;
-                }
-                existingStop = new StopArea(newStopPlatform);
-                existingStop.setStopPosition(newStopPosition, routeType);
-                allRouteStops.put(stop.getPlatform().osm_id, existingStop);
-            }
-            exportRouteStops.add(existingStop);
-        }
-        return exportRouteStops;
-    }
     public boolean conflateRoutePaths(final StopConflator stopConflator) {
         for(final Route route : exportRoutes) {
-            System.out.println("Begin conflation for subroute \"" + route.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + route.routeRelation.osm_id + ")");
+            System.out.format("INFO: Begin conflation for subroute “%s” (tripMarker %s)\n", route.routeRelation.getTag(OSMEntity.KEY_NAME), route.routeRelation.getTag(GTFS_TRIP_MARKER));
             if (debugTripMarker != null && !route.tripMarker.equals(debugTripMarker)) {
                 System.out.println("skipping (not a flagged route)");
                 continue;
