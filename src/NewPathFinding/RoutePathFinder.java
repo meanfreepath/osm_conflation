@@ -48,7 +48,7 @@ public class RoutePathFinder {
      * Must be called after the Route's stops have been matched to their respective OSM ways
      */
     public void generatePathTrees() {
-        System.out.println("Route " + route.routeLine.way.osm_id + ": " + route.stops.size() + " stops");
+        System.out.format("INFO: Route %s: %d stops\n", route.tripMarker, route.stops.size());
         //Find the closest segment and point on the routeLineSegment to the stops' positions
         int pathTreeIndex = 0, endIndex = route.stops.size() - 1;
         Point closestPointOnRouteLineToPlatform, lastFoundPoint = null;
@@ -96,32 +96,42 @@ public class RoutePathFinder {
         //for the first/last stops, automatically set to the first/last segment on the routeLine (prevents issues if provided GTFS route line doesn't extend all the way to first/last stops)
         final Point stopPoint = stopPosition.getCentroid();
         RouteLineSegment closestSegment = null;
-        if(route.stops.indexOf(curStop) == 0) {
-            closestSegment = (RouteLineSegment) route.routeLine.segments.get(0);
-        } else if(route.stops.indexOf(curStop) == route.stops.size() - 1) {
-            closestSegment = (RouteLineSegment) route.routeLine.segments.get(route.routeLine.segments.size() - 1);
-        } else { //otherwise, scan the routeLine, finding the closest segment to the stop platform
-            double minDistance = StopArea.maxDistanceFromPlatformToWay, curDistance;
-            Point closestPointOnSegment;
-            boolean inSearchZone = searchBeginPoint == null;
-            for(final LineSegment segment : route.routeLine.segments) {
-                //start checking from the last-found point; prevents issues when routeLine passes a stop multiple times
-                if(!inSearchZone && segment.originPoint == searchBeginPoint) {
-                    inSearchZone = true;
-                }
-
-                if(inSearchZone) {
-                    closestPointOnSegment = segment.closestPointToPoint(stopPoint);
-                    curDistance = Point.distance(stopPoint, closestPointOnSegment);
-                    if (curDistance < minDistance) {
-                        minDistance = curDistance;
-                        closestSegment = (RouteLineSegment) segment;
-                    }
-                }
+        //scan the routeLine, finding the closest segment to the stop platform
+        double minDistance = StopArea.maxDistanceFromPlatformToWay, curDistance;
+        Point closestPointOnSegment;
+        boolean inSearchZone = searchBeginPoint == null, reachedStopZone = false;
+        for(final LineSegment segment : route.routeLine.segments) {
+            //start checking from the last-found point; prevents issues when routeLine passes a stop multiple times
+            if(!inSearchZone && segment.originPoint == searchBeginPoint) {
+                inSearchZone = true;
             }
 
-            //if still not found, bail here
-            if(closestSegment == null) {
+            if(inSearchZone) {
+                closestPointOnSegment = segment.closestPointToPoint(stopPoint);
+                curDistance = Point.distance(stopPoint, closestPointOnSegment);
+
+                //start tracking the closest segment once we're within the search area of the stop's platform
+                if (curDistance < minDistance) {
+                    minDistance = curDistance;
+                    closestSegment = (RouteLineSegment) segment;
+                    reachedStopZone = true;
+                }
+
+                //stop searching once we exit the stop's platform search area
+                if(reachedStopZone && curDistance > StopArea.maxDistanceFromPlatformToWay) {
+                    break;
+                }
+            }
+        }
+
+        //if an in-range RouteLineSegment isn't found for the stop...
+        if(closestSegment == null) {
+            //check if it's the first or last stop - sometimes the routeLine starts/ends after/before the stop
+            if(route.stops.indexOf(curStop) == 0) {
+                closestSegment = (RouteLineSegment) route.routeLine.segments.get(0);
+            } else if(route.stops.indexOf(curStop) == route.stops.size() - 1) {
+                closestSegment = (RouteLineSegment) route.routeLine.segments.get(route.routeLine.segments.size() - 1);
+            } else { //otherwise, bail here
                 System.out.println("WARNING: no close by routeLineSegment found for stop " + curStop);
                 return;
             }
