@@ -8,8 +8,9 @@ import java.nio.file.FileSystemException;
  * Created by nick on 11/22/16.
  */
 public class Config {
+    public final static String DEFAULT_CONFIG_FILE = "config.txt", DEFAULT_GTFS_FILE = "routes.osm";
     public static Config sharedInstance = null;
-    public final String outputDirectory, cacheDirectory, debugDirectory;
+    public final String outputDirectory, cacheDirectory;
 
     //Tasking manager options
     public final String taskingManagerBaseUrl;
@@ -27,9 +28,8 @@ public class Config {
         //TODO load from config
         outputDirectory = "./output";
         cacheDirectory = "./cache";
-        debugDirectory = "./debug";
 
-        String dirs[] = {outputDirectory, cacheDirectory, debugDirectory};
+        String dirs[] = {outputDirectory, cacheDirectory};
         for(final String dir : dirs) {
             File workingDir = new File("./" + dir);
             if (!workingDir.exists() && !workingDir.mkdir()) {

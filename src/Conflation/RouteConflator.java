@@ -509,15 +509,6 @@ public class RouteConflator {
             //and finally, add the ways associated with the routeFinder's best path to the OSM route relation
             route.routePathFinder.addWaysToRouteRelation();
 
-            if(debugEnabled) {
-                try {
-                    workingEntitySpace.outputXml(Config.sharedInstance.debugDirectory + "/newresult" + route.routeRelation.osm_id + ".osm");
-                    route.routePathFinder.debugOutputPaths(workingEntitySpace);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-
             //return TRUE if all patchs were successful
             boolean routeSuccessful = route.routePathFinder.getSuccessfulPaths() == route.routePathFinder.routePathTrees.size();
             if(routeSuccessful) {

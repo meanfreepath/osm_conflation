@@ -318,7 +318,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
 
         if(debugEnabled) {
             try {
-                existingStopsSpace.outputXml(String.format("%s/stopdownload.osm", Config.sharedInstance.debugDirectory));
+                existingStopsSpace.outputXml(String.format("%s/stopdownload.osm", Config.sharedInstance.cacheDirectory));
             } catch (IOException e) {
                 e.printStackTrace();
             }

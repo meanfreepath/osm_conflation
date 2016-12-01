@@ -294,7 +294,7 @@ public class RoutePathFinder {
         }
 
         try {
-            segmentSpace.outputXml(Config.sharedInstance.debugDirectory + "/pathdebug" + route.routeRelation.osm_id + ".osm");
+            segmentSpace.outputXml(String.format("%s/debugpath_%s.osm", Config.sharedInstance.outputDirectory, route.tripMarker));
         } catch (IOException e) {
             e.printStackTrace();
         }

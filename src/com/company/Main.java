@@ -35,8 +35,8 @@ public class Main {
     }
     public static void main(String[] args) {
         //check command line args
-        String importFileName = "routes.osm";
-        String configPath = "./config.txt";
+        String importFileName = Config.DEFAULT_GTFS_FILE;
+        String configPath = Config.DEFAULT_CONFIG_FILE;
         List<String> selectedRoutes = null;
         boolean outputStopsToTaskingManager = false, processStopsOnly = false, overpassCachingEnabled = true;
 
@@ -209,7 +209,9 @@ public class Main {
                 final OSMEntitySpace stopPlatformSpace = new OSMEntitySpace(2048);
                 stopConflator.outputStopsForRoutes(RouteConflator.allConflators.get(0).routeType, stopPlatformSpace);
                 stopPlatformSpace.setCanUpload(true);
-                stopPlatformSpace.outputXml(String.format("%s/routestops_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
+                final String stopsFileName = String.format("%s/routestops_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds));
+                stopPlatformSpace.outputXml(stopsFileName);
+                System.out.format("INFO: outputted stops data to %s\n", stopsFileName);
                 System.exit(0);
             } else { //otherwise, fetch all ways from OSM that are within the routes' bounding boxes
                 routeDataManager.downloadRegionsForImportDataset(RouteConflator.allConflators, matchingOptions, overpassCachingEnabled);
@@ -243,7 +245,7 @@ public class Main {
             //now add any entities that were created or modified during the matching process
             for(final OSMEntity entity : routeDataManager.allEntities.values()) {
                 if(entity.getAction() != OSMEntity.ChangeAction.none) {
-                    relationSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null, true);
+                    relationSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null, false);
                 }
             }
 

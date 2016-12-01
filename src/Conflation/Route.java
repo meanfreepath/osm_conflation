@@ -240,7 +240,7 @@ public class Route {
             cellWay.setTag("name", cell.toString());
         }
 
-        final String fileName = String.format("%s/segments_%s.osm", Config.sharedInstance.debugDirectory, tripMarker);
+        final String fileName = String.format("%s/debug_segments_%s.osm", Config.sharedInstance.outputDirectory, tripMarker);
         segmentSpace.outputXml(fileName);
         System.out.format("INFO: debug segments file output to %s\n", fileName);
     }
