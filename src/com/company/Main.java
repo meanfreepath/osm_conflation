@@ -227,32 +227,40 @@ public class Main {
                 if(routeConflator.conflateRoutePaths(stopConflator)) {
                     successfullyMatchedRouteMasters++;
                 }
+            }
 
-                //finally, add the completed route relation to the output file for review and upload
-                relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null, true);
+            //if all routes fully matched, add the completed route relation to the output file for review and upload
+            if(successfullyMatchedRouteMasters == RouteConflator.allConflators.size()) {
+                for (final RouteConflator routeConflator : RouteConflator.allConflators) {
+                    relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null, true);
 
-                //also add any other relations that contain any of the route's memberList, to prevent membership conflicts if the user edits the output file.
-                for(final Route route : routeConflator.getExportRoutes()) {
-                    for(final OSMRelation.OSMRelationMember routeMember : route.routeRelation.getMembers()) {
-                        final Collection<OSMRelation> containingRelations = routeMember.member.getContainingRelations().values();
-                        for (final OSMRelation containingRelation : containingRelations) {
-                            relationSpace.addEntity(containingRelation, OSMEntity.TagMergeStrategy.keepTags, null, false);
+                    //also add any other relations that contain any of the route's memberList, to prevent membership conflicts if the user edits the output file.
+                    for (final Route route : routeConflator.getExportRoutes()) {
+                        for (final OSMRelation.OSMRelationMember routeMember : route.routeRelation.getMembers()) {
+                            final Collection<OSMRelation> containingRelations = routeMember.member.getContainingRelations().values();
+                            for (final OSMRelation containingRelation : containingRelations) {
+                                relationSpace.addEntity(containingRelation, OSMEntity.TagMergeStrategy.keepTags, null, false);
+                            }
                         }
                     }
                 }
-            }
 
-            //now add any entities that were created or modified during the matching process
-            for(final OSMEntity entity : routeDataManager.allEntities.values()) {
-                if(entity.getAction() != OSMEntity.ChangeAction.none) {
-                    relationSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null, false);
+                //now add any entities that were created or modified during the matching process
+                for (final OSMEntity entity : routeDataManager.allEntities.values()) {
+                    if (entity.getAction() != OSMEntity.ChangeAction.none) {
+                        relationSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null, false);
+                    }
                 }
+
+                //and finally output to a .osm file
+                relationSpace.setCanUpload(true);
+                final String uploadFileName = String.format("%s/relations_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds));
+                relationSpace.outputXml(uploadFileName);
+                System.out.format("INFO: SUCCESS! Outputted uploadable OSM file to %s\n", uploadFileName);
             }
 
-            //and finally set the "upload" flag and output to a .osm file
-            relationSpace.setCanUpload(successfullyMatchedRouteMasters == RouteConflator.allConflators.size());
-            relationSpace.outputXml(String.format("%s/relations_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
-            routeDataManager.outputXml(String.format("%s/fullresult_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
+            //also output the full working space to a .osm file
+            routeDataManager.outputXml(String.format("%s/workingspace_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
         } catch (IOException | ParserConfigurationException | SAXException | InvalidArgumentException e) {
             e.printStackTrace();
         }
