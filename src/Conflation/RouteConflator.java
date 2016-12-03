@@ -442,7 +442,7 @@ public class RouteConflator {
     }
     public boolean conflateRoutePaths(final StopConflator stopConflator) {
         for(final Route route : exportRoutes) {
-            System.out.format("INFO: Begin conflation for subroute “%s” (tripMarker %s)\n", route.routeRelation.getTag(OSMEntity.KEY_NAME), route.routeRelation.getTag(GTFS_TRIP_MARKER));
+            System.out.format("INFO: Begin conflation for subroute “%s” (tripMarker %s, routeLine way local id %d)\n", route.routeRelation.getTag(OSMEntity.KEY_NAME), route.routeRelation.getTag(GTFS_TRIP_MARKER), route.routeLine.way.osm_id);
             if (debugTripMarker != null && !route.tripMarker.equals(debugTripMarker)) {
                 System.out.println("skipping (not a flagged route)");
                 continue;

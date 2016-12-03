@@ -380,11 +380,19 @@ public class StopArea implements WaySegmentsObserver {
             //update the way matches to include the new segment
             for (final Map<Long, StopWayMatch> routeWayMatches : wayMatches.values()) {
                 final StopWayMatch wayMatch = routeWayMatches.get(originalWaySegments.way.osm_id);
+                if(wayMatch == null) { //i.e. the stop has no proximity match for the way - can happen if RouteLine deviates significantly from the OSM way this stop is on
+                    System.out.format("WARNING: no proximity match for observed way #%d\n", originalWaySegments.way.osm_id);
+                    continue;
+                }
                 final StopWayMatch.SegmentProximityMatch originalProximityMatch = wayMatch.proximityMatches.get(oldSegment.id);
 
                 //now update the proximity match list, removing the old segment, and adding the (now updated) best match to the list
                 if (originalProximityMatch != null) {
                     wayMatch.proximityMatches.remove(oldSegment.id);
+                    if(wayMatch.proximityMatches.size() == 0) { //also remove the proximity match if no segment proximity matches
+                        wayMatches.remove(wayMatch.osmLine.way.osm_id);
+                        wayMatch.osmLine.removeObserver(this);
+                    }
                     if(originalProximityMatch.segmentMatch.mainSegment.bestMatchOverall != null) {
                         addProximityMatch(originalProximityMatch.segmentMatch.mainSegment.bestMatchOverall);
                     }
