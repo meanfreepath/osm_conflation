@@ -352,7 +352,8 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
                     //check whether the entity is a platform or a stop_position
                     final String entityType = existingEntity.getTag(OSMEntity.KEY_PUBLIC_TRANSPORT);
 
-                    if(!existingEntity.hasTag(RouteConflator.GTFS_STOP_ID) && (entityType == null || OSMEntity.TAG_PLATFORM.equals(entityType))) { //if a platform, mark as a conflict
+                    //flag as a conflict if no gtfs:stop_id or ref tag
+                    if(!existingEntity.hasTag(RouteConflator.GTFS_STOP_ID) && !existingEntity.hasTag(OSMEntity.KEY_REF) && (entityType == null || OSMEntity.TAG_PLATFORM.equals(entityType))) { //if a platform, mark as a conflict
                         final double stopDistance = Point.distance(stop.getPlatform().getCentroid(), existingEntity.getCentroid());
                         if (stopDistance < StopArea.maxDistanceBetweenDuplicateStops) {
                             //System.out.println("Within distance of " + stop + "! " + existingEntity.osm_id + ": " + existingEntity.getTag(OSMEntity.KEY_REF) + "/" + existingEntity.getTag(OSMEntity.KEY_NAME) + ", dist " + stopDistance);
