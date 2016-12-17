@@ -1,11 +1,11 @@
 package com.company;
 
 import Conflation.*;
+import NewPathFinding.PathTree;
 import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMRelation;
 import Overpass.OverpassConverter;
-import PathFinding.PathTree;
 import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.xml.sax.SAXException;
 
