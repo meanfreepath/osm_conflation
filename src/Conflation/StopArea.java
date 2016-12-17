@@ -1,7 +1,7 @@
 package Conflation;
 
 import OSM.*;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 
 import java.util.*;
 

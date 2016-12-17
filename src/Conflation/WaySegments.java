@@ -1,7 +1,7 @@
 package Conflation;
 
 import OSM.*;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -180,8 +180,7 @@ public abstract class WaySegments {
      */
     public void appendNode(final OSMNode node) throws InvalidArgumentException {
         if(segments.size() == 0) {
-            String[] errMsg = {"No existing line segments!"};
-            throw new InvalidArgumentException(errMsg);
+            throw new InvalidArgumentException("No existing line segments!");
         }
         final LineSegment lastSegment = segments.get(segments.size() - 1);
 

@@ -6,7 +6,7 @@ import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMRelation;
 import Overpass.OverpassConverter;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;

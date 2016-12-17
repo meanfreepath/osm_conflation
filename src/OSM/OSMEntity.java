@@ -1,6 +1,6 @@
 package OSM;
 
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 
 import java.lang.ref.WeakReference;
 import java.text.CharacterIterator;
@@ -182,8 +182,7 @@ public abstract class OSMEntity {
         }
 
         if(tags.containsKey(name)) {
-            String[] msg = {"Tag \"" + name + "\" already set!"};
-            throw new InvalidArgumentException(msg);
+            throw new InvalidArgumentException("Tag \"" + name + "\" already set!");
         }
         tags.put(name, value.trim());
         markAsModified();

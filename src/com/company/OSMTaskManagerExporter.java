@@ -4,7 +4,7 @@ import Conflation.RouteConflator;
 import Conflation.RouteDataManager;
 import Conflation.StopArea;
 import OSM.*;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 import org.json.JSONWriter;
 
 import java.io.FileWriter;

@@ -1,7 +1,7 @@
 package Overpass;
 
 import OSM.*;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 import org.json.JSONArray;
 import org.json.JSONObject;
 

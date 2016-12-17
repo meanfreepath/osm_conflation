@@ -4,7 +4,7 @@ import Conflation.*;
 import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMWay;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 
 import java.io.IOException;
 import java.util.*;

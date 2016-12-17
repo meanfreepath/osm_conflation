@@ -5,7 +5,7 @@ import Conflation.OSMWaySegments;
 import Conflation.RouteConflator;
 import Conflation.RouteLineSegment;
 import OSM.*;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 
 import java.util.ArrayList;
 import java.util.HashMap;

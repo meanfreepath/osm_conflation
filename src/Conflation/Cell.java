@@ -4,7 +4,7 @@ import OSM.OSMNode;
 import OSM.Point;
 import OSM.Region;
 import OSM.SphericalMercator;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 
 import java.util.ArrayList;
 import java.util.List;

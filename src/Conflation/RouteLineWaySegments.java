@@ -4,7 +4,7 @@ import OSM.OSMNode;
 import OSM.OSMWay;
 import OSM.Point;
 import OSM.Region;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 
 import java.lang.ref.WeakReference;
 import java.util.*;

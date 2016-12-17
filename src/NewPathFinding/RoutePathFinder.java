@@ -3,7 +3,7 @@ package NewPathFinding;
 import Conflation.*;
 import OSM.*;
 import com.company.Config;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 
 import java.io.IOException;
 import java.util.ArrayList;

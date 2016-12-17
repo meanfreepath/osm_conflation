@@ -3,7 +3,7 @@ package Conflation;
 import OSM.*;
 import Overpass.OverpassConverter;
 import com.company.Config;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -33,8 +33,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
             if(routeType == null) {
                 routeType = routeConflator.routeType;
             } else if(routeType != routeConflator.routeType) {
-                final String[] errMsg = {"All routes must be of the same routeType"};
-                throw new InvalidArgumentException(errMsg);
+                throw new InvalidArgumentException("All routes must be of the same routeType");
             }
 
             for (final Route route : routeConflator.importRoutes) {

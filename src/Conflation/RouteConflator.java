@@ -4,7 +4,7 @@ import NewPathFinding.PathTree;
 import OSM.*;
 import com.company.Config;
 import com.sun.istack.internal.NotNull;
-import com.sun.javaws.exceptions.InvalidArgumentException;
+import com.company.InvalidArgumentException;
 
 import java.io.IOException;
 import java.util.*;
@@ -117,8 +117,7 @@ public class RouteConflator {
             if (routeType == null) {
                 routeType = routeMasterRelation.getTag(OSMEntity.KEY_ROUTE);
             } else if (!routeType.equals(routeMasterRelation.getTag(OSMEntity.KEY_ROUTE))) {
-                final String[] errMsg = {"All routes must be of the same routeType"};
-                throw new InvalidArgumentException(errMsg);
+                throw new InvalidArgumentException("All routes must be of the same routeType");
             }
         }
 
@@ -148,8 +147,7 @@ public class RouteConflator {
         routeType = RouteType.fromString(routeMaster.getTag(OSMEntity.KEY_ROUTE_MASTER));
         gtfsRouteId = routeMaster.getTag(GTFS_ROUTE_ID);
         if(routeType == null) {
-            final String errMsg[] = {"Invalid route type provided"};
-            throw new InvalidArgumentException(errMsg);
+            throw new InvalidArgumentException("Invalid route type provided");
         }
 
         allowedRouteTags = wayTagsForRouteType(routeType);
