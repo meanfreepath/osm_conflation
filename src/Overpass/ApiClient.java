@@ -96,7 +96,7 @@ public class ApiClient {
             response = new JSONObject(rawResponse);
 
             //write the data to cache
-            if(cachingEnabled && cacheFile != null) {
+            if(cacheFile != null) {
                 BufferedWriter writer = new BufferedWriter(new FileWriter(cacheFile));
                 writer.write(rawResponse);
                 writer.close();
