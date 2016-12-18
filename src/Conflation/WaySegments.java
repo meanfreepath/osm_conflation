@@ -92,16 +92,8 @@ public abstract class WaySegments {
         this.segments = new ArrayList<>(splitSegments);
         this.wayMatchingOptions = originalSegments.wayMatchingOptions;
 
-        //copy the appropriate segments from the originalSegments
-        int newSegmentIndex = 0, newNodeIndex = 0;
-        for(final LineSegment segment : segments) {
-            segment.setParent(this);
-            segment.segmentIndex = newSegmentIndex++;
-            segment.nodeIndex = newNodeIndex;
-            if (segment.originNode != null) {
-                ++newNodeIndex;
-            }
-        }
+        //update the indexes of the segments to work with their new parent
+        recalculateSegmentIndexes(segments, this);
 
         //also copy any observers
         if(originalSegments.observers != null) {
@@ -313,16 +305,8 @@ public abstract class WaySegments {
                 segments.clear();
                 segments.addAll(curLineSegments);
 
-                int newSegmentIndex = 0, newNodeIndex = 0;
-                for(final LineSegment segment : curLineSegments) {
-                    segment.segmentIndex = newSegmentIndex++;
-                    segment.nodeIndex = newNodeIndex;
-                    if (segment.originNode != null) {
-                        ++newNodeIndex;
-                    }
-                }
-
-                //resyncLineMatches(); //TODO:222 how to handle LineMatches (are they needed?) with new matching system
+                //and recalculate the indexes for the LineSegments to reflect their new positioning
+                recalculateSegmentIndexes(segments, null);
             }
             splitWaySegments[idx++] = ws;
 
@@ -342,6 +326,24 @@ public abstract class WaySegments {
         }
 
         return splitWaySegments;
+    }
+    /**
+     * Recalculates the node and segment indexes for the given LineSegment objects
+     * @param segments the list of LineSegment objects to calculate the indexes for
+     * @param parent the new parent WaySegments to assign the the segments (set to NULL to avoid assignment)
+     */
+    private static void recalculateSegmentIndexes(final List<LineSegment> segments, final WaySegments parent) {
+        int newSegmentIndex = 0, newNodeIndex = 0;
+        for(final LineSegment segment : segments) {
+            if(parent != null) {
+                segment.setParent(parent);
+            }
+            segment.segmentIndex = newSegmentIndex++;
+            segment.nodeIndex = newNodeIndex;
+            if (segment.destinationNode != null) {
+                ++newNodeIndex;
+            }
+        }
     }
     public String toString() {
         return String.format("WaySegments @%d: way #%d (%s): [%d->%d], %d segments", hashCode(), way.osm_id, way.getTag(OSMEntity.KEY_NAME), way.getFirstNode().osm_id, way.getLastNode().osm_id, segments.size());
