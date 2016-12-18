@@ -19,6 +19,31 @@ public class OSMRelation extends OSMEntity {
 
     protected final ArrayList<OSMRelationMember> members = new ArrayList<>();
 
+    public static class OSMRelationMember {
+        public final OSMEntity member;
+        public final String role;
+
+        public OSMRelationMember(OSMEntity memberEntity, @NotNull String memberRole) {
+            role = memberRole;
+            member = memberEntity;
+        }
+        public String toString() {
+            return String.format("RelMem@%d: role \"%s\" member %s", hashCode(), role, member);
+        }
+    }
+
+    public OSMRelation(final long id) {
+        super(id);
+    }
+
+    /**
+     * Copy constructor
+     * @param relationToCopy the relation to copy
+     */
+    public OSMRelation(final OSMRelation relationToCopy, final Long idOverride) {
+        super(relationToCopy, idOverride);
+    }
+
     /**
      * Gets the completion counts of this relation's members
      * @return array of completion counts, in this order: incomplete, partially complete, fully complete members
@@ -41,31 +66,6 @@ public class OSMRelation extends OSMEntity {
             }
         }
         return new int[]{incompleteMemberCount, partiallyCompleteMemberCount, completedMemberCount};
-    }
-
-    public static class OSMRelationMember {
-        public final OSMEntity member;
-        public final String role;
-
-        public OSMRelationMember(OSMEntity memberEntity, @NotNull String memberRole) {
-            role = memberRole;
-            member = memberEntity;
-        }
-        public String toString() {
-            return String.format("RelMem@%d: role \"%s\" member %s", hashCode(), role, member);
-        }
-    }
-
-    public OSMRelation(final long id) {
-        super(id);
-    }
-
-    /**
-     * Copy constructor
-     * @param relationToCopy
-     */
-    public OSMRelation(final OSMRelation relationToCopy, final Long idOverride) {
-        super(relationToCopy, idOverride);
     }
     @Override
     protected void downgradeToIncompleteEntity() {
@@ -194,40 +194,54 @@ public class OSMRelation extends OSMEntity {
     }
 
     /**
-     * Gets the OSMRelationMember object for the given entity
-     * @param entity
-     * @return
+     * Gets the OSMRelationMember object(s) for the given entity
+     * @param entity the entity to search for
+     * @return array of OSMRelationMembers containing entity
      */
-    public OSMRelationMember getMemberForEntity(final OSMEntity entity) {
-        int index = indexOfMember(entity);
-        if(index < 0) {
+    public OSMRelationMember[] getMembersForEntity(final OSMEntity entity) {
+        int indexes[] = getMembershipIndexes(entity);
+        if(indexes == null) {
             return null;
         }
-        return members.get(index);
+        List<OSMRelationMember> entityMembers = new ArrayList<>(indexes.length);
+        for(int idx : indexes) {
+            entityMembers.add(members.get(idx));
+        }
+        return entityMembers.toArray(new OSMRelationMember[entityMembers.size()]);
     }
 
     /**
-     * Get the index of the membership object for the given entity
-     * @param entity
-     * @return the index, or -1 if entity isn't a member of this relation
+     * Get the index(es) of the membership object for the given entity
+     * @param entity the entity to search for
+     * @return the index(es), or null if entity isn't a member of this relation
      */
-    public int indexOfMember(final OSMEntity entity) {
+    public int[] getMembershipIndexes(final OSMEntity entity) {
         int index = 0;
+        List<Integer> indexes = new ArrayList<>(8);
         for(final OSMRelationMember member : members) {
             if(member.member == entity) {
-                return index;
+                indexes.add(index);
             }
             index++;
         }
-        return -1;
+        if(indexes.size() > 0) {
+            int[] retVal = new int[indexes.size()];
+            int i = 0;
+            for(Integer idx : indexes) {
+                retVal[i++] = idx;
+            }
+            return retVal;
+        } else {
+            return null;
+        }
     }
     /**
      * Checks whether the given node is a member of this way
-     * @param entity
-     * @return
+     * @param entity the entity to search for
+     * @return true if entity has at least 1 membership, false if not
      */
     public boolean containsMember(final OSMEntity entity) {
-        return indexOfMember(entity) >= 0;
+        return getMembershipIndexes(entity) != null;
     }
 
     /**
@@ -259,28 +273,31 @@ public class OSMRelation extends OSMEntity {
     }
 
     /**
-     * Adds a member to the end of the relation list
-     * @param member
-     * @param role
-     * @return
+     * Adds an entity to the end of the relation list
+     * @param entity the entity to add
+     * @param role its role in the relation
+     * @return true if added, false otherwise
      */
-    public boolean addMember(final OSMEntity member, final String role) {
-        final boolean status = addMemberInternal(member, role, members.size(), true);
+    public boolean addMember(final OSMEntity entity, final String role) {
+        final boolean status = addMemberInternal(entity, role, members.size(), true);
         if(status) {
             updateCompletionStatus();
         }
         return status;
     }
     /**
-     * Add a new member before the given existing member in the member list
-     * @param member
-     * @param role
-     * @param existingMember
-     * @return
+     * Add a new entity before the given existing member in the member list
+     * @param entity the entity to add
+     * @param role its role in the relation
+     * @param existingMember the existing member object
+     * @return true if added, false if not (i.e. existingMember not actually a member of this relation)
      */
-    public boolean insertBeforeMember(final OSMEntity member, final String role, final OSMEntity existingMember) {
-        final int existingMemberIndex = existingMember != null ? indexOfMember(existingMember) : 0; //default to the first if no existingMember provided
-        final boolean status = addMemberInternal(member, role, existingMemberIndex, true);
+    public boolean insertBeforeMember(final OSMEntity entity, final String role, final OSMRelationMember existingMember) {
+        final int existingMemberIndex = members.indexOf(existingMember);
+        if(existingMemberIndex < 0) {
+            return false;
+        }
+        final boolean status = addMemberInternal(entity, role, existingMemberIndex, true);
         if(status) {
             updateCompletionStatus();
         }
@@ -288,14 +305,17 @@ public class OSMRelation extends OSMEntity {
     }
     /**
      * Add a new member after the given existing member in the member list
-     * @param member
-     * @param role
-     * @param existingMember
-     * @return
+     * @param entity the entity to add
+     * @param role its role in the relation
+     * @param existingMember the existing member object
+     * @return true if added, false if not (i.e. existingMember not actually a member of this relation)
      */
-    public boolean insertAfterMember(final OSMEntity member, final String role, final OSMEntity existingMember) {
-        final int existingMemberIndex = existingMember != null ? indexOfMember(existingMember) : members.size() - 2; //default to the last if no existingMember provided
-        final boolean status = addMemberInternal(member, role, existingMemberIndex + 1, true);
+    public boolean insertAfterMember(final OSMEntity entity, final String role, final OSMRelationMember existingMember) {
+        final int existingMemberIndex = members.indexOf(existingMember);
+        if(existingMemberIndex < 0) {
+            return false;
+        }
+        final boolean status = addMemberInternal(entity, role, existingMemberIndex + 1, true);
         if(status) {
             updateCompletionStatus();
         }
@@ -314,24 +334,30 @@ public class OSMRelation extends OSMEntity {
         complete = allMembersComplete ? CompletionStatus.membersComplete : CompletionStatus.memberList;
     }
     /**
-     * Replace the old member with the new member
-     * @param oldEntity
-     * @param newEntity
+     * Replaces all memberships of the old entity with the new entity
+     * @param oldEntity the entity to replace
+     * @param newEntity the entity to replate oldEntity with
      */
-    public void replaceMember(final OSMEntity oldEntity, final OSMEntity newEntity) {
-        final int memberIndex = indexOfMember(oldEntity);
-        if(memberIndex >= 0) {
-            final OSMRelationMember oldMember = members.get(memberIndex);
-            final OSMRelationMember newMember = new OSMRelationMember(newEntity, oldMember.role);
-            members.set(memberIndex, newMember);
+    public int replaceEntityMemberships(final OSMEntity oldEntity, final OSMEntity newEntity) {
+        final ListIterator<OSMRelationMember> memberListIterator = members.listIterator();
+        int replaceCount = 0;
+        while(memberListIterator.hasNext()) {
+            final OSMRelationMember oldMember = memberListIterator.next();
+            if (oldMember.member == oldEntity) {
+                final OSMRelationMember newMember = new OSMRelationMember(newEntity, oldMember.role);
+                memberListIterator.set(newMember);
 
-            oldMember.member.didRemoveFromEntity(this, false);
-            newMember.member.didAddToEntity(this);
+                oldMember.member.didRemoveFromEntity(this, false);
+                newMember.member.didAddToEntity(this);
 
-            boundingBox = null; //invalidate the bounding box
-            markAsModified();
-            updateCompletionStatus();
+                boundingBox = null; //invalidate the bounding box
+                markAsModified();
+                updateCompletionStatus();
+
+                replaceCount++;
+            }
         }
+        return replaceCount;
     }
     public List<OSMRelationMember> getMembers() {
         return members;
@@ -410,7 +436,7 @@ public class OSMRelation extends OSMEntity {
                         //check which splitWay contains the via node, and update the relation membership as needed
                         for(final OSMWay splitWay : allSplitWays) {
                             if(splitWay.complete == CompletionStatus.membersComplete && splitWay != originalWay && splitWay.getNodes().contains(viaEntity)) {
-                                replaceMember(originalWay, splitWay);
+                                replaceEntityMemberships(originalWay, splitWay);
                                 break;
                             }
                         }
@@ -420,16 +446,16 @@ public class OSMRelation extends OSMEntity {
                         //check which splitWay intersects the "via" way, replace the old way with it in the relation
                         for(final OSMWay splitWay : allSplitWays) {
                             if(splitWay != originalWay && splitWay.complete == CompletionStatus.membersComplete && (splitWay.getNodes().contains(viaWay.getFirstNode()) || splitWay.getNodes().contains(viaWay.getLastNode()))) {
-                                replaceMember(originalWay, splitWay);
+                                replaceEntityMemberships(originalWay, splitWay);
                                 break;
                             }
                         }
                     }
-                } else { //if the restriction is invalid, just add the new originalWay to it and log a warning
-                    final OSMRelationMember member = getMemberForEntity(originalWay);
+                } else { //if the restriction is invalid, just add the new splitWays to it and log a warning
+                    final OSMRelationMember members[] = getMembersForEntity(originalWay);
                     for(final OSMWay splitWay : allSplitWays) {
                         if (splitWay != originalWay) {
-                            addMember(splitWay, member.role);
+                            addMember(splitWay, members[0].role);
                         }
                     }
                 }
@@ -437,59 +463,58 @@ public class OSMRelation extends OSMEntity {
                 break;
             default: //all other types: just add the new ways to the relation, in the correct order if possible
                 final OSMNode originalWayFirstNode = originalNodeList.get(0), originalWayLastNode = originalNodeList.get(originalNodeList.size() - 1);
-                final List<OSMWay> relationWays = new ArrayList<>(members.size());
+                final List<OSMRelationMember> relationWays = new ArrayList<>(members.size());
                 for(final OSMRelationMember member : members) {
                     if(member.member instanceof OSMWay) {
-                        relationWays.add((OSMWay) member.member);
+                        relationWays.add(member);
                     }
                 }
 
-                //get the order of originalWay in the relation, defaulting to adding in the forward direction
-                boolean addForward = true;
-                final int index = relationWays.indexOf(originalWay);
-                if(index > 0) { //if not the first way in list: use previous member's first/last nodes to check
-                    final OSMWay prevWay = relationWays.get(index - 1);
-                    if(originalWayLastNode == prevWay.getFirstNode() ||originalWayLastNode == prevWay.getLastNode()) {
-                        addForward = false;
-                    } else if(originalWayFirstNode == prevWay.getFirstNode() ||originalWayFirstNode == prevWay.getLastNode()) {
-                        addForward = true;
-                    }
-                } else {
-                    final OSMWay nextWay = relationWays.get(index + 1);
-                    if(originalWayLastNode == nextWay.getFirstNode() ||originalWayLastNode == nextWay.getLastNode()) {
-                        addForward = true;
-                    } else if(originalWayFirstNode == nextWay.getFirstNode() ||originalWayFirstNode == nextWay.getLastNode()) {
-                        addForward = false;
-                    }
-                }
-
-                final OSMRelation.OSMRelationMember originalWayMember = getMemberForEntity(originalWay);
-
-                /*System.out.format("SPLIT %s into %d ways, index %d:: %s\n", originalWay.getTag("name"), allSplitWays.length, index, addForward);
-                System.out.format("\tOrigin F/L nodes: %d/%d\n", originalWayFirstNode.osm_id, originalWayLastNode.osm_id);
-                for(final OSMWay splitWay : allSplitWays) {
-                    System.out.format("\tWay: %s\n", splitWay);
-                }*/
-
-
-                //and add all the newly-split ways to the relation:
-                final List<OSMWay> splitWaysForRelation = new ArrayList<>(allSplitWays.length);
-                Collections.addAll(splitWaysForRelation, allSplitWays);
-                if(!addForward) { //reverse the iteration order if adding in a backward direction
-                    Collections.reverse(splitWaysForRelation);
-                }
-
-                boolean hitOriginal = false;
-                for (final OSMWay splitWay : splitWaysForRelation) {
-                    if(splitWay == originalWay) { //don't re-add the originalWay
-                        hitOriginal = true;
-                        continue;
-                    }
-                    //System.out.format("\tAdding new splitWay (%d nodes) %s %s: %s to relation %s\n", splitWay.getNodes().size(), addForward ? "FORWARD" : "BACKWARD", hitOriginal ? "AFTER" : "BEFORE", splitWay.getTag("name"), getTag("name"));
-                    if(hitOriginal) {
-                        insertAfterMember(splitWay, originalWayMember.role, originalWay);
+                //get the order of the originalWay's membership(s) in the relation, defaulting to adding in the forward direction
+                final OSMRelationMember originalWayMemberships[] = getMembersForEntity(originalWay);
+                for(final OSMRelationMember originalWayMember : originalWayMemberships) {
+                    boolean addForward = true;
+                    final int index = relationWays.indexOf(originalWayMember);
+                    if(index > 0) { //if not the first way in list: use previous member's first/last nodes to check
+                        final OSMWay prevWay = (OSMWay) relationWays.get(index - 1).member;
+                        if(originalWayLastNode == prevWay.getFirstNode() ||originalWayLastNode == prevWay.getLastNode()) {
+                            addForward = false;
+                        } else if(originalWayFirstNode == prevWay.getFirstNode() ||originalWayFirstNode == prevWay.getLastNode()) {
+                            addForward = true;
+                        }
                     } else {
-                        insertBeforeMember(splitWay, originalWayMember.role, originalWay);
+                        final OSMWay nextWay = (OSMWay) relationWays.get(index + 1).member;
+                        if(originalWayLastNode == nextWay.getFirstNode() ||originalWayLastNode == nextWay.getLastNode()) {
+                            addForward = true;
+                        } else if(originalWayFirstNode == nextWay.getFirstNode() ||originalWayFirstNode == nextWay.getLastNode()) {
+                            addForward = false;
+                        }
+                    }
+
+                    //and add all the newly-split ways to the relation:
+                    final List<OSMWay> splitWaysForRelation = new ArrayList<>(allSplitWays.length);
+                    Collections.addAll(splitWaysForRelation, allSplitWays);
+                    if(!addForward) { //reverse the iteration order if adding in a backward direction
+                        Collections.reverse(splitWaysForRelation);
+                    }
+
+                    /*System.out.format("SPLIT %s into %d ways, index %d:: %s\n", originalWay.getTag("name"), allSplitWays.length, index, addForward);
+                    System.out.format("\tOrigin F/L nodes: %d/%d\n", originalWayFirstNode.osm_id, originalWayLastNode.osm_id);
+                    for(final OSMWay splitWay : allSplitWays) {
+                        System.out.format("\tWay: %s\n", splitWay);
+                    }*/
+                    boolean hitOriginal = false;
+                    for (final OSMWay splitWay : splitWaysForRelation) {
+                        if (splitWay == originalWay) { //don't re-add the originalWay
+                            hitOriginal = true;
+                            continue;
+                        }
+                        //System.out.format("\tAdding new splitWay (%d nodes) %s %s: %s to relation %s\n", splitWay.getNodes().size(), addForward ? "FORWARD" : "BACKWARD", hitOriginal ? "AFTER" : "BEFORE", splitWay.getTag("name"), getTag("name"));
+                        if (hitOriginal) {
+                            insertAfterMember(splitWay, originalWayMember.role, originalWayMember);
+                        } else {
+                            insertBeforeMember(splitWay, originalWayMember.role, originalWayMember);
+                        }
                     }
                 }
                 break;

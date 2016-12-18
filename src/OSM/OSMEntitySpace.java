@@ -549,7 +549,7 @@ public class OSMEntitySpace {
 
             //and add targetEntity to any relations theEntity is involved in
             for(final OSMRelation containingRelation : theEntity.getContainingRelations().values()) {
-                containingRelation.replaceMember(theEntity, targetEntity);
+                containingRelation.replaceEntityMemberships(theEntity, targetEntity);
             }
 
             //copy the metadata from withEntity, since it's "better"
@@ -575,7 +575,7 @@ public class OSMEntitySpace {
         //also replace the incoming entity's relation memberships with the target entity
         final Map<Long, OSMRelation> containingRelations = new HashMap<>(withEntity.getContainingRelations());
         for(final OSMRelation containingRelation : containingRelations.values()) {
-            containingRelation.replaceMember(withEntity, targetEntity);
+            containingRelation.replaceEntityMemberships(withEntity, targetEntity);
         }
 
         //remove withEntity from this space
