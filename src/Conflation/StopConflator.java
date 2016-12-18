@@ -123,7 +123,7 @@ public class StopConflator {
             }
 
             //get a handle on the best-matching way to the StopArea, and the nearest point to it
-            final LineSegment bestSegment = stopArea.bestWayMatch.getClosestSegmentToStopPlatform();
+            final OSMLineSegment bestSegment = stopArea.bestWayMatch.getClosestSegmentToStopPlatform();
             if(bestSegment == null) {
                 System.out.println("WARNING: " + stopArea + " has no nearby matching segment");
                 for (final StopArea.SummarizedMatch otherMatch : stopArea.bestWayMatches) {
