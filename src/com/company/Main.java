@@ -214,6 +214,7 @@ public class Main {
                 System.exit(0);
             } else { //otherwise, fetch all ways from OSM that are within the routes' bounding boxes
                 routeDataManager.downloadRegionsForImportDataset(RouteConflator.allConflators, matchingOptions, overpassCachingEnabled);
+                routeDataManager.outputXml(String.format("%s/routedownload_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
                 routeDataManager.conflateStopsWithOSM(RouteConflator.allConflators, false); //don't cache stop data, to avoid stale data if previously run with processStopsOnly option
             }
 
