@@ -336,7 +336,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
                 }
             }
             if(includeEntity) {
-                importedExistingStops.add(addEntity(existingStop, OSMEntity.TagMergeStrategy.keepTags, null, true));
+                importedExistingStops.add(addEntity(existingStop, OSMEntity.TagMergeStrategy.keepTags, null, true, 1));
             }
         }
 

@@ -6,7 +6,6 @@ import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMRelation;
 import Overpass.OverpassConverter;
-import com.company.InvalidArgumentException;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -142,11 +141,11 @@ public class Main {
 
                         //add to the working import space
                         if (relationType != null && relationType.equals(OSMEntity.TAG_ROUTE_MASTER) && selectedGTFSRouteId.equals(gtfsRouteId)) {
-                            workingImportSpace.addEntity(relation, OSMEntity.TagMergeStrategy.copyTags, null, true);
+                            workingImportSpace.addEntity(relation, OSMEntity.TagMergeStrategy.copyTags, null, true, 0);
 
                             //also save the route's data to an OSM file
                             OSMEntitySpace routeImportSpace = new OSMEntitySpace(2048);
-                            routeImportSpace.addEntity(relation, OSMEntity.TagMergeStrategy.copyTags, null, true);
+                            routeImportSpace.addEntity(relation, OSMEntity.TagMergeStrategy.copyTags, null, true, 0);
                             routeImportSpace.outputXml(routeFileName);
                         }
                     }
@@ -215,7 +214,7 @@ public class Main {
                 System.exit(0);
             } else { //otherwise, fetch all ways from OSM that are within the routes' bounding boxes
                 routeDataManager.downloadRegionsForImportDataset(RouteConflator.allConflators, matchingOptions, overpassCachingEnabled);
-                routeDataManager.conflateStopsWithOSM(RouteConflator.allConflators, overpassCachingEnabled);
+                routeDataManager.conflateStopsWithOSM(RouteConflator.allConflators, false); //don't cache stop data, to avoid stale data if previously run with processStopsOnly option
             }
 
             //now run the conflation algorithms on each route_master, adding the conflated path data to an output space
@@ -232,14 +231,14 @@ public class Main {
             //if all routes fully matched, add the completed route relation to the output file for review and upload
             if(successfullyMatchedRouteMasters == RouteConflator.allConflators.size()) {
                 for (final RouteConflator routeConflator : RouteConflator.allConflators) {
-                    relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null, true);
+                    relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null, true, 0);
 
                     //also add any other relations that contain any of the route's memberList, to prevent membership conflicts if the user edits the output file.
                     for (final Route route : routeConflator.getExportRoutes()) {
                         for (final OSMRelation.OSMRelationMember routeMember : route.routeRelation.getMembers()) {
                             final Collection<OSMRelation> containingRelations = routeMember.member.getContainingRelations().values();
                             for (final OSMRelation containingRelation : containingRelations) {
-                                relationSpace.addEntity(containingRelation, OSMEntity.TagMergeStrategy.keepTags, null, false);
+                                relationSpace.addEntity(containingRelation, OSMEntity.TagMergeStrategy.keepTags, null, false, 0);
                             }
                         }
                     }
@@ -248,7 +247,7 @@ public class Main {
                 //now add any entities that were created or modified during the matching process
                 for (final OSMEntity entity : routeDataManager.allEntities.values()) {
                     if (entity.getAction() != OSMEntity.ChangeAction.none) {
-                        relationSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null, false);
+                        relationSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null, false, 0);
                     }
                 }
 

@@ -4,7 +4,6 @@ import Conflation.RouteConflator;
 import Conflation.RouteDataManager;
 import Conflation.StopArea;
 import OSM.*;
-import com.company.InvalidArgumentException;
 import org.json.JSONWriter;
 
 import java.io.FileWriter;
@@ -107,7 +106,7 @@ public class OSMTaskManagerExporter {
         for(final DividedBox box : subBoxes) {
             final OSMEntitySpace boxSpace = new OSMEntitySpace(box.containedEntities.size());
             for(final OSMEntity entity : box.containedEntities) {
-                boxSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null, true);
+                boxSpace.addEntity(entity, OSMEntity.TagMergeStrategy.keepTags, null, true, 0);
             }
 
             try {
@@ -169,7 +168,7 @@ public class OSMTaskManagerExporter {
         final OSMEntitySpace debugEntitySpace = new OSMEntitySpace(allStops.size());
         for(final StopArea entity : allStops) {
             if(entity.getPlatform().hasTag(StopArea.KEY_GTFS_CONFLICT)) {
-                debugEntitySpace.addEntity(entity.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null, true);
+                debugEntitySpace.addEntity(entity.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null, true, 0);
             }
         }
         debugEntitySpace.outputXml(destinationDir + "all_stops.osm");

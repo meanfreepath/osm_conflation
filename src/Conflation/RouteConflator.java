@@ -179,7 +179,7 @@ public class RouteConflator {
                 StopArea stopArea = allStops.get(gtfsStopId);
                 if(stopArea == null) {
                     //add the import platform node to the working entity space (may be replaced later when conflating stops with existing data)
-                    importPlatform = (OSMNode) dataManager.addEntity(stopMember.member, OSMEntity.TagMergeStrategy.keepTags, null, true);
+                    importPlatform = (OSMNode) dataManager.addEntity(stopMember.member, OSMEntity.TagMergeStrategy.keepTags, null, true, 0);
                     stopArea = new StopArea(importPlatform);
                     allStops.put(gtfsStopId, stopArea);
                 }
@@ -421,7 +421,7 @@ public class RouteConflator {
                     existingRouteRelation.removeMember(member.member, Integer.MAX_VALUE);
                 }
                 final OSMWay importRoutePath = (OSMWay) importRoute.routeRelation.getMembers("").get(0).member;
-                final OSMRelation exportRouteRelation = (OSMRelation) workingEntitySpace.addEntity(existingRouteRelation, OSMEntity.TagMergeStrategy.copyTags, null, true);
+                final OSMRelation exportRouteRelation = (OSMRelation) workingEntitySpace.addEntity(existingRouteRelation, OSMEntity.TagMergeStrategy.copyTags, null, true, 0);
                 exportRoute = new Route(exportRouteRelation, importRoutePath, importRoute.stops, this);
             } else {
                 exportRoute = new Route(importRoute, importRoute.stops, workingEntitySpace);

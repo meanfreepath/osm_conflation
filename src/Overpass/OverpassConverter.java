@@ -77,7 +77,7 @@ public class OverpassConverter {
                     if(curElement.has(keyVersion)) {
                         addMetadata(curElement,node);
                     }
-                    entitySpace.addEntity(node, OSMEntity.TagMergeStrategy.keepTags, null, true);
+                    entitySpace.addEntity(node, OSMEntity.TagMergeStrategy.keepTags, null, true, 0);
                 } else if(elementType.equals(OSMEntity.OSMType.way.name())) {
                     OSMWay way = new OSMWay(curElement.getLong(keyId));
                     way.setComplete(OSMEntity.CompletionStatus.self);
@@ -87,7 +87,7 @@ public class OverpassConverter {
                     if(curElement.has(keyVersion)) {
                         addMetadata(curElement, way);
                     }
-                    way = (OSMWay) entitySpace.addEntity(way, OSMEntity.TagMergeStrategy.keepTags, null, true);
+                    way = (OSMWay) entitySpace.addEntity(way, OSMEntity.TagMergeStrategy.keepTags, null, true, 0);
                     if(curElement.has("nodes")) {
                         way.setComplete(OSMEntity.CompletionStatus.memberList);
                         JSONArray wayNodes = curElement.getJSONArray("nodes");
@@ -112,7 +112,7 @@ public class OverpassConverter {
                     if(curElement.has(keyVersion)) {
                         addMetadata(curElement, relation);
                     }
-                    relation = (OSMRelation) entitySpace.addEntity(relation, OSMEntity.TagMergeStrategy.keepTags, null, true);
+                    relation = (OSMRelation) entitySpace.addEntity(relation, OSMEntity.TagMergeStrategy.keepTags, null, true, 0);
                     if(curElement.has("members")) { //NOTE: relations are last in the Overpass
                         relation.setComplete(OSMEntity.CompletionStatus.memberList);
                         final JSONArray members = curElement.getJSONArray("members");

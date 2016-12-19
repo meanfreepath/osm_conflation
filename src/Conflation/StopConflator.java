@@ -1,9 +1,7 @@
 package Conflation;
 
 import OSM.*;
-import com.company.Config;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -186,7 +184,7 @@ public class StopConflator {
         OSMEntity platform;
         for (final StopArea stop : RouteConflator.allStops.values()) {
             platform = stop.getPlatform();
-            outputSpace.addEntity(platform, OSMEntity.TagMergeStrategy.keepTags, null, true);
+            outputSpace.addEntity(platform, OSMEntity.TagMergeStrategy.keepTags, null, true, 1);
             if(platform.osm_id > 0) {
                 existingStops++;
             } else {
@@ -196,7 +194,7 @@ public class StopConflator {
             //add the stop position, if present
             final OSMNode stopPosition = stop.getStopPosition(routeType);
             if (stopPosition != null) {
-                outputSpace.addEntity(stopPosition, OSMEntity.TagMergeStrategy.keepTags, null, true);
+                outputSpace.addEntity(stopPosition, OSMEntity.TagMergeStrategy.keepTags, null, true, 1);
             }
         }
         System.out.format("INFO: %d new, %d existing stops (%d total)\n", newStops, existingStops, newStops + existingStops);
