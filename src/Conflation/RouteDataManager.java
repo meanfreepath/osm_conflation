@@ -273,6 +273,9 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
         final double stopSearchBuffer = -SphericalMercator.metersToCoordDelta(100.0/*StopArea.duplicateStopPlatformBoundingBoxSize*/, stopDownloadRegion.getCentroid().y);
         stopDownloadRegion = stopDownloadRegion.regionInset(stopSearchBuffer, stopSearchBuffer);
 
+        final Map<String, List<String>> platformTags = RouteConflator.platformTagsForRouteType(routeType);
+        assert platformTags != null;
+
         final OverpassConverter converter = new OverpassConverter();
         try {
             final String query;
@@ -280,12 +283,12 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
             switch (routeType) {
                 case bus: //bus stops are typically nodes, but may also be ways
                     final String[] queryComponentsBus = {
-                            String.format("node[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("node[\"public_transport\"~\"platform|stop_position\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("way[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude)
+                            String.format("node[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f);rel(bn);", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("node[\"public_transport\"~\"platform|stop_position\"](%.07f,%.07f,%.07f,%.07f);rel(bn);", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("way[\"highway\"=\"bus_stop\"](%.07f,%.07f,%.07f,%.07f)->.a;.a>;.a<;", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)->.b;.b>;.b<;", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude)
                     };
-                    query = "(" + String.join(";", queryComponentsBus) + ");(._;>;);";
+                    query = "(" + String.join(" ", queryComponentsBus) + ");(._;);";
                     break;
                 case light_rail:
                 case train:
@@ -293,10 +296,10 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
                 case railway:
                 case tram:
                     final String[] queryComponentsRail = {
-                            String.format("node[\"railway\"~\"platform|tram_stop\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("node[\"public_transport\"~\"platform|stop_position\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("way[\"railway\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
-                            String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude)
+                            String.format("node[\"railway\"~\"platform|tram_stop\"](%.07f,%.07f,%.07f,%.07f);rel(bn);", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("node[\"public_transport\"~\"platform|stop_position\"](%.07f,%.07f,%.07f,%.07f);rel(bn);", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("way[\"railway\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)->.a;.a>;.a<;", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude),
+                            String.format("way[\"public_transport\"=\"platform\"](%.07f,%.07f,%.07f,%.07f)->.b;.b>;.b<;", stopDownloadRegionLL.origin.latitude, stopDownloadRegionLL.origin.longitude, stopDownloadRegionLL.extent.latitude, stopDownloadRegionLL.extent.longitude)
                     };
                     query = "(" + String.join(";", queryComponentsRail) + ");(._;>;);";
                     break;
@@ -325,7 +328,16 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
         //and another list of stops in the existing OSM data
         final ArrayList<OSMEntity> importedExistingStops = new ArrayList<>(existingStopsSpace.allEntities.size());
         for(final OSMEntity existingStop : existingStopsSpace.allEntities.values()) {
-            importedExistingStops.add(addEntity(existingStop, OSMEntity.TagMergeStrategy.keepTags, null, true));
+            boolean includeEntity = false;
+            for(final String platformKey : platformTags.keySet()) {
+                if (existingStop.hasTag(platformKey)) { //only check for entities matching the route's platform tags
+                    includeEntity = true;
+                    break;
+                }
+            }
+            if(includeEntity) {
+                importedExistingStops.add(addEntity(existingStop, OSMEntity.TagMergeStrategy.keepTags, null, true));
+            }
         }
 
         //and compare them to the existing OSM data
@@ -356,7 +368,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
                     if(!existingEntity.hasTag(RouteConflator.GTFS_STOP_ID) && !existingEntity.hasTag(OSMEntity.KEY_REF) && (entityType == null || OSMEntity.TAG_PLATFORM.equals(entityType))) { //if a platform, mark as a conflict
                         final double stopDistance = Point.distance(stop.getPlatform().getCentroid(), existingEntity.getCentroid());
                         if (stopDistance < StopArea.maxDistanceBetweenDuplicateStops) {
-                            //System.out.println("Within distance of " + stop + "! " + existingEntity.osm_id + ": " + existingEntity.getTag(OSMEntity.KEY_REF) + "/" + existingEntity.getTag(OSMEntity.KEY_NAME) + ", dist " + stopDistance);
+                            //System.out.format("%s within distance of %s: dist %.01f!\n", stop, existingEntity, stopDistance);
                             stop.getPlatform().setTag(StopArea.KEY_GTFS_CONFLICT, "id #" + existingEntity.osm_id);
                         }
                     }/* else if(OSMEntity.TAG_STOP_POSITION.equals(entityType)) { //no action taken on existing stop positions
