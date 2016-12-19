@@ -319,9 +319,6 @@ public abstract class OSMEntity {
      * @return
      */
     public final Map<String, String> getTags() {
-        if(tags == null) {
-            return null;
-        }
         return tags;
     }
     public boolean hasTag(final String name) {
