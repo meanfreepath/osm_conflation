@@ -634,14 +634,15 @@ public class OSMEntitySpace {
     public OSMWay[] splitWay(final OSMWay originalWay, final OSMNode[] splitNodes) throws InvalidArgumentException {
         //basic checks
         final List<OSMNode> curNodes = originalWay.getNodes();
-        List<NodeIndexer> actualSplitNodes = new ArrayList<>(splitNodes.length);
+        final boolean originalWayIsClosed = originalWay.isClosed();
+        final List<NodeIndexer> actualSplitNodes = new ArrayList<>(splitNodes.length);
         for(final OSMNode splitNode : splitNodes) {
             final int nodeIndex = curNodes.indexOf(splitNode);
             if (nodeIndex < 0) {
                 throw new InvalidArgumentException("splitNode " + splitNode.osm_id + " is not a member of the originalWay \"" + originalWay.getTag("name") + "\" (" + originalWay.osm_id + ")");
             }
-            //no need to split at first/last nodes
-            if (splitNode == originalWay.getFirstNode() || splitNode == originalWay.getLastNode()) {
+            //no need to split at first/last nodes (unclosed ways only)
+            if (!originalWayIsClosed && (splitNode == originalWay.getFirstNode() || splitNode == originalWay.getLastNode())) {
                 continue;
             }
             actualSplitNodes.add(new NodeIndexer(splitNode, nodeIndex));
@@ -649,6 +650,10 @@ public class OSMEntitySpace {
         if(actualSplitNodes.size() == 0) {
             return new OSMWay[]{originalWay};
         }
+        if(originalWayIsClosed && actualSplitNodes.size() < 2) {
+            throw new InvalidArgumentException("Need to provide at least 2 unique nodes to split a closed way!");
+        }
+
         //sort the split nodes so their order matches the order of originalWay's nodes
         actualSplitNodes.sort(nodeIndexComparator);
         final int splitWayCount = actualSplitNodes.size() + 1;
@@ -712,6 +717,11 @@ public class OSMEntitySpace {
                 }
                 for(final OSMNode nodeToRemove : nodesToRemove) {
                     originalWay.removeNode(nodeToRemove);
+                }
+
+                //remove the last node on the originalWay if it was closed, since now it's split it's no longer closed
+                if(originalWayIsClosed) {
+                    originalWay.removeNodeAtIndex(originalWay.getNodes().size() - 1);
                 }
             } else { //a new way: create an OSMWay (which is added to this space) with originalWay's tags, and add the split nodes
                 curWay = createWay(originalWay.getTags(), wayNodes);

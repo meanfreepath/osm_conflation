@@ -104,6 +104,15 @@ public class OSMWay extends OSMEntity {
         markAsModified();
         updateCompletionStatus();
     }
+
+    /**
+     * Removes the node at the given index
+     * @param nodeIndex the index of the node to remove
+     * @return TRUE if the node was found and replaced
+     */
+    public boolean removeNodeAtIndex(final int nodeIndex) {
+        return replaceNodeAtIndex(nodeIndex, null);
+    }
     public boolean removeNode(final OSMNode node) {
         return replaceNode(node, null);
     }
@@ -114,8 +123,26 @@ public class OSMWay extends OSMEntity {
      * @return TRUE if the node was found and replaced
      */
     public boolean replaceNode(final OSMNode oldNode, @NotNull final OSMNode newNode) {
-        final int nodeIndex = nodes.indexOf(oldNode);
+        int nodeIndex = nodes.indexOf(oldNode);
+        boolean replaced = replaceNodeAtIndex(nodeIndex, newNode);
+
+        //if this is a closed way, we also need to replace the last node if it's the same as oldNode (previous 2 lines only replaced the first instance)
+        if(isClosed() && oldNode == getLastNode()) {
+            nodeIndex = nodes.indexOf(oldNode);
+            replaceNodeAtIndex(nodeIndex, newNode);
+        }
+        return replaced;
+    }
+
+    /**
+     *
+     * @param nodeIndex the index of the node to remove
+     * @param newNode
+     * @return TRUE if the node was found and replaced
+     */
+    private boolean replaceNodeAtIndex(final int nodeIndex, @NotNull final OSMNode newNode) {
         if(nodeIndex >= 0) {
+            final OSMNode oldNode = nodes.get(nodeIndex);
             if(newNode != null) {
                 nodes.set(nodeIndex, newNode);
                 newNode.didAddToEntity(this);
