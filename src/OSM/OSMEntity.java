@@ -18,8 +18,8 @@ public abstract class OSMEntity {
     public final static String TAG_LANE = "lane", TAG_OPPOSITE_LANE = "opposite_lane";
     public final static String MEMBERSHIP_DEFAULT = "", MEMBERSHIP_STOP = "stop", MEMBERSHIP_PLATFORM = "platform";
 
-    public final static String KEY_AREA = "area", KEY_HIGHWAY = "highway", KEY_RAILWAY = "railway", KEY_SUBWAY = "subway", KEY_MONORAIL = "monorail", KEY_PUBLIC_TRANSPORT = "public_transport", KEY_PUBLIC_TRANSPORT_VERSION = "public_transport:version", KEY_BUS = "bus", KEY_BUSWAY = "busway", KEY_TRAIN = "train", KEY_FERRY = "ferry", KEY_TRAM = "tram", KEY_AERIALWAY = "aerialway", KEY_FUNICULAR = "funicular";
-    public final static String TAG_LEGACY_BUS_STOP = "bus_stop", TAG_PLATFORM = "platform", TAG_STOP_POSITION = "stop_position", TAG_LEGACY_FERRY_TERMINAL = "ferry_terminal";
+    public final static String KEY_AREA = "area", KEY_HIGHWAY = "highway", KEY_RAILWAY = "railway", KEY_SUBWAY = "subway", KEY_MONORAIL = "monorail", KEY_PUBLIC_TRANSPORT = "public_transport", KEY_PUBLIC_TRANSPORT_VERSION = "public_transport:version", KEY_BUS = "bus", KEY_BUSWAY = "busway", KEY_TRAIN = "train", KEY_FERRY = "ferry", KEY_TRAM = "tram", KEY_AERIALWAY = "aerialway", KEY_FUNICULAR = "funicular", KEY_JUNCTION = "junction";
+    public final static String TAG_LEGACY_BUS_STOP = "bus_stop", TAG_PLATFORM = "platform", TAG_STOP_POSITION = "stop_position", TAG_LEGACY_FERRY_TERMINAL = "ferry_terminal", TAG_ROUNDABOUT = "roundabout";
 
     protected final static String
             BASE_XML_TAG_FORMAT_TAG = "  <tag k=\"%s\" v=\"%s\"/>\n",

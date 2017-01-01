@@ -253,25 +253,10 @@ public class PathTree {
             return;
         }
 
-        //check if we need to split the route path at the first/last stops
-        if(previousPathTree == null) { //if this is the first part of the route's path, check if we need to split at the first stop's position
-            final OSMNode pathOriginNode = bestPath.firstPathSegment.getOriginNode();
-            final OSMWay pathOriginWay = bestPath.firstPathSegment.getLine().way;
-            if (pathOriginWay.getFirstNode() != pathOriginNode && pathOriginWay.getLastNode() != pathOriginNode) {
-                final OSMNode[] splitNodes = {pathOriginNode};
-                bestPath.firstPathSegment.getLine().split(splitNodes, entitySpace);
-            }
-        } else if(nextPathTree == null) { //if this is the last part of the route's path, check if we need to split at the last stop's position
-            final OSMNode pathDestinationNode = bestPath.lastPathSegment.getEndNode();
-            final OSMWay pathDestinationWay = bestPath.lastPathSegment.getLine().way;
-            if (pathDestinationWay.getFirstNode() != pathDestinationNode && pathDestinationWay.getLastNode() != pathDestinationNode) {
-                final OSMNode[] splitNodes = {pathDestinationNode};
-                bestPath.lastPathSegment.getLine().split(splitNodes, entitySpace);
-            }
-        }
+        final List<OSMNode> newSplitNodes = new ArrayList<>(2);
 
-        //and check if the best path needs any intermediate splits
-        bestPath.splitWaysAtIntersections(entitySpace);
+        //check if the best path needs any intermediate splits
+        bestPath.splitWaysAtIntersections(entitySpace, newSplitNodes);
     }
     @Override
     public String toString() {

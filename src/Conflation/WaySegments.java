@@ -4,9 +4,7 @@ import OSM.*;
 import com.company.InvalidArgumentException;
 
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 /**
  * Container for an OSM way and its calculated line segments
@@ -235,37 +233,13 @@ public abstract class WaySegments {
         return closestSegment;
     }
     public WaySegments[] split(final OSMNode[] splitNodes, final OSMEntitySpace entitySpace) throws InvalidArgumentException {
-        final List<OSMNode> actualSplitNodes = new ArrayList<>(splitNodes.length);
-        for(final OSMNode node : splitNodes) {
-            if(node == way.getFirstNode() || node == way.getLastNode()) {
-                continue;
-            }
-            actualSplitNodes.add(node);
-        }
+        //run the split on the underlying way
+        final OSMWay[] splitWays = entitySpace.splitWay(way, splitNodes);
 
-        //System.out.println("Run split on " + way.getTag("name") + "? " + actualSplitNodes.size());
-
-        if(actualSplitNodes.size() == 0) {
+        //System.out.println(splitWays.length + " split ways:");
+        if(splitWays.length == 1 && splitWays[0] == way) { //i.e. the split wasn't run, just return an array containing this WaySegments
             return new WaySegments[]{this};
         }
-
-        /*final List<Point> preSplitPoints = new ArrayList<>(segments.size() + 1);
-        if(segments.size() > 0) {
-            preSplitPoints.add(segments.get(0).originPoint);
-            for (final LineSegment segment : segments) {
-                preSplitPoints.add(segment.destinationPoint);
-            }
-        }
-
-        /*final List<String> nodeIds = new ArrayList<>(actualSplitNodes.size());
-        for(final OSMNode node : actualSplitNodes) {
-            nodeIds.add(Long.toString(node.osm_id));
-        }
-        System.out.println("Line " + way.getTag("name") + "(" + way.debugOutput() + "), " + segments.size() + " segments, split at " + String.join(",", nodeIds) + ": ");//*/
-
-        //run the split on the underlying way
-        final OSMWay[] splitWays = entitySpace.splitWay(way, actualSplitNodes.toArray(new OSMNode[actualSplitNodes.size()]));
-        //System.out.println(splitWays.length + " split ways:");
 
         //create a WaySegments object for each way
         final WaySegments[] splitWaySegments = new WaySegments[splitWays.length];
@@ -273,18 +247,31 @@ public abstract class WaySegments {
         final List<LineSegment> originalLineSegments = new ArrayList<>(segments);
         for(final OSMWay splitWay : splitWays) {
             //System.out.println("check way " + splitWay.debugOutput());
-            List<LineSegment> curLineSegments = new ArrayList<>(originalLineSegments.size());
+            final List<LineSegment> curLineSegments = new ArrayList<>(originalLineSegments.size());
 
             boolean inWay = false;
-            for(final LineSegment segment : originalLineSegments) {
+            ListIterator<LineSegment> segmentListIterator = originalLineSegments.listIterator();
+            for(;;) {
+                /**
+                 * reset the list iterator if we've reached the end of the original segment list without finding the end of the splitWay
+                 * (i.e. when the first/last nodes change when splitting a closed way)
+                 */
+                if(!segmentListIterator.hasNext()) {
+                    segmentListIterator = originalLineSegments.listIterator();
+                }
+
+                final LineSegment segment = segmentListIterator.next();
                 if(inWay) {
                     curLineSegments.add(segment);
+                    segmentListIterator.remove();
                 } else if(segment.originNode == splitWay.getFirstNode()) {
                     inWay = true;
                     curLineSegments.add(segment);
+                    segmentListIterator.remove();
                 }
 
-                if(segment.destinationNode == splitWay.getLastNode()) {
+                //bail once we've reached the end of the splitWay
+                if(inWay && segment.destinationNode == splitWay.getLastNode()) {
                     break;
                 }
             }

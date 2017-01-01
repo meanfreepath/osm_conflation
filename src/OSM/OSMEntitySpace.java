@@ -178,7 +178,7 @@ public class OSMEntitySpace {
             }
         }
         if(withNodes != null) {
-            newWay.copyNodes(withNodes);
+            newWay.setNodes(withNodes);
         }
         addWayToSpaceList(newWay);
         return newWay;
@@ -436,6 +436,7 @@ public class OSMEntitySpace {
 
     /**
      * Copy the nodes from externalWay into this entity space and onto localWay
+     * TODO: handle conflicts between the ways' node memberships
      * @param externalWay the external way whose nodes we want to copy
      * @param localWay the local copy of the way
      */
@@ -447,7 +448,7 @@ public class OSMEntitySpace {
         }
 
         //and add them onto the local way
-        localWay.copyNodes(localNodes);
+        localWay.setNodes(localNodes);
     }
 
     /**
@@ -636,7 +637,7 @@ public class OSMEntitySpace {
         final List<OSMNode> curNodes = originalWay.getNodes();
         final boolean originalWayIsClosed = originalWay.isClosed();
         final List<NodeIndexer> actualSplitNodes = new ArrayList<>(splitNodes.length);
-        for(final OSMNode splitNode : splitNodes) {
+        for (final OSMNode splitNode : splitNodes) {
             final int nodeIndex = curNodes.indexOf(splitNode);
             if (nodeIndex < 0) {
                 throw new InvalidArgumentException("splitNode " + splitNode.osm_id + " is not a member of the originalWay \"" + originalWay.getTag("name") + "\" (" + originalWay.osm_id + ")");
@@ -647,46 +648,71 @@ public class OSMEntitySpace {
             }
             actualSplitNodes.add(new NodeIndexer(splitNode, nodeIndex));
         }
-        if(actualSplitNodes.size() == 0) {
+        if (actualSplitNodes.size() == 0) {
             return new OSMWay[]{originalWay};
         }
-        if(originalWayIsClosed && actualSplitNodes.size() < 2) {
+        if (originalWayIsClosed && actualSplitNodes.size() < 2) {
             throw new InvalidArgumentException("Need to provide at least 2 unique nodes to split a closed way!");
         }
 
         //sort the split nodes so their order matches the order of originalWay's nodes
         actualSplitNodes.sort(nodeIndexComparator);
-        final int splitWayCount = actualSplitNodes.size() + 1;
+        final int splitWayCount = actualSplitNodes.size() + (originalWayIsClosed ? 0 : 1);
 
         //generate the arrays of nodes that will belong to the newly-split ways
         final List<List<OSMNode>> splitWayNodes = new ArrayList<>(splitWayCount);
-        for(int i=0;i<actualSplitNodes.size()+1;i++) {
+        for (int i = 0; i < splitWayCount; i++) {
             splitWayNodes.add(new ArrayList<>());
         }
 
-        int splitNodeIndex = 0;
-        OSMNode nextSplitNode = actualSplitNodes.get(splitNodeIndex).node;
-        List<OSMNode> curWayNodes = splitWayNodes.get(splitNodeIndex);
-        for(final OSMNode node : curNodes) {
-            curWayNodes.add(node);
-
-            //if we've reached a split node, increment the split index and add the current node to the new split array
-            if(node == nextSplitNode) {
-                if(++splitNodeIndex < actualSplitNodes.size()) {
-                    nextSplitNode = actualSplitNodes.get(splitNodeIndex).node;
+        if (originalWayIsClosed) {
+            int splitNodeIndex = 0;
+            NodeIndexer curSplitNodeIndexer = actualSplitNodes.get(0), nextSplitNodeIndexer;
+            final ListIterator<NodeIndexer> splitNodeIterator = actualSplitNodes.listIterator(1);
+            boolean finished = false;
+            //iterate over the split nodes, using their indexes in the curNodes list to split into new node strings as needed
+            while (!finished) {
+                if (splitNodeIterator.hasNext()) {
+                    nextSplitNodeIndexer = splitNodeIterator.next();
                 } else {
-                    nextSplitNode = null;
+                    nextSplitNodeIndexer = actualSplitNodes.get(0);
+                    finished = true;
                 }
-                curWayNodes = splitWayNodes.get(splitNodeIndex);
+
+                final List<OSMNode> curWayNodes = splitWayNodes.get(splitNodeIndex++);
+                if (curSplitNodeIndexer.nodeIndex < nextSplitNodeIndexer.nodeIndex) { //get the sublist of nodes between the 2 split node indexes
+                    curWayNodes.addAll(curNodes.subList(curSplitNodeIndexer.nodeIndex, nextSplitNodeIndexer.nodeIndex + 1));
+                } else { //if the next index is less than the current, we need to wrap around the first/last nodes up to the next splitnode's index
+                    curWayNodes.addAll(curNodes.subList(curSplitNodeIndexer.nodeIndex, curNodes.size() - 1));
+                    curWayNodes.addAll(curNodes.subList(0, nextSplitNodeIndexer.nodeIndex + 1));
+                }
+                curSplitNodeIndexer = nextSplitNodeIndexer;
+            }
+        } else {
+            int splitNodeIndex = 0;
+            OSMNode nextSplitNode = actualSplitNodes.get(splitNodeIndex).node;
+            List<OSMNode> curWayNodes = splitWayNodes.get(splitNodeIndex);
+            for (final OSMNode node : curNodes) {
                 curWayNodes.add(node);
+
+                //if we've reached a split node, increment the split index and add the current node to the new split array
+                if (node == nextSplitNode) {
+                    if (++splitNodeIndex < actualSplitNodes.size()) {
+                        nextSplitNode = actualSplitNodes.get(splitNodeIndex).node;
+                    } else {
+                        nextSplitNode = null;
+                    }
+                    curWayNodes = splitWayNodes.get(splitNodeIndex);
+                    curWayNodes.add(node);
+                }
             }
         }
 
         //chose which portion will retain the history of originalWay - we'll use the split way with the most nodes
         List<OSMNode> oldWayNewNodes = null;
         int largestNodeSize = -1;
-        for(final List<OSMNode> wayNodes : splitWayNodes) {
-            if(wayNodes.size() > largestNodeSize) {
+        for (final List<OSMNode> wayNodes : splitWayNodes) {
+            if (wayNodes.size() > largestNodeSize) {
                 oldWayNewNodes = wayNodes;
                 largestNodeSize = wayNodes.size();
             }
@@ -695,7 +721,7 @@ public class OSMEntitySpace {
 
         //Check if the originalWay's containing relations are valid PRIOR to the split
         final ArrayList<Boolean> containingRelationValidity = new ArrayList<>(originalWay.getContainingRelations().size());
-        for(final OSMRelation containingRelation : originalWay.getContainingRelations().values()) {
+        for (final OSMRelation containingRelation : originalWay.getContainingRelations().values()) {
             containingRelationValidity.add(containingRelation.isValid());
         }
 
@@ -703,26 +729,11 @@ public class OSMEntitySpace {
         final List<OSMNode> originalNodeList = new ArrayList<>(originalWay.getNodes()); //make a copy to preserve the nodes to make it easier for post-split code to run comparisons etc
         final OSMWay[] allSplitWays = new OSMWay[splitWayCount];
         int splitWayIndex = 0;
-        for(final List<OSMNode> wayNodes : splitWayNodes) {
+        for (final List<OSMNode> wayNodes : splitWayNodes) {
             final OSMWay curWay;
-            if(wayNodes == oldWayNewNodes) { //originalWay: just edit its node list
+            if (wayNodes == oldWayNewNodes) { //originalWay: just edit its node list
                 curWay = originalWay;
-
-                //remove all the nodes that aren't in the NEW node list for originalWay
-                final List<OSMNode> nodesToRemove = new ArrayList<>(originalWay.getNodes().size() - oldWayNewNodes.size());
-                for(final OSMNode oldWayNode : originalWay.getNodes()) {
-                    if(!oldWayNewNodes.contains(oldWayNode)) {
-                        nodesToRemove.add(oldWayNode);
-                    }
-                }
-                for(final OSMNode nodeToRemove : nodesToRemove) {
-                    originalWay.removeNode(nodeToRemove);
-                }
-
-                //remove the last node on the originalWay if it was closed, since now it's split it's no longer closed
-                if(originalWayIsClosed) {
-                    originalWay.removeNodeAtIndex(originalWay.getNodes().size() - 1);
-                }
+                curWay.setNodes(oldWayNewNodes);
             } else { //a new way: create an OSMWay (which is added to this space) with originalWay's tags, and add the split nodes
                 curWay = createWay(originalWay.getTags(), wayNodes);
             }
@@ -733,7 +744,7 @@ public class OSMEntitySpace {
         //now we need to handle membership of any relations, to ensure they're updated with the correct ways
         int idx = 0;
         final ArrayList<OSMRelation> originalWayContainingRelations = new ArrayList<>(originalWay.getContainingRelations().values());
-        for(final OSMRelation containingRelation : originalWayContainingRelations) {
+        for (final OSMRelation containingRelation : originalWayContainingRelations) {
             containingRelation.handleMemberWaySplit(originalWay, originalNodeList, allSplitWays, containingRelationValidity.get(idx++));
         }
 

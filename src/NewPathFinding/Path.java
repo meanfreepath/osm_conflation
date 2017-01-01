@@ -25,7 +25,7 @@ public class Path {
         waypointReached, deadEnded, lengthLimitReached, detourLimitReached, unknown
     }
 
-    private final List<PathSegment> pathSegments, detourPathSegments;
+    protected final List<PathSegment> pathSegments, detourPathSegments;
     public final PathTree parentPathTree;
     public PathSegment firstPathSegment = null, lastPathSegment = null;
     public PathOutcome outcome = PathOutcome.unknown;
@@ -182,52 +182,75 @@ public class Path {
      * Checks the PathSegments' originating/ending nodes and splits any ways that extend past them
      * Only needs to be called on the "best" path
      */
-    public void splitWaysAtIntersections(final OSMEntitySpace entitySpace) throws InvalidArgumentException {
+    public void splitWaysAtIntersections(final OSMEntitySpace entitySpace, final List<OSMNode> newSplitNodes) throws InvalidArgumentException {
         //check if the line is the same as the previous path's line
+        //debugEnabled = true;
         if(debugEnabled) {
             System.out.println("------------------------------------------------------------------------------------------------");
             System.out.println("CHECK SPLIT PATH: " + this.toString());
         }
+
+        //if this is the first path on the route, check if we need to split the way the first stop is on
+        if(parentPathTree.previousPathTree == null) {
+            final OSMNode pathOriginNode = firstPathSegment.getOriginNode();
+            final OSMWay pathOriginWay = firstPathSegment.getLine().way;
+            if (pathOriginWay.getFirstNode() != pathOriginNode && pathOriginWay.getLastNode() != pathOriginNode) {
+                newSplitNodes.add(pathOriginNode);
+            }
+        }
+
         final Path previousPath = parentPathTree.previousPathTree != null ? parentPathTree.previousPathTree.bestPath : null;
         PathSegment previousSegment = previousPath != null ? previousPath.lastPathSegment : null;
+        //default the currentLine to the previous path's last segment's line
+        OSMWaySegments currentLine = previousPath != null ? previousPath.lastPathSegment.getLine() : firstPathSegment.getLine();
         for (int segmentIndex = 0; segmentIndex < pathSegments.size(); segmentIndex++) {
             final PathSegment pathSegment = pathSegments.get(segmentIndex);
-            if (previousSegment == null) { //skip the first iteration
-                previousSegment = pathSegment;
-                continue;
-            }
 
-            //int origSize = pathSegments.size();
-            if(debugEnabled) {
-                System.out.println("DEBUG: Check for Split: " + pathSegment);
-            }
-            final OSMWay pathSegmentWay = pathSegment.getLine().way, previousSegmentWay = previousSegment.getLine().way;
-            final OSMNode pathSegmentOriginNode = pathSegment.getOriginNode();
-
-            //only need to split if the current pathSegment is on a different way than the previous pathSegment
-            if (pathSegmentWay != previousSegmentWay) {
-                if(debugEnabled) {
-                    System.out.format("DEBUG: \tDifferent ways: %d[%d->%d] vs %d[%d->%d]\n", previousSegmentWay.osm_id, previousSegmentWay.getFirstNode().osm_id, previousSegmentWay.getLastNode().osm_id, pathSegmentWay.osm_id, pathSegmentWay.getFirstNode().osm_id, pathSegmentWay.getLastNode().osm_id);
-                }
-                final OSMNode splitNodes[] = {pathSegmentOriginNode};
-
-                //split the previous pathSegment if it does not end with the first/last node of its contained way
-                if (pathSegmentOriginNode != previousSegmentWay.getFirstNode() && pathSegmentOriginNode != previousSegmentWay.getLastNode()) {
-                    if(debugEnabled) {
-                        System.out.format("DEBUG: \tSPLIT PREVIOUS PS at %d: %s\n", pathSegmentOriginNode.osm_id, previousSegment);
+            //if the current line has changed, split it if necessary
+            if(currentLine != pathSegment.getLine()) {
+                //if the current line doesn't begin or end at the new PathSegment's origin, it needs to be split there
+                final OSMNode originNode = pathSegment.getOriginNode();
+                if(currentLine.way.isClosed() || currentLine.way.getFirstNode() != originNode && currentLine.way.getLastNode() != originNode) {
+                    if (debugEnabled) {
+                        System.out.format("DEBUG:\tSPLIT PREVIOUS PS at %d: %s\n", originNode.osm_id, previousSegment);
                     }
-                    previousSegment.getLine().split(splitNodes, entitySpace);
+                    newSplitNodes.add(originNode);
                 }
 
-                //split the current pathSegment if it does not start with the first/last node of its contained way
-                if (pathSegmentOriginNode != pathSegmentWay.getFirstNode() && pathSegmentOriginNode != pathSegmentWay.getLastNode()) {
-                    if(debugEnabled) {
-                        System.out.format("\tSPLIT CURRENT PS at %d: %s\n", pathSegmentOriginNode.osm_id, pathSegment);
+                //now run the split on the currentLine if needed
+                if(newSplitNodes.size() > 0) {
+                    runSplit(entitySpace, currentLine, newSplitNodes);
+                }
+
+                //and assign currentLine to the current PathSegment's line
+                currentLine = pathSegment.getLine();
+
+                //and check if it begins or ends at the current PathSegment's origin; if not it needs to be split there
+                if(currentLine.way.isClosed() && pathSegment.getOriginNode() != pathSegment.getEndNode() || currentLine.way.getFirstNode() != originNode && currentLine.way.getLastNode() != originNode) {
+                    if (debugEnabled) {
+                        System.out.format("DEBUG:\tSPLIT CURRENT PS at %d: %s\n", originNode.osm_id, pathSegment);
                     }
-                    pathSegment.getLine().split(splitNodes, entitySpace);
+                    newSplitNodes.add(originNode);
                 }
             }
             previousSegment = pathSegment;
+        }
+
+        //and if this is the last part of the route's path, check if we need to split at the last stop's position
+        if(parentPathTree.nextPathTree == null) {
+            final OSMNode pathDestinationNode = lastPathSegment.getEndNode();
+            final OSMWay pathDestinationWay = lastPathSegment.getLine().way;
+            if (pathDestinationWay.getFirstNode() != pathDestinationNode && pathDestinationWay.getLastNode() != pathDestinationNode) {
+                newSplitNodes.add(pathDestinationNode);
+            }
+        }
+
+        //split the last pathSegment's line, if needed
+        if(newSplitNodes.size() > 0) {
+            if (debugEnabled) {
+                System.out.format("DEBUG:\tSPLIT CLEANUP PS at %d: %s\n", lastPathSegment.getOriginNode().osm_id, lastPathSegment);
+            }
+            runSplit(entitySpace, lastPathSegment.getLine(), newSplitNodes);
         }
 
         //DEBUG TEST: run a bunch of splits on the pathSegments' ways and validate the result
@@ -265,6 +288,34 @@ public class Path {
             }
             validatePath();
         }//*/
+    }
+    private static void runSplit(final OSMEntitySpace entitySpace, final OSMWaySegments line, final List<OSMNode> newSplitNodes) throws InvalidArgumentException {
+        if(debugEnabled) {
+            final List<String> nl = new ArrayList<>(4);
+            for (final OSMNode node : newSplitNodes) {
+                nl.add(Long.toString(node.osm_id));
+            }
+            System.out.format("RUN SPLIT ON %d WITH NODES [%s]\n", line.way.osm_id, String.join(",", nl));
+        }
+
+        //handle closed way-specific cases
+        if(line.way.isClosed()) {
+            //ways tagged junction=roundabout are not split, according to convention
+            if(OSMEntity.TAG_ROUNDABOUT.equalsIgnoreCase(line.way.getTag(OSMEntity.KEY_JUNCTION))) {
+                newSplitNodes.clear();
+                return;
+            }
+
+            //special case: handle highway/driveway loops with stops on them, i.e. where vehicle enters and leaves way via the same node.
+            //TODO: check may be obsolete
+            if(newSplitNodes.size() == 1) {
+                System.out.format("Skipping split of closed way with only 1 node: %s\n", line.way);
+                newSplitNodes.clear();
+                return;
+            }
+        }
+        line.split(newSplitNodes.toArray(new OSMNode[newSplitNodes.size()]), entitySpace);
+        newSplitNodes.clear();
     }
     /*public String scoreSummary() {
         final DecimalFormat format = new DecimalFormat("0.00");

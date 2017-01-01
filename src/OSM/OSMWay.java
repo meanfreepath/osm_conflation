@@ -60,14 +60,28 @@ public class OSMWay extends OSMEntity {
      * Adds the given nodes to our way
      * @param nodesToCopy
      */
-    public void copyNodes(final List<OSMNode> nodesToCopy) {
+    public void setNodes(final List<OSMNode> nodesToCopy) {
         //add the nodes if complete
         if(complete != CompletionStatus.incomplete) {
+            final List<OSMNode> oldNodes = new ArrayList<>(nodes);
+            nodes.clear();
             nodes.addAll(nodesToCopy);
-            for (final OSMNode addedNode : nodes) {
-                addedNode.didAddToEntity(this);
+
+            //notify any added or removed nodes
+            for(final OSMNode newNode : nodesToCopy) {
+                if(!oldNodes.contains(newNode)) {
+                    newNode.didAddToEntity(this);
+                }
             }
+            for(final OSMNode oldNode : oldNodes) {
+                if(!nodes.contains(oldNode)) {
+                    oldNode.didRemoveFromEntity(this, false);
+                }
+            }
+
             updateFirstAndLastNodes();
+            boundingBox = null; //invalidate the bounding box
+            markAsModified();
             updateCompletionStatus();
         }
     }
@@ -104,7 +118,6 @@ public class OSMWay extends OSMEntity {
         markAsModified();
         updateCompletionStatus();
     }
-
     /**
      * Removes the node at the given index
      * @param nodeIndex the index of the node to remove
@@ -114,6 +127,9 @@ public class OSMWay extends OSMEntity {
         return replaceNodeAtIndex(nodeIndex, null);
     }
     public boolean removeNode(final OSMNode node) {
+        if(osm_id == 30108041L) {
+            System.out.println("\tREMOVE NODE " + node);
+        }
         return replaceNode(node, null);
     }
     /**

@@ -101,7 +101,7 @@ public class OverpassConverter {
                             }
                             nodeList.add(curNode);
                         }
-                        way.copyNodes(nodeList);
+                        way.setNodes(nodeList);
                     }
                 } else if(elementType.equals(OSMEntity.OSMType.relation.name())) {
                     OSMRelation relation = new OSMRelation(curElement.getLong(keyId));
