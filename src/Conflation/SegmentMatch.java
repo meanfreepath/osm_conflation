@@ -20,7 +20,7 @@ public class SegmentMatch {
 
     //tag definitions used for checking for contraflow bus lanes
     private final static String[] integerTagsForward = {"lanes:bus:forward", "lanes:psv:forward"}, integerTagsBackward = {"lanes:bus:backward", "lanes:psv:backward"};
-    private final static String[] stringTagsForward = {"bus:lanes:forward", "psv:lanes:forward"}, stringTagsBackward = {"bus:lanes:backward", "psv:lanes:backward"};;
+    private final static String[] stringTagsForward = {"bus:lanes:forward", "psv:lanes:forward"}, stringTagsBackward = {"bus:lanes:backward", "psv:lanes:backward"};
 
     public final long id;
     public final double orthogonalDistance, midPointDistance, dotProduct;
@@ -72,7 +72,7 @@ public class SegmentMatch {
      * @return true if travel is possible, false otherwise
      */
     private static boolean checkOneWayDirection(final OSMWay way, final RouteConflator.RouteType routeType, final WaySegments.OneWayDirection oneWayDirection, final double dotProduct) {
-        final boolean travelingWithOneWayDirection = oneWayDirection == WaySegments.OneWayDirection.forward && dotProduct > 0.0 || oneWayDirection == WaySegments.OneWayDirection.backward && dotProduct < 0.0;
+        final boolean travelingWithOneWayDirection = oneWayDirection == WaySegments.OneWayDirection.forward && dotProduct >= 0.0 || oneWayDirection == WaySegments.OneWayDirection.backward && dotProduct < 0.0;
 
         //if traveling against the oneway direction of the way, check if there are any exceptions based on the route's type
         if(!travelingWithOneWayDirection && routeType == RouteConflator.RouteType.bus) {
