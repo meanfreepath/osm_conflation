@@ -25,7 +25,7 @@ public class PathTree {
     public final static short matchMaskAll = matchStatusFromStop | matchStatusToStop | matchStatusFromRouteLineNode | getMatchStatusToRouteLineNode;
     public final static int MAX_PATHS_TO_CONSIDER = 320;
     private final static short NUMBER_OF_FUTURE_SEGMENTS = 5;
-    private final static long debugPathTreeId = 0L;
+    private final static long debugPathTreeId = 2996122432L;//1153577939L;
     public static boolean debugEnabled = false;
 
     public final long id;
@@ -168,7 +168,7 @@ public class PathTree {
         bestPath = successfulPaths.size() > 0 ? successfulPaths.get(0) : null;
 
         if(bestPath != null) {
-            if(debug) {
+            if(id == debugPathTreeId) {
                 System.out.println("\tSUCCESS: ");
                 for (final Path path : successfulPaths) {
                     System.out.format("\t\tscore %.01f: %s\n", path.getTotalScore(), path);

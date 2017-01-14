@@ -16,13 +16,8 @@ import java.util.ListIterator;
  * Created by nick on 10/20/16.
  */
 public class PathSegment implements WaySegmentsObserver {
-    /**
-     * Cache for all existing PathSegments, to reduce duplication when Paths traverse a similar location
-     * TODO: possible issues with looping, i.e. PathSegments with different endJunctions?
-     */
     private final static double SCORE_FOR_ALIGNMENT = 100.0, SCORE_FACTOR_FOR_TRAVEL_DIRECTION = 100.0;
-
-    private final static long debugWayId = 192505701L;
+    private final static long debugWayId = 428243920L;
 
     /**
      * Whether this PathSegment is traveling with (0->N) or against(N->0) its line's segments' node direction
@@ -66,7 +61,7 @@ public class PathSegment implements WaySegmentsObserver {
             newPathSegment.retire(); //properly discard the newPathSegment, since it's not going to be used
         }
         return existingPathSegment;*/
-        return new PathSegment(line, fromNode, travelDirection); //TODO: determine if caching is feasible or not
+        return new PathSegment(line, fromNode, travelDirection);
     }
     private PathSegment(final OSMWaySegments line, final OSMNode fromNode, final TravelDirection travelDirection) {
         originNode = fromNode;
@@ -153,7 +148,7 @@ public class PathSegment implements WaySegmentsObserver {
                     System.out.println("\t\t\tPDB check FWD " + this + ":::SEG:::" + segment);
                 }
 
-                segmentStatus = checkSegment(lineMatches, (OSMLineSegment) segment, segment.destinationNode, parentPathTree, routeConflator, lastNode, matchMask, debug);
+                segmentStatus = checkSegment(targetSegment, lineMatches, (OSMLineSegment) segment, segment.destinationNode, parentPathTree, routeConflator, lastNode, matchMask, debug);
                 if(segmentStatus != ProcessingStatus.inprocess) { //TODO: add fallback/scoring instead of requiring full match?
                     processingStatus = segmentStatus;
                     break;
@@ -168,7 +163,7 @@ public class PathSegment implements WaySegmentsObserver {
                     System.out.println("\t\t\tPDB check BKW " + this + ":::SEG:::" + segment);
                 }
 
-                segmentStatus = checkSegment(lineMatches, (OSMLineSegment) segment, segment.originNode, parentPathTree, routeConflator, lastNode, matchMask, debug);
+                segmentStatus = checkSegment(targetSegment, lineMatches, (OSMLineSegment) segment, segment.originNode, parentPathTree, routeConflator, lastNode, matchMask, debug);
                 if(segmentStatus != ProcessingStatus.inprocess) { //TODO: add fallback/scoring instead of requiring full match?
                     processingStatus = segmentStatus;
                     break;
@@ -177,12 +172,12 @@ public class PathSegment implements WaySegmentsObserver {
         }
         return true;
     }
-    private ProcessingStatus checkSegment(final LineMatch lineMatch, final OSMLineSegment segment, final OSMNode nodeToCheck, final PathTree parentPathTree, final RouteConflator routeConflator, final OSMNode endingWayNode, final short matchMask, final boolean debug) {
+    private ProcessingStatus checkSegment(final RouteLineSegment targetSegment, final LineMatch lineMatch, final OSMLineSegment segment, final OSMNode nodeToCheck, final PathTree parentPathTree, final RouteConflator routeConflator, final OSMNode endingWayNode, final short matchMask, final boolean debug) {
         //get all the routeLineSegment's that matched with this OSM segment
         final List<SegmentMatch> osmSegmentMatches = lineMatch.getRouteLineMatchesForSegment(segment, matchMask);
 
         if(debug && segment.getParent().way.osm_id == debugWayId) {
-            System.out.format("\t\t\tPDB: %d matches for line %s\n", osmSegmentMatches.size(), segment.getParent().way);
+            System.out.format("\t\t\tPDB: targetSegment [%d/%d]: %d total matches for line %s\n", targetSegment.segmentIndex, targetSegment.nodeIndex, osmSegmentMatches.size(), segment.getParent().way);
         }
 
         //and iterate over them, ensuring that ALL meet the match mask requirements
@@ -190,12 +185,15 @@ public class PathSegment implements WaySegmentsObserver {
         double minDistance = routeConflator.wayMatchingOptions.segmentSearchBoxSize;
         for(final SegmentMatch segmentMatch : osmSegmentMatches) {
             if(debug && segment.getParent().way.osm_id == debugWayId) {
-                System.out.println("\t\t\t\tSEGMATCH: " + segmentMatch);
+                //System.out.println("\t\t\t\tSEGMATCH: " + segmentMatch);
             }
             if((segmentMatch.type & matchMask) != SegmentMatch.matchTypeNone && segmentMatch.midPointDistance <= minDistance) {
                 bestSegmentMatch = segmentMatch;
                 minDistance = segmentMatch.midPointDistance;
             }
+        }
+        if(debug && segment.getParent().way.osm_id == debugWayId) {
+            System.out.println("\t\t\t\t\tBEST SEGMATCH: " + bestSegmentMatch);
         }
         /*if(osmSegmentMatches.size() == 0 && segment.getParent().way.osm_id == debugWayId) {
             System.out.println("FAILED SEGMATCH FOR:" + segment + ":: " + lineMatch);
@@ -227,7 +225,6 @@ public class PathSegment implements WaySegmentsObserver {
         if((bestSegmentMatch.type & SegmentMatch.matchTypeTravelDirection) > 0) {
             alignedPathScore += SCORE_FACTOR_FOR_TRAVEL_DIRECTION;
         }
-
 
         //check if we've found the final destination node for this PathSegment's PathTree, or we're at a junction, and if so, bail
         if(nodeToCheck != null) {

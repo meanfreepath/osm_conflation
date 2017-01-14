@@ -309,7 +309,7 @@ public class Path {
             //special case: handle highway/driveway loops with stops on them, i.e. where vehicle enters and leaves way via the same node.
             //TODO: check may be obsolete
             if(newSplitNodes.size() == 1) {
-                System.out.format("Skipping split of closed way with only 1 node: %s\n", line.way);
+                System.out.format("NOTICE: Skipping split of closed way with only 1 node: %s\n", line.way);
                 newSplitNodes.clear();
                 return;
             }
