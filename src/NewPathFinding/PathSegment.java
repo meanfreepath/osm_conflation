@@ -181,6 +181,8 @@ public class PathSegment implements WaySegmentsObserver {
         }
 
         //and iterate over them, ensuring that ALL meet the match mask requirements
+        /*NOTE: this will check ALL matching RouteLineSegments with this line - including ones that may
+          traverse this line earlier/later in the matching process.  This should be offset by the earlier futureVector check*/
         SegmentMatch bestSegmentMatch = null;
         double minDistance = routeConflator.wayMatchingOptions.segmentSearchBoxSize;
         for(final SegmentMatch segmentMatch : osmSegmentMatches) {
