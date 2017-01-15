@@ -95,6 +95,15 @@ public class Route {
         //first generate the pathTrees using the routeLine and this route's stops
         routePathFinder.generatePathTrees();
 
+        //output the segments post-stop insertion, if desired
+        if(RouteConflator.debugEnabled) {
+            try {
+                debugOutputSegments(routeConflator.getWorkingEntitySpace());
+            } catch (IOException | InvalidArgumentException e) {
+                e.printStackTrace();
+            }
+        }
+
         debugCheckMatchIndexIntegrity("PathTrees Generated");
 
         //and run the pathfinding algorithm
@@ -169,8 +178,9 @@ public class Route {
             pathRelation.addMember(segmentSpace.addEntity(pathTree.destinationStop.getPlatform(), OSMEntity.TagMergeStrategy.keepTags, null, true, 0), "platform");
 
             //and the closest nodes on the RouteLine
-            if(pathTree.routeLineSegments != null) {
-                final RouteLineSegment fromSegment = pathTree.routeLineSegments.get(0), toSegment = pathTree.routeLineSegments.get(pathTree.routeLineSegments.size() - 1);
+            if(pathTree.matchStatus == PathTree.matchMaskAll) {
+                final RouteLineSegment fromSegment = pathTree.routeLineSegments.get(0);
+                final RouteLineSegment toSegment = pathTree.routeLineSegments.get(pathTree.routeLineSegments.size() - 1);
                 final OSMWay fromSegmentWay = routeLineSegmentWays.get(fromSegment.id), toSegmentWay = routeLineSegmentWays.get(toSegment.id);
                 stopTags.put(OSMEntity.KEY_NAME, pathTree.originStop.getPlatform().getTag(OSMEntity.KEY_NAME));
                 fromSegmentWay.getFirstNode().setTags(stopTags);
@@ -188,6 +198,8 @@ public class Route {
                         System.out.println("NULL SEG");
                     }
                 }
+            } else {
+                System.out.format("NOTICE: pathTree id %d: unable to determine routeLineSegments (status is %d)\n", pathTree.id, pathTree.matchStatus);
             }
         }
 
