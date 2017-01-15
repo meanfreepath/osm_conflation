@@ -97,7 +97,7 @@ public class Main {
         try {
             Config.initWithConfigFile(configPath);
             //define the options for the comparison routines TODO load from config
-            matchingOptions.segmentSearchBoxSize = 65.0;
+            matchingOptions.segmentSearchBoxSize = 30.0; //NOTE: higher values (60+ may result in false positives and "short-circuited" loops, depending on the routes)
             matchingOptions.maxSegmentLength = 10.0;
             matchingOptions.setMaxSegmentAngle(50.0);
             matchingOptions.setMaxFutureVectorAngle(75.0);
