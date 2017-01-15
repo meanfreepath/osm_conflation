@@ -28,10 +28,10 @@ public class OSMWaySegments extends WaySegments {
     }
     @Override
     protected LineSegment createLineSegment(final Point miniOrigin, final Point miniDestination, final OSMNode miniOriginNode, final OSMNode miniDestinationNode, int segmentIndex, int nodeIndex) {
-        return new OSMLineSegment(this, wayMatchingOptions, miniOrigin, miniDestination, miniOriginNode, miniDestinationNode, segmentIndex, nodeIndex);
+        return new OSMLineSegment(this, miniOrigin, miniDestination, miniOriginNode, miniDestinationNode, segmentIndex, nodeIndex);
     }
     @Override
     protected LineSegment copyLineSegment(final LineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
-        return new OSMLineSegment((OSMLineSegment) segmentToCopy, wayMatchingOptions, destination, destinationNode);
+        return new OSMLineSegment((OSMLineSegment) segmentToCopy, destination, destinationNode);
     }
 }

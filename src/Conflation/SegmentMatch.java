@@ -192,7 +192,7 @@ public class SegmentMatch {
             System.out.println(String.format("OSM %03d/%04d: [%.01f,%.01f] :: point:(%.01f,%.01f)", osmLineSegment.nodeIndex, osmLineSegment.segmentIndex, osmLineSegment.vectorX, osmLineSegment.vectorY, osmLineSegment.midPointX, osmLineSegment.midPointY));
             System.out.println(String.format("DP MATCH for %s: %.05f, dist (%.01f,%.01f), oDist:%.02f, mDist: %.02f intersect(%.01f,%.01f)", osmLineSegment.getParent().way.getTag("name"), dotProduct, oDiffX, oDiffY, orthogonalDistance, midPointDistance, yInt, xInt));
         }
-        if(Region.intersects(routeLineSegment.searchAreaForMatchingOtherSegments, osmLineSegment.searchAreaForMatchingOtherSegments)) {
+        if(Region.intersects(routeLineSegment.searchAreaForMatchingOtherSegments, osmLineSegment.boundingBox)) {
 
             //if the segments meet the threshold requirements, store the match in a SegmentMatch object
             //if(Math.abs(dotProduct) >= options.getMinSegmentDotProduct() && orthogonalDistance <= options.maxSegmentOrthogonalDistance && midPointDistance <= options.maxSegmentMidPointDistance) {

@@ -1,8 +1,6 @@
 package Conflation;
 
-import OSM.OSMNode;
-import OSM.OSMWay;
-import OSM.Point;
+import OSM.*;
 
 import java.util.*;
 
@@ -48,6 +46,12 @@ public class RouteLineSegment extends LineSegment {
      */
     public SegmentMatch bestMatchOverall = null;
 
+    /**
+     * The area this segment can check for matching OSM segments
+     * TODO: turn into a fan-shaped polygon, facing in the direction of travel
+     */
+    public final Region searchAreaForMatchingOtherSegments;
+
     public boolean summarized = false;
 
     /**
@@ -61,12 +65,15 @@ public class RouteLineSegment extends LineSegment {
      * @param nodeIndex the index of this segment's originNode within its parent's way (will be same as previous segment if no origin node present)
      */
     protected RouteLineSegment(RouteLineWaySegments parentSegments, Point origin, Point destination, OSMNode originNode, OSMNode destinationNode, int segmentIndex, int nodeIndex) {
-        super(parentSegments.wayMatchingOptions, origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
+        super(origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
         this.parentSegments = parentSegments;
 
         matchingSegments = new HashMap<>(8);
         matchingSegmentsById = new HashMap<>(8);
         bestMatchForLine = new HashMap<>(8);
+
+        final double searchAreaBuffer = -SphericalMercator.metersToCoordDelta(parentSegments.wayMatchingOptions.segmentSearchBoxSize, midPointY);
+        searchAreaForMatchingOtherSegments = boundingBox.regionInset(searchAreaBuffer, searchAreaBuffer);
     }
 
     /**
@@ -76,13 +83,16 @@ public class RouteLineSegment extends LineSegment {
      * @param destinationNode the new destination node to use, if any
      */
     protected RouteLineSegment(final RouteLineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
-        super(segmentToCopy.parentSegments.wayMatchingOptions, segmentToCopy, destination, destinationNode);
+        super(segmentToCopy, destination, destinationNode);
         this.parentSegments = segmentToCopy.parentSegments;
 
         //NOTE: these matches are re-run in post-split observer functions in RouteLineWaySegments
         matchingSegments = new HashMap<>(segmentToCopy.matchingSegments.size());
         matchingSegmentsById = new HashMap<>(segmentToCopy.matchingSegmentsById.size());
         bestMatchForLine = new HashMap<>(segmentToCopy.bestMatchForLine.size());
+
+        final double searchAreaBuffer = -SphericalMercator.metersToCoordDelta(parentSegments.wayMatchingOptions.segmentSearchBoxSize, midPointY);
+        searchAreaForMatchingOtherSegments = boundingBox.regionInset(searchAreaBuffer, searchAreaBuffer);
     }
     /**
      * Add the given SegmentMatch to this object's match indexes.

@@ -30,8 +30,7 @@ public abstract class LineSegment {
     public final double vectorX, vectorY, orthogonalVectorX, orthogonalVectorY, midPointX, midPointY;
     public final double vectorMagnitude;
     public final double length;
-    public final Region boundingBox, searchAreaForMatchingOtherSegments;
-    private final RouteConflator.LineComparisonOptions wayMatchingOptions;
+    public final Region boundingBox;
 
     /**
      * Creates a unique id for the given parameters.  Note that if two or more LineSegments have the exact same origin/end points
@@ -45,10 +44,9 @@ public abstract class LineSegment {
         idGenerator.update(String.format(ID_HASH_FORMAT, origin.y, origin.x, destination.y, destination.x).getBytes(Charset.forName("ascii")));
         return idGenerator.getValue();
     }
-    protected LineSegment(final RouteConflator.LineComparisonOptions wayMatchingOptions, final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
+    protected LineSegment(final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
         originPoint = origin;
         destinationPoint = destination;
-        this.wayMatchingOptions = wayMatchingOptions;
         this.originNode = originNode;
         this.destinationNode = destinationNode;
         this.nodeIndex = nodeIndex;
@@ -69,11 +67,8 @@ public abstract class LineSegment {
 
         length = Point.distance(vectorX, vectorY, midPointY);
         boundingBox = new Region(Math.min(originPoint.x, destinationPoint.x), Math.min(originPoint.y, destinationPoint.y), Math.abs(vectorX), Math.abs(vectorY));
-        final double searchAreaBuffer = -SphericalMercator.metersToCoordDelta(wayMatchingOptions.segmentSearchBoxSize, midPointY);
-        searchAreaForMatchingOtherSegments = boundingBox.regionInset(searchAreaBuffer, searchAreaBuffer);
     }
-    protected LineSegment(final RouteConflator.LineComparisonOptions wayMatchingOptions, final LineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
-        this.wayMatchingOptions = wayMatchingOptions;
+    protected LineSegment(final LineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
         this.originPoint = segmentToCopy.originPoint;
         this.destinationPoint = destination;
         this.originNode = segmentToCopy.originNode;
@@ -96,8 +91,6 @@ public abstract class LineSegment {
 
         length = Point.distance(vectorX, vectorY, midPointY);
         boundingBox = new Region(Math.min(originPoint.x, destinationPoint.x), Math.min(originPoint.y, destinationPoint.y), Math.abs(vectorX), Math.abs(vectorY));
-        final double searchAreaBuffer = -SphericalMercator.metersToCoordDelta(wayMatchingOptions.segmentSearchBoxSize, midPointY);
-        searchAreaForMatchingOtherSegments = boundingBox.regionInset(searchAreaBuffer, searchAreaBuffer);
     }
 
     /*public void copyMatches(final LineSegment fromSegment) {
