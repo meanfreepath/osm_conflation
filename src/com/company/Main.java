@@ -204,7 +204,7 @@ public class Main {
             //if processing stops only, output them to an OSM XML file and bail
             final List<String> routeIds = RouteConflator.getRouteMasterIds();
             if(processStopsOnly) {
-                routeDataManager.conflateStopsWithOSM(RouteConflator.allConflators, overpassCachingEnabled);
+                routeDataManager.conflateStopsWithOSM(RouteConflator.allConflators, false); //no need to cache stop downloads
                 final OSMEntitySpace stopPlatformSpace = new OSMEntitySpace(2048);
                 stopConflator.outputStopsForRoutes(RouteConflator.allConflators.get(0).routeType, stopPlatformSpace);
                 stopPlatformSpace.setCanUpload(true);
