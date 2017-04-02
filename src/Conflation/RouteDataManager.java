@@ -105,7 +105,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
         markAllEntitiesWithAction(OSMEntity.ChangeAction.none);
 
         //now that the data is downloaded, create the necessary OSM relations in the new working entity space:
-        //create a list of all routes and route_masters in the working entity space
+        //create a list of all existing routes and route_masters in the working entity space
         final List<OSMRelation> existingRouteMasters = new ArrayList<>(allRelations.size()), existingRoutes = new ArrayList<>(allRelations.size());
         for(final OSMRelation relation : allRelations.values()) {
             if (OSMEntity.TAG_ROUTE_MASTER.equalsIgnoreCase(relation.getTag(OSMEntity.KEY_TYPE))) {

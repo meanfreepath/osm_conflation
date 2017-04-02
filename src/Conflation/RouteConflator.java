@@ -35,7 +35,7 @@ public class RouteConflator {
             return minFutureVectorDotProduct;
         }
     }
-    public final static String GTFS_AGENCY_ID = "gtfs:agency_id", GTFS_ROUTE_ID = "gtfs:route_id", GTFS_TRIP_ID = "gtfs:trip_id", GTFS_TRIP_MARKER = "gtfs:trip_marker", GTFS_STOP_ID = "gtfs:stop_id", GTFS_IGNORE = "gtfs:ignore";
+    public final static String GTFS_DATASET_ID = "gtfs:dataset_id", GTFS_AGENCY_ID = "gtfs:agency_id", GTFS_ROUTE_ID = "gtfs:route_id", GTFS_TRIP_ID = "gtfs:trip_id", GTFS_TRIP_MARKER = "gtfs:trip_marker", GTFS_STOP_ID = "gtfs:stop_id", GTFS_IGNORE = "gtfs:ignore";
 
     public enum RouteType {
         bus, railway, light_rail, monorail, train, tram, subway, ferry;
@@ -355,88 +355,120 @@ public class RouteConflator {
 
     /**
      * Conflates the GTFS import route's trips with existing OSM route relations
-     * @param existingRoutes - a list of all type=route relations in workingEntitySpace
+     * @param allExistingRoutes - a list of all type=route relations in workingEntitySpace
      * @param existingSubRoutes - a list of the existing OSM routes that belong to the existing route_master relation (if any - will be empty if a new route_master was created)
      */
-    protected void conflateExistingRouteRelations(final List<OSMRelation> existingRoutes, final List<OSMRelation> existingSubRoutes) {
+    protected void conflateExistingRouteRelations(final List<OSMRelation> allExistingRoutes, final List<OSMRelation> existingSubRoutes) {
         //first compile a list of existing routes to consider for conflation
         final String importRouteAgencyId = exportRouteMaster.getTag(GTFS_AGENCY_ID), importRouteMasterRef = exportRouteMaster.getTag(OSMEntity.KEY_REF);
-        final List<OSMRelation> matchingRoutes;
-        final boolean existingSubRoutesPresent = existingSubRoutes.size() > 0;
-        if(existingSubRoutesPresent) { //if there's an existing route_master, use its child routes as the list
-            matchingRoutes = existingSubRoutes;
+        final List<OSMRelation> existingRouteCandidates;
+        if(existingSubRoutes.size() > 0) { //if there's an existing route_master, use its child routes as the list
+            existingRouteCandidates = existingSubRoutes;
         } else { //if there was no existing route_master, or it had no child routes, create a list of existing routes based on ref
-            matchingRoutes = new ArrayList<>();
-            for(final OSMRelation relation : existingRoutes) {
+            existingRouteCandidates = new ArrayList<>();
+            for(final OSMRelation relation : allExistingRoutes) {
                 if(importRouteMasterRef != null && importRouteMasterRef.equalsIgnoreCase(relation.getTag(OSMEntity.KEY_REF))) {
-                    matchingRoutes.add(relation);
+                    existingRouteCandidates.add(relation);
                 }
             }
         }
 
         //now iterate over the GTFS import routes (trips), matching them to the existing routes (or creating them if no match made)
         exportRoutes = new ArrayList<>(importRoutes.size());
-        for(final Route importRoute : importRoutes) {
+
+        //simple class to make it easier to track import/existing route matches
+        class RouteMatch {
+            private final Route importRoute;
+            private final OSMRelation matchingRelation;
+            private final String matchType;
+            private RouteMatch(Route route, OSMRelation relation, String type) {
+                importRoute = route;
+                matchingRelation = relation;
+                matchType = type;
+            }
+        }
+
+        //first try to match based on the TRIP_MARKER tag
+        List<Route> unmatchedImportRoutes = new ArrayList<>(importRoutes);
+        List<RouteMatch>matchedImportRoutes = new ArrayList<>(importRoutes.size());
+        ListIterator<Route> unmatchedImportRoutesIterator = unmatchedImportRoutes.listIterator();
+        while(unmatchedImportRoutesIterator.hasNext()) {
+            final Route importRoute = unmatchedImportRoutesIterator.next();
             //System.out.println("CHECK subroute \"" + importRoute.routeRelation.getTag(OSMEntity.KEY_NAME) + "\" (id " + importRoute.routeRelation.osm_id + ")");
             //first try to match up the import route (trip) with the matching routes, using the GTFS trip_marker
-            OSMRelation existingRouteRelation = null;
-            ListIterator<OSMRelation> matchingRoutesIterator = matchingRoutes.listIterator();
-            while(matchingRoutesIterator.hasNext()) {
-                final OSMRelation relation = matchingRoutesIterator.next();
+            ListIterator<OSMRelation> existingRouteCandidatesIterator = existingRouteCandidates.listIterator();
+            while (existingRouteCandidatesIterator.hasNext()) {
+                final OSMRelation relation = existingRouteCandidatesIterator.next();
 
-                //break on the first GTFS id match
+                //break on the first TRIP_MARKER id match
                 //System.out.println("check TRIP " + importRoute.tripMarker + " vs " + relation.getTag(GTFS_TRIP_MARKER));
-                if(importRoute.tripMarker != null && importRoute.tripMarker.equals(relation.getTag(GTFS_TRIP_MARKER))) {
-                    existingRouteRelation = relation;
-                    System.out.format("INFO: Matched trip to existing relation #%d using %s tag\n", existingRouteRelation.osm_id, GTFS_TRIP_MARKER);
-                    matchingRoutesIterator.remove();
+                if (importRoute.tripMarker != null && importRoute.tripMarker.equals(relation.getTag(GTFS_TRIP_MARKER))) {
+                    System.out.format("INFO: Matched trip to existing relation #%d using %s tag\n", relation.osm_id, GTFS_TRIP_MARKER);
+                    existingRouteCandidatesIterator.remove();
+                    unmatchedImportRoutesIterator.remove();
+                    matchedImportRoutes.add(new RouteMatch(importRoute, relation, "marker"));
                     break;
                 }
             }
+        }
 
-            //if nothing was found using the GTFS trip_marker tag, select one of the matching routes as the one to use
-            //NOTE: this will overwrite any route with the same ref - may be a problem in areas where multiple agencies use the same route numbers!
-            if(existingRouteRelation == null) {
-                System.out.format("INFO: no matches for trip based on GTFS id: using first existing route instead\n");
-                matchingRoutesIterator = matchingRoutes.listIterator();
-                while (matchingRoutesIterator.hasNext()) {
-                    final OSMRelation relation = matchingRoutesIterator.next();
-                    if (!relation.hasTag(GTFS_TRIP_MARKER)) {
-                        existingRouteRelation = relation;
-                        matchingRoutesIterator.remove();
-                        break;
-                    }
-                }
-            }
-
-            //and add the stops to the existing route relation
-            final Route exportRoute;
-            if(existingRouteRelation != null) {
-                //copy over the tags from the GTFS trip object
-                existingRouteRelation.copyTagsFrom(importRoute.routeRelation, OSMEntity.TagMergeStrategy.copyTags);
-
-                //remove all existing memberList from the route relation - will be substituted with matched data later
-                final List<OSMRelation.OSMRelationMember> existingRouteMembers = new ArrayList<>(existingRouteRelation.getMembers());
-                for(final OSMRelation.OSMRelationMember member : existingRouteMembers) {
-                    existingRouteRelation.removeMember(member.member, Integer.MAX_VALUE);
-                }
-                final OSMWay importRoutePath = (OSMWay) importRoute.routeRelation.getMembers("").get(0).member;
-                final OSMRelation exportRouteRelation = (OSMRelation) workingEntitySpace.addEntity(existingRouteRelation, OSMEntity.TagMergeStrategy.copyTags, null, true, 0);
-                exportRoute = new Route(exportRouteRelation, importRoutePath, importRoute.stops, this);
+        //if nothing was found using the GTFS trip_marker tag, select one of the matching routes as the one to use
+        //NOTE: this will overwrite any route with the same ref - may be a problem in areas where multiple agencies use the same route numbers!
+        unmatchedImportRoutesIterator = unmatchedImportRoutes.listIterator();
+        ListIterator<OSMRelation> existingRouteCandidatesIterator = existingRouteCandidates.listIterator();
+        while(unmatchedImportRoutesIterator.hasNext()) {
+            final Route importRoute = unmatchedImportRoutesIterator.next();
+            if (existingRouteCandidatesIterator.hasNext()) {
+                final OSMRelation existingRelation = existingRouteCandidatesIterator.next();
+                existingRouteCandidatesIterator.remove();
+                unmatchedImportRoutesIterator.remove();
+                matchedImportRoutes.add(new RouteMatch(importRoute, existingRelation, "filler"));
+                System.out.format("INFO: no matches for trip based on GTFS id: using first existing route instead: %s\n", existingRelation);
             } else {
-                exportRoute = new Route(importRoute, importRoute.stops, workingEntitySpace);
+                break;
             }
+        }
+
+        //and create brand new route relations for any leftover routes
+        while(unmatchedImportRoutesIterator.hasNext()) {
+            final Route importRoute = unmatchedImportRoutesIterator.next();
+            final Route exportRoute = new Route(importRoute, importRoute.stops, workingEntitySpace);
+            workingEntitySpace.addEntity(exportRoute.routeRelation, OSMEntity.TagMergeStrategy.copyTags, null, true, 0);
             exportRoutes.add(exportRoute);
             exportRouteMaster.addMember(exportRoute.routeRelation, OSMEntity.MEMBERSHIP_DEFAULT);
         }
 
         /*if the existing route_master has any leftover routes that weren't matched above, they were most likely
           canceled by the transit agency - delete them from the entity space (and from OSM)*/
-        if(existingSubRoutesPresent && matchingRoutes.size() > 0) {
-            for(final OSMRelation relation : matchingRoutes) {
-                workingEntitySpace.deleteEntity(relation);
-            }
+        existingRouteCandidatesIterator = existingRouteCandidates.listIterator();
+        while(existingRouteCandidatesIterator.hasNext()) {
+            final OSMRelation leftoverRoute = existingRouteCandidatesIterator.next();
+            workingEntitySpace.deleteEntity(leftoverRoute);
         }
+
+        //now iterate over the matched existing routes
+        for(final RouteMatch routeMatch : matchedImportRoutes) {
+            //copy over the GTFS-specific tags from the new GTFS trip object
+            routeMatch.matchingRelation.setTag(GTFS_AGENCY_ID, routeMatch.importRoute.routeRelation.getTag(GTFS_AGENCY_ID));
+            routeMatch.matchingRelation.setTag(GTFS_DATASET_ID, routeMatch.importRoute.routeRelation.getTag(GTFS_DATASET_ID));
+            routeMatch.matchingRelation.setTag(GTFS_TRIP_ID, routeMatch.importRoute.routeRelation.getTag(GTFS_TRIP_ID));
+            routeMatch.matchingRelation.setTag(GTFS_TRIP_MARKER, routeMatch.importRoute.routeRelation.getTag(GTFS_TRIP_MARKER));
+
+            //remove all existing members from the existing route relation - will be substituted with matched data later
+            final List<OSMRelation.OSMRelationMember> existingRouteMembers = new ArrayList<>(routeMatch.matchingRelation.getMembers());
+            for(final OSMRelation.OSMRelationMember member : existingRouteMembers) {
+                routeMatch.matchingRelation.removeMember(member.member, Integer.MAX_VALUE);
+            }
+            //add the routePath from the import route
+            final OSMWay importRoutePath = (OSMWay) routeMatch.importRoute.routeRelation.getMembers("").get(0).member;
+
+            //and add the existing relation to the working space, and set up the local variables to track it
+            final OSMRelation exportRouteRelation = (OSMRelation) workingEntitySpace.addEntity(routeMatch.matchingRelation, OSMEntity.TagMergeStrategy.copyTags, null, true, 0);
+            final Route exportRoute = new Route(exportRouteRelation, importRoutePath, routeMatch.importRoute.stops, this);
+            exportRoutes.add(exportRoute);
+            exportRouteMaster.addMember(exportRoute.routeRelation, OSMEntity.MEMBERSHIP_DEFAULT);
+        }
+
     }
     public boolean conflateRoutePaths(final StopConflator stopConflator) {
         for(final Route route : exportRoutes) {
