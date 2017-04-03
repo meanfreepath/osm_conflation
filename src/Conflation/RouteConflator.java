@@ -443,16 +443,22 @@ public class RouteConflator {
         existingRouteCandidatesIterator = existingRouteCandidates.listIterator();
         while(existingRouteCandidatesIterator.hasNext()) {
             final OSMRelation leftoverRoute = existingRouteCandidatesIterator.next();
-            workingEntitySpace.deleteEntity(leftoverRoute);
+            final OSMRelation deleteRouteRelation = (OSMRelation) workingEntitySpace.addEntity(leftoverRoute, OSMEntity.TagMergeStrategy.copyTags, null, true, 0);
+            workingEntitySpace.deleteEntity(deleteRouteRelation);
+            System.out.format("INFO: Deleting unneeded existing relation %s\n", deleteRouteRelation);
         }
 
         //now iterate over the matched existing routes
         for(final RouteMatch routeMatch : matchedImportRoutes) {
             //copy over the GTFS-specific tags from the new GTFS trip object
-            routeMatch.matchingRelation.setTag(GTFS_AGENCY_ID, routeMatch.importRoute.routeRelation.getTag(GTFS_AGENCY_ID));
-            routeMatch.matchingRelation.setTag(GTFS_DATASET_ID, routeMatch.importRoute.routeRelation.getTag(GTFS_DATASET_ID));
-            routeMatch.matchingRelation.setTag(GTFS_TRIP_ID, routeMatch.importRoute.routeRelation.getTag(GTFS_TRIP_ID));
-            routeMatch.matchingRelation.setTag(GTFS_TRIP_MARKER, routeMatch.importRoute.routeRelation.getTag(GTFS_TRIP_MARKER));
+            if(routeMatch.matchType.equals("marker")) {
+                routeMatch.matchingRelation.setTag(GTFS_AGENCY_ID, routeMatch.importRoute.routeRelation.getTag(GTFS_AGENCY_ID));
+                routeMatch.matchingRelation.setTag(GTFS_DATASET_ID, routeMatch.importRoute.routeRelation.getTag(GTFS_DATASET_ID));
+                routeMatch.matchingRelation.setTag(GTFS_TRIP_ID, routeMatch.importRoute.routeRelation.getTag(GTFS_TRIP_ID));
+                routeMatch.matchingRelation.setTag(GTFS_TRIP_MARKER, routeMatch.importRoute.routeRelation.getTag(GTFS_TRIP_MARKER));
+            } else {
+                routeMatch.matchingRelation.copyTagsFrom(routeMatch.importRoute.routeRelation, OSMEntity.TagMergeStrategy.copyTags);
+            }
 
             //remove all existing members from the existing route relation - will be substituted with matched data later
             final List<OSMRelation.OSMRelationMember> existingRouteMembers = new ArrayList<>(routeMatch.matchingRelation.getMembers());

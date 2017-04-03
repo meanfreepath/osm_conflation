@@ -252,6 +252,11 @@ public class Main {
                     }
                 }
 
+                //also include any deleted entities from the working space
+                for(final OSMEntity deletedEntity : routeDataManager.deletedEntities.values()) {
+                    relationSpace.deleteEntity(deletedEntity);
+                }
+
                 //and finally output to a .osm file
                 relationSpace.setCanUpload(true);
                 final String uploadFileName = String.format("%s/relations_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds));
