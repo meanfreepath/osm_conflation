@@ -417,8 +417,8 @@ public class RouteConflator {
         unmatchedImportRoutesIterator = unmatchedImportRoutes.listIterator();
         ListIterator<OSMRelation> existingRouteCandidatesIterator = existingRouteCandidates.listIterator();
         while(unmatchedImportRoutesIterator.hasNext()) {
-            final Route importRoute = unmatchedImportRoutesIterator.next();
             if (existingRouteCandidatesIterator.hasNext()) {
+                final Route importRoute = unmatchedImportRoutesIterator.next();
                 final OSMRelation existingRelation = existingRouteCandidatesIterator.next();
                 existingRouteCandidatesIterator.remove();
                 unmatchedImportRoutesIterator.remove();
@@ -432,10 +432,12 @@ public class RouteConflator {
         //and create brand new route relations for any leftover routes
         while(unmatchedImportRoutesIterator.hasNext()) {
             final Route importRoute = unmatchedImportRoutesIterator.next();
-            final Route exportRoute = new Route(importRoute, importRoute.stops, workingEntitySpace);
-            workingEntitySpace.addEntity(exportRoute.routeRelation, OSMEntity.TagMergeStrategy.copyTags, null, true, 0);
+            //add the routePath from the import route
+            final OSMWay importRoutePath = (OSMWay) importRoute.routeRelation.getMembers("").get(0).member;
+            final Route exportRoute = new Route(workingEntitySpace.createRelation(importRoute.routeRelation.getTags(), null), importRoutePath, importRoute.stops, this);
             exportRoutes.add(exportRoute);
             exportRouteMaster.addMember(exportRoute.routeRelation, OSMEntity.MEMBERSHIP_DEFAULT);
+            System.out.format("INFO: creating new route\n");
         }
 
         /*if the existing route_master has any leftover routes that weren't matched above, they were most likely
