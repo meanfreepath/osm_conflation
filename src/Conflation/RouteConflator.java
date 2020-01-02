@@ -3,8 +3,9 @@ package Conflation;
 import NewPathFinding.PathTree;
 import OSM.*;
 import com.company.Config;
-import com.sun.istack.internal.NotNull;
 import com.company.InvalidArgumentException;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.*;
@@ -240,7 +241,7 @@ public class RouteConflator {
                 tags[0] = new String[]{"rail", "light_rail", "subway"};
                 break;
             case ferry:
-                keys = new String[]{"railway"};
+                keys = new String[]{"ferry"};
                 tags = new String[keys.length][];
                 tags[0] = new String[]{"rail", "light_rail", "subway"};
                 break;
@@ -310,7 +311,7 @@ public class RouteConflator {
      */
     protected List<OSMRelation> conflateExistingRouteMaster(final List<OSMRelation> existingRouteMasters) {
         //scan the route_masters list for route_masters matching the import route
-        final String importRouteRef = importRouteMaster.getTag(OSMEntity.KEY_REF), importRouteAgencyId = importRouteMaster.getTag(GTFS_AGENCY_ID);
+        final String importRouteAgencyId = importRouteMaster.getTag(GTFS_AGENCY_ID);
         for(final OSMRelation relation : existingRouteMasters) {
             //break on the first GTFS id match
             if(gtfsRouteId != null && gtfsRouteId.equals(relation.getTag(GTFS_ROUTE_ID)) && importRouteAgencyId != null && importRouteAgencyId.equals(relation.getTag(GTFS_AGENCY_ID))) {
@@ -319,8 +320,8 @@ public class RouteConflator {
                 break;
             }
 
-            //try matching on ref as well
-            if(importRouteRef != null && importRouteRef.equalsIgnoreCase(relation.getTag(OSMEntity.KEY_REF))) {
+            //try matching on ref and route type as well
+            if(OSMEntity.compareTags(importRouteMaster, relation, OSMEntity.KEY_REF) && OSMEntity.compareTags(importRouteMaster, relation, OSMEntity.KEY_ROUTE)) {
                 exportRouteMaster = relation;
                 System.out.format("INFO: Matched route master to existing relation #%d using ref tag\n", exportRouteMaster.osm_id);
                 break;
@@ -358,16 +359,18 @@ public class RouteConflator {
      * @param allExistingRoutes - a list of all type=route relations in workingEntitySpace
      * @param existingSubRoutes - a list of the existing OSM routes that belong to the existing route_master relation (if any - will be empty if a new route_master was created)
      */
-    protected void conflateExistingRouteRelations(final List<OSMRelation> allExistingRoutes, final List<OSMRelation> existingSubRoutes) {
+    protected void conflateExistingRouteRelations(final List<OSMRelation> allExistingRoutes, @NotNull final List<OSMRelation> existingSubRoutes) {
         //first compile a list of existing routes to consider for conflation
-        final String importRouteAgencyId = exportRouteMaster.getTag(GTFS_AGENCY_ID), importRouteMasterRef = exportRouteMaster.getTag(OSMEntity.KEY_REF);
+        final String importRouteMasterRef = exportRouteMaster.getTag(OSMEntity.KEY_REF);
         final List<OSMRelation> existingRouteCandidates;
         if(existingSubRoutes.size() > 0) { //if there's an existing route_master, use its child routes as the list
             existingRouteCandidates = existingSubRoutes;
-        } else { //if there was no existing route_master, or it had no child routes, create a list of existing routes based on ref
+        } else { //if there was no existing route_master, or it had no child routes, create a list of existing routes based on ref and type
             existingRouteCandidates = new ArrayList<>();
             for(final OSMRelation relation : allExistingRoutes) {
-                if(importRouteMasterRef != null && importRouteMasterRef.equalsIgnoreCase(relation.getTag(OSMEntity.KEY_REF))) {
+
+                if(OSMEntity.compareTags(importRouteMaster, relation, OSMEntity.KEY_REF) && OSMEntity.compareTags(importRouteMaster, relation, OSMEntity.KEY_ROUTE)) {
+                    System.out.format("INFO: Matched trip to existing relation #%d using ref tag %s\n", relation.osm_id, importRouteMasterRef);
                     existingRouteCandidates.add(relation);
                 }
             }
@@ -413,7 +416,7 @@ public class RouteConflator {
         }
 
         //if nothing was found using the GTFS trip_marker tag, select one of the matching routes as the one to use
-        //NOTE: this will overwrite any route with the same ref - may be a problem in areas where multiple agencies use the same route numbers!
+        //TODO: this will overwrite any route with the same ref/type - may be a problem in areas where multiple agencies use the same route numbers!
         unmatchedImportRoutesIterator = unmatchedImportRoutes.listIterator();
         ListIterator<OSMRelation> existingRouteCandidatesIterator = existingRouteCandidates.listIterator();
         while(unmatchedImportRoutesIterator.hasNext()) {
