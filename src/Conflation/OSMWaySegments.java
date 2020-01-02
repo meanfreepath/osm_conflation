@@ -1,6 +1,7 @@
 package Conflation;
 
 import OSM.*;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -8,23 +9,29 @@ import java.util.List;
  * Created by nick on 9/30/16.
  */
 public class OSMWaySegments extends WaySegments {
-    public final Region boundingBoxForStopMatching, boundingBoxForSegmentMatching;
+    public @NotNull final Region boundingBoxForStopMatching, boundingBoxForSegmentMatching;
 
     protected OSMWaySegments(OSMWay way, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
         super(way, wayMatchingOptions);
 
         //set up the various bounding boxes
-        final double platformDistanceBuffer = -SphericalMercator.metersToCoordDelta(StopArea.waySearchAreaBoundingBoxSize, way.getCentroid().y), segmentSearchBuffer = -SphericalMercator.metersToCoordDelta(wayMatchingOptions.segmentSearchBoxSize, way.getCentroid().y);
-        boundingBoxForStopMatching = way.getBoundingBox().regionInset(platformDistanceBuffer, platformDistanceBuffer);
-        boundingBoxForSegmentMatching = way.getBoundingBox().regionInset(segmentSearchBuffer, segmentSearchBuffer);
+        Region wayRegion = way.getBoundingBox();
+        assert wayRegion != null;
+        Point wayCentroid = wayRegion.getCentroid();
+        final double platformDistanceBuffer = -SphericalMercator.metersToCoordDelta(StopArea.waySearchAreaBoundingBoxSize, wayCentroid.y), segmentSearchBuffer = -SphericalMercator.metersToCoordDelta(wayMatchingOptions.segmentSearchBoxSize, wayCentroid.y);
+        boundingBoxForStopMatching = wayRegion.regionInset(platformDistanceBuffer, platformDistanceBuffer);
+        boundingBoxForSegmentMatching = wayRegion.regionInset(segmentSearchBuffer, segmentSearchBuffer);
     }
     protected OSMWaySegments(final OSMWaySegments originalSegments, final OSMWay splitWay, final List<LineSegment> splitSegments) {
         super(originalSegments, splitWay, splitSegments);
 
         //set up the various bounding boxes
-        final double platformDistanceBuffer = -SphericalMercator.metersToCoordDelta(StopArea.waySearchAreaBoundingBoxSize, way.getCentroid().y), segmentSearchBuffer = -SphericalMercator.metersToCoordDelta(wayMatchingOptions.segmentSearchBoxSize, way.getCentroid().y);
-        boundingBoxForStopMatching = way.getBoundingBox().regionInset(platformDistanceBuffer, platformDistanceBuffer);
-        boundingBoxForSegmentMatching = way.getBoundingBox().regionInset(segmentSearchBuffer, segmentSearchBuffer);
+        Region wayRegion = way.getBoundingBox();
+        assert wayRegion != null;
+        Point wayCentroid = wayRegion.getCentroid();
+        final double platformDistanceBuffer = -SphericalMercator.metersToCoordDelta(StopArea.waySearchAreaBoundingBoxSize, wayCentroid.y), segmentSearchBuffer = -SphericalMercator.metersToCoordDelta(wayMatchingOptions.segmentSearchBoxSize, wayCentroid.y);
+        boundingBoxForStopMatching = wayRegion.regionInset(platformDistanceBuffer, platformDistanceBuffer);
+        boundingBoxForSegmentMatching = wayRegion.regionInset(segmentSearchBuffer, segmentSearchBuffer);
     }
     @Override
     protected LineSegment createLineSegment(final Point miniOrigin, final Point miniDestination, final OSMNode miniOriginNode, final OSMNode miniDestinationNode, int segmentIndex, int nodeIndex) {

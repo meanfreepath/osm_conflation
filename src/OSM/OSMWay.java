@@ -1,6 +1,7 @@
 package OSM;
 
-import com.sun.istack.internal.NotNull;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
@@ -18,8 +19,8 @@ public class OSMWay extends OSMEntity {
     private final static OSMType type = OSMType.way;
     private final static int INITIAL_CAPACITY_NODE = 32;
 
-    private final List<OSMNode> nodes;
-    private OSMNode firstNode = null, lastNode = null;
+    private @NotNull final List<OSMNode> nodes;
+    private @Nullable OSMNode firstNode = null, lastNode = null;
 
     public OSMWay(final long id) {
         super(id);
@@ -31,7 +32,7 @@ public class OSMWay extends OSMEntity {
      * @param wayToCopy
      * @param idOverride
      */
-    protected OSMWay(final OSMWay wayToCopy, final Long idOverride) {
+    protected OSMWay(final @NotNull OSMWay wayToCopy, final @Nullable Long idOverride) {
         super(wayToCopy, idOverride);
 
         nodes = new ArrayList<>(wayToCopy.nodes.size());
@@ -58,9 +59,9 @@ public class OSMWay extends OSMEntity {
 
     /**
      * Adds the given nodes to our way
-     * @param nodesToCopy
+     * @param nodesToCopy the nodes to copy in
      */
-    public void setNodes(final List<OSMNode> nodesToCopy) {
+    public void setNodes(final @NotNull List<OSMNode> nodesToCopy) {
         //add the nodes if complete
         if(complete != CompletionStatus.incomplete) {
             final List<OSMNode> oldNodes = new ArrayList<>(nodes);
@@ -94,10 +95,11 @@ public class OSMWay extends OSMEntity {
 
     /**
      * Inserts a node at the given index
-     * @param node
-     * @param index
+     * @param node the OSMNode to insert
+     * @param index the index to insert it at
+     * @throws IndexOutOfBoundsException if index isn't in bounds
      */
-    public void insertNode(final OSMNode node, final int index) {
+    public void insertNode(final @NotNull OSMNode node, final int index) {
         nodes.add(index, node);
         node.didAddToEntity(this);
         updateFirstAndLastNodes();
@@ -108,9 +110,9 @@ public class OSMWay extends OSMEntity {
     }
     /**
      * Appends a node to the end of the way
-     * @param node
+     * @param node the node to append
      */
-    public void appendNode(final OSMNode node) {
+    public void appendNode(final @NotNull OSMNode node) {
         nodes.add(node);
         node.didAddToEntity(this);
         updateFirstAndLastNodes();
@@ -126,7 +128,7 @@ public class OSMWay extends OSMEntity {
     public boolean removeNodeAtIndex(final int nodeIndex) {
         return replaceNodeAtIndex(nodeIndex, null);
     }
-    public boolean removeNode(final OSMNode node) {
+    public boolean removeNode(final @NotNull OSMNode node) {
         if(osm_id == 30108041L) {
             System.out.println("\tREMOVE NODE " + node);
         }
@@ -134,11 +136,11 @@ public class OSMWay extends OSMEntity {
     }
     /**
      * Replace the old node with the new node
-     * @param oldNode
-     * @param newNode
+     * @param oldNode the old node to replace
+     * @param newNode the new node.  If null, then old node will be removed
      * @return TRUE if the node was found and replaced
      */
-    public boolean replaceNode(final OSMNode oldNode, @NotNull final OSMNode newNode) {
+    public boolean replaceNode(final @NotNull OSMNode oldNode, final @Nullable OSMNode newNode) {
         int nodeIndex = nodes.indexOf(oldNode);
         boolean replaced = replaceNodeAtIndex(nodeIndex, newNode);
 
@@ -153,10 +155,10 @@ public class OSMWay extends OSMEntity {
     /**
      *
      * @param nodeIndex the index of the node to remove
-     * @param newNode
+     * @param newNode the new node.  If null, then the node at the index will be removed
      * @return TRUE if the node was found and replaced
      */
-    private boolean replaceNodeAtIndex(final int nodeIndex, @NotNull final OSMNode newNode) {
+    private boolean replaceNodeAtIndex(final int nodeIndex, final @Nullable OSMNode newNode) {
         if(nodeIndex >= 0) {
             final OSMNode oldNode = nodes.get(nodeIndex);
             if(newNode != null) {
@@ -178,22 +180,25 @@ public class OSMWay extends OSMEntity {
 
     /**
      * Checks whether the given node is a member of this way
-     * @param node
-     * @return
+     * @param node the node to look up
+     * @return the index it's at, if present
      */
-    public int indexOfNode(final OSMNode node) {
+    public int indexOfNode(final @Nullable OSMNode node) {
         return nodes.indexOf(node);
     }
+    @NotNull
     public List<OSMNode> getNodes() {
         return nodes;
     }
+    @Nullable
     public OSMNode getFirstNode() {
         return firstNode;
     }
+    @Nullable
     public OSMNode getLastNode() {
         return lastNode;
     }
-    protected void nodeWasMadeComplete(final OSMNode node) {
+    protected void nodeWasMadeComplete(final @NotNull OSMNode node) {
         updateCompletionStatus();
     }
     private void updateCompletionStatus() {
@@ -205,7 +210,8 @@ public class OSMWay extends OSMEntity {
      * @param tolerance maximum distance, in meters
      * @return the closest node, or null if none within the tolerance distance
      */
-    public OSMNode nearestNodeAtPoint(final Point point, final double tolerance) {
+    @Nullable
+    public OSMNode nearestNodeAtPoint(final @NotNull Point point, final double tolerance) {
         double closestNodeDistance = tolerance, curDistance;
         OSMNode closestNode = null;
 
@@ -251,7 +257,7 @@ public class OSMWay extends OSMEntity {
 
     /**
      * Returns a rough total length of the way, in meters.
-     * @return
+     * @return the length
      */
     public double length() {
         OSMNode lastNode = null;
@@ -265,12 +271,14 @@ public class OSMWay extends OSMEntity {
         return length;
     }
 
+    @NotNull
     @Override
     public OSMType getType() {
         return type;
     }
 
     @Override
+    @Nullable
     public Region getBoundingBox() {
         if(nodes.size() == 0) {
             return null;
@@ -286,7 +294,10 @@ public class OSMWay extends OSMEntity {
                 if(boundingBox != null) {
                     boundingBox.combinedBoxWithRegion(node.getBoundingBox());
                 } else {
-                    boundingBox = new Region(node.getBoundingBox());
+                    Region nodeBoundingBox = node.getBoundingBox();
+                    if(nodeBoundingBox != null) {
+                        boundingBox = new Region(nodeBoundingBox);
+                    }
                 }
             }
         }
@@ -307,6 +318,7 @@ public class OSMWay extends OSMEntity {
         return Region.computeCentroid2(vertices);
     }
 
+    @NotNull
     @Override
     public String toOSMXML() {
         if(debugEnabled) {
@@ -350,24 +362,24 @@ public class OSMWay extends OSMEntity {
     }
 
     @Override
-    public void didAddToEntity(OSMEntity entity) {
+    public void didAddToEntity(@NotNull OSMEntity entity) {
         if(entity instanceof OSMRelation) {
             addContainingRelation((OSMRelation) entity);
         }
     }
     @Override
-    public void didRemoveFromEntity(OSMEntity entity, boolean entityWasDeleted) {
+    public void didRemoveFromEntity(@NotNull OSMEntity entity, boolean entityWasDeleted) {
         if(entity instanceof OSMRelation) {
             removeContainingRelation((OSMRelation) entity);
         }
     }
     @Override
-    public void containedEntityWasDeleted(OSMEntity entity) {
+    public void containedEntityWasDeleted(@NotNull OSMEntity entity) {
         final OSMNode containedNode = (OSMNode) entity;
         removeNode(containedNode);
     }
     @Override
-    public boolean didDelete(OSMEntitySpace fromSpace) {
+    public boolean didDelete(@NotNull OSMEntitySpace fromSpace) {
         final List<OSMNode> containedNodes = new ArrayList<>(nodes);
         for(final OSMNode containedNode : containedNodes) {
             removeNode(containedNode);
@@ -398,6 +410,7 @@ public class OSMWay extends OSMEntity {
      * @param tolerance The distance (in meters) to use to identify nodes as being in the same location
      * @return Array of duplicate node pairs
      */
+    @Nullable
     public OSMNode[][] identifyDuplicateNodesByPosition(final double tolerance) {
         if(nodes.size() < 2) {
             return null;

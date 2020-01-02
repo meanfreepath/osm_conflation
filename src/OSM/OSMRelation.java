@@ -1,6 +1,8 @@
 package OSM;
 
-import com.sun.istack.internal.NotNull;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
@@ -17,13 +19,16 @@ public class OSMRelation extends OSMEntity {
             BASE_XML_TAG_FORMAT_MEMBER = "  <member type=\"%s\" ref=\"%d\" role=\"%s\"/>\n";
     private final static OSMType type = OSMType.relation;
 
+    @NotNull
     protected final ArrayList<OSMRelationMember> members = new ArrayList<>();
 
     public static class OSMRelationMember {
+        @NotNull
         public final OSMEntity member;
+        @NotNull
         public final String role;
 
-        public OSMRelationMember(OSMEntity memberEntity, @NotNull String memberRole) {
+        public OSMRelationMember(@NotNull OSMEntity memberEntity, @NotNull String memberRole) {
             role = memberRole;
             member = memberEntity;
         }
@@ -40,7 +45,7 @@ public class OSMRelation extends OSMEntity {
      * Copy constructor
      * @param relationToCopy the relation to copy
      */
-    public OSMRelation(final OSMRelation relationToCopy, final Long idOverride) {
+    public OSMRelation(final @NotNull OSMRelation relationToCopy, final @Nullable Long idOverride) {
         super(relationToCopy, idOverride);
     }
 
@@ -48,6 +53,7 @@ public class OSMRelation extends OSMEntity {
      * Gets the completion counts of this relation's members
      * @return array of completion counts, in this order: incomplete, partially complete, fully complete members
      */
+    @NotNull
     public int[] getCompletedMemberCounts() {
         int completedMemberCount = 0, partiallyCompleteMemberCount = 0, incompleteMemberCount = 0;
         for(final OSMRelationMember member : members) {
@@ -79,7 +85,7 @@ public class OSMRelation extends OSMEntity {
             member.member.didRemoveFromEntity(this, false);
         }
     }
-    public void copyMembers(final List<OSMRelationMember> membersToCopy) {
+    public void copyMembers(final @NotNull List<OSMRelationMember> membersToCopy) {
         if(complete != CompletionStatus.incomplete) {
             for(final OSMRelationMember member : membersToCopy) {
                 addMemberInternal(member.member, member.role, members.size(), false);
@@ -87,16 +93,18 @@ public class OSMRelation extends OSMEntity {
             updateCompletionStatus();
         }
     }
-    protected void memberWasMadeComplete(final OSMEntity memberEntity) {
+    protected void memberWasMadeComplete(final @NotNull OSMEntity memberEntity) {
         updateCompletionStatus();
     }
 
+    @NotNull
     @Override
     public OSMType getType() {
         return type;
     }
 
     @Override
+    @Nullable
     public Region getBoundingBox() {
         //generate the combined bounding box from the members' bounding boxes
         Region combinedBoundingBox = null, curBoundingBox;
@@ -114,11 +122,17 @@ public class OSMRelation extends OSMEntity {
     }
 
     @Override
+    @Nullable
     public Point getCentroid() {
         Region boundingBox = getBoundingBox();
-        return new Point(0.5 * (boundingBox.origin.x + boundingBox.extent.x), 0.5 * (boundingBox.origin.y + boundingBox.extent.y));
+        if(boundingBox == null) {
+            return null;
+        } else {
+            return new Point(0.5 * (boundingBox.origin.x + boundingBox.extent.x), 0.5 * (boundingBox.origin.y + boundingBox.extent.y));
+        }
     }
 
+    @NotNull
     @Override
     public String toOSMXML() {
         if(debugEnabled) {
@@ -164,24 +178,24 @@ public class OSMRelation extends OSMEntity {
     }
 
     @Override
-    public void didAddToEntity(OSMEntity entity) {
+    public void didAddToEntity(@NotNull OSMEntity entity) {
         if(entity instanceof OSMRelation) { //relations can only be added to other relations
             addContainingRelation((OSMRelation) entity);
         }
     }
     @Override
-    public void didRemoveFromEntity(OSMEntity entity, boolean entityWasDeleted) {
+    public void didRemoveFromEntity(@NotNull OSMEntity entity, boolean entityWasDeleted) {
         if(entity instanceof OSMRelation) {
             removeContainingRelation((OSMRelation) entity);
         }
     }
     @Override
-    public void containedEntityWasDeleted(OSMEntity entity) {
+    public void containedEntityWasDeleted(@NotNull OSMEntity entity) {
         removeMember(entity, Integer.MAX_VALUE); //remove all instances of the entity from the member list
     }
 
     @Override
-    public boolean didDelete(OSMEntitySpace fromSpace) {
+    public boolean didDelete(@NotNull OSMEntitySpace fromSpace) {
         if(members.size() > 0) {
             markAsModified();
         }
@@ -198,8 +212,9 @@ public class OSMRelation extends OSMEntity {
      * @param entity the entity to search for
      * @return array of OSMRelationMembers containing entity
      */
-    public OSMRelationMember[] getMembersForEntity(final OSMEntity entity) {
-        int indexes[] = getMembershipIndexes(entity);
+    @Nullable
+    public OSMRelationMember[] getMembersForEntity(final @NotNull OSMEntity entity) {
+        int[] indexes = getMembershipIndexes(entity);
         if(indexes == null) {
             return null;
         }
@@ -215,7 +230,8 @@ public class OSMRelation extends OSMEntity {
      * @param entity the entity to search for
      * @return the index(es), or null if entity isn't a member of this relation
      */
-    public int[] getMembershipIndexes(final OSMEntity entity) {
+    @Nullable
+    public int[] getMembershipIndexes(final @NotNull OSMEntity entity) {
         int index = 0;
         List<Integer> indexes = new ArrayList<>(8);
         for(final OSMRelationMember member : members) {
@@ -240,7 +256,7 @@ public class OSMRelation extends OSMEntity {
      * @param entity the entity to search for
      * @return true if entity has at least 1 membership, false if not
      */
-    public boolean containsMember(final OSMEntity entity) {
+    public boolean containsMember(final @NotNull OSMEntity entity) {
         return getMembershipIndexes(entity) != null;
     }
 
@@ -250,7 +266,7 @@ public class OSMRelation extends OSMEntity {
      * @param maxToRemove the max number of memberships to remove (i.e. if an entity has multiple member instances)
      * @return TRUE if removed, FALSE if not found in relation
      */
-    public boolean removeMember(final OSMEntity member, final int maxToRemove) {
+    public boolean removeMember(final @NotNull OSMEntity member, final int maxToRemove) {
         final List<OSMRelationMember> relationMembersToRemove = new ArrayList<>(4);
         int numRemoved = 0;
         for(final OSMRelationMember containedMember : members) {
@@ -278,7 +294,7 @@ public class OSMRelation extends OSMEntity {
      * @param role its role in the relation
      * @return true if added, false otherwise
      */
-    public boolean addMember(final OSMEntity entity, final String role) {
+    public boolean addMember(final @NotNull OSMEntity entity, final @NotNull String role) {
         final boolean status = addMemberInternal(entity, role, members.size(), true);
         if(status) {
             updateCompletionStatus();
@@ -292,7 +308,7 @@ public class OSMRelation extends OSMEntity {
      * @param existingMember the existing member object
      * @return true if added, false if not (i.e. existingMember not actually a member of this relation)
      */
-    public boolean insertBeforeMember(final OSMEntity entity, final String role, final OSMRelationMember existingMember) {
+    public boolean insertBeforeMember(final @NotNull OSMEntity entity, final @NotNull String role, final @NotNull OSMRelationMember existingMember) {
         final int existingMemberIndex = members.indexOf(existingMember);
         if(existingMemberIndex < 0) {
             return false;
@@ -310,7 +326,7 @@ public class OSMRelation extends OSMEntity {
      * @param existingMember the existing member object
      * @return true if added, false if not (i.e. existingMember not actually a member of this relation)
      */
-    public boolean insertAfterMember(final OSMEntity entity, final String role, final OSMRelationMember existingMember) {
+    public boolean insertAfterMember(final @NotNull OSMEntity entity, final @NotNull String role, final @NotNull OSMRelationMember existingMember) {
         final int existingMemberIndex = members.indexOf(existingMember);
         if(existingMemberIndex < 0) {
             return false;
@@ -321,7 +337,7 @@ public class OSMRelation extends OSMEntity {
         }
         return status;
     }
-    private boolean addMemberInternal(final OSMEntity member, final String role, final int index, final boolean markAsModified) {
+    private boolean addMemberInternal(final @NotNull OSMEntity member, final @NotNull String role, final int index, final boolean markAsModified) {
         members.add(index, new OSMRelationMember(member, role));
         member.didAddToEntity(this);
         if(markAsModified) {
@@ -338,7 +354,7 @@ public class OSMRelation extends OSMEntity {
      * @param oldEntity the entity to replace
      * @param newEntity the entity to replate oldEntity with
      */
-    public int replaceEntityMemberships(final OSMEntity oldEntity, final OSMEntity newEntity) {
+    public int replaceEntityMemberships(final @NotNull OSMEntity oldEntity, final @NotNull OSMEntity newEntity) {
         final ListIterator<OSMRelationMember> memberListIterator = members.listIterator();
         int replaceCount = 0;
         while(memberListIterator.hasNext()) {
@@ -422,7 +438,7 @@ public class OSMRelation extends OSMEntity {
      * @param originalWay
      * @param allSplitWays
      */
-    public void handleMemberWaySplit(final OSMWay originalWay, final List<OSMNode> originalNodeList, final OSMWay[] allSplitWays, final boolean wasValidBeforeSplit) {
+    public void handleMemberWaySplit(final @NotNull OSMWay originalWay, final @NotNull List<OSMNode> originalNodeList, final @NotNull OSMWay[] allSplitWays, final boolean wasValidBeforeSplit) {
         //get the relation's type, using the default handling if not set
         final String relationType = hasTag(KEY_TYPE) ? getTag(KEY_TYPE) : "";
         assert relationType != null;
@@ -452,7 +468,8 @@ public class OSMRelation extends OSMEntity {
                         }
                     }
                 } else { //if the restriction is invalid, just add the new splitWays to it and log a warning
-                    final OSMRelationMember members[] = getMembersForEntity(originalWay);
+                    final OSMRelationMember[] members = getMembersForEntity(originalWay);
+                    assert members != null;
                     for(final OSMWay splitWay : allSplitWays) {
                         if (splitWay != originalWay) {
                             addMember(splitWay, members[0].role);
@@ -471,7 +488,8 @@ public class OSMRelation extends OSMEntity {
                 }
 
                 //get the order of the originalWay's membership(s) in the relation, defaulting to adding in the forward direction
-                final OSMRelationMember originalWayMemberships[] = getMembersForEntity(originalWay);
+                final OSMRelationMember[] originalWayMemberships = getMembersForEntity(originalWay);
+                assert originalWayMemberships != null;
                 for(final OSMRelationMember originalWayMember : originalWayMemberships) {
                     boolean addForward = true;
                     final int index = relationWays.indexOf(originalWayMember);
@@ -479,14 +497,14 @@ public class OSMRelation extends OSMEntity {
                         final OSMWay prevWay = (OSMWay) relationWays.get(index - 1).member;
                         if(originalWayLastNode == prevWay.getFirstNode() ||originalWayLastNode == prevWay.getLastNode()) {
                             addForward = false;
-                        } else if(originalWayFirstNode == prevWay.getFirstNode() ||originalWayFirstNode == prevWay.getLastNode()) {
+                        } else if(originalWayFirstNode == prevWay.getFirstNode() || originalWayFirstNode == prevWay.getLastNode()) {
                             addForward = true;
                         }
                     } else {
                         final OSMWay nextWay = (OSMWay) relationWays.get(index + 1).member;
                         if(originalWayLastNode == nextWay.getFirstNode() ||originalWayLastNode == nextWay.getLastNode()) {
                             addForward = true;
-                        } else if(originalWayFirstNode == nextWay.getFirstNode() ||originalWayFirstNode == nextWay.getLastNode()) {
+                        } else if(originalWayFirstNode == nextWay.getFirstNode() || originalWayFirstNode == nextWay.getLastNode()) {
                             addForward = false;
                         }
                     }

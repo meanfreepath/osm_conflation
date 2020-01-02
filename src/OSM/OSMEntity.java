@@ -1,6 +1,8 @@
 package OSM;
 
 import com.company.InvalidArgumentException;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
 import java.text.CharacterIterator;
@@ -48,35 +50,35 @@ public abstract class OSMEntity {
     //Metadata (not required)
     public int uid = -1, version = -1, changeset = -1;
     public boolean visible = true;
-    public String user = null, timestamp = null;
-    protected ChangeAction action = ChangeAction.none;
+    public @Nullable String user = null, timestamp = null;
+    protected @NotNull ChangeAction action = ChangeAction.none;
 
 
-    protected Region boundingBox;
-    protected CompletionStatus complete = CompletionStatus.incomplete;
+    protected @Nullable Region boundingBox;
+    protected @NotNull CompletionStatus complete = CompletionStatus.incomplete;
 
-    protected HashMap<String,String> tags;
+    protected @Nullable HashMap<String,String> tags;
 
-    private HashMap<Long, WeakReference<OSMRelation>> containingRelations = null;
+    private @Nullable HashMap<Long, WeakReference<OSMRelation>> containingRelations = null;
 
-    public abstract OSMType getType();
-    public abstract Region getBoundingBox();
-    public abstract Point getCentroid();
-    public abstract String toOSMXML();
+    public abstract @NotNull OSMType getType();
+    public abstract @Nullable Region getBoundingBox();
+    public abstract @Nullable Point getCentroid();
+    public abstract @NotNull String toOSMXML();
 
     /**
      * Notifies this entity it's been added to the given way's node list
      * @param entity
      */
-    public abstract void didAddToEntity(OSMEntity entity);
-    public abstract void didRemoveFromEntity(OSMEntity entity, boolean entityWasDeleted);
-    public abstract void containedEntityWasDeleted(OSMEntity entity);
+    public abstract void didAddToEntity(@NotNull OSMEntity entity);
+    public abstract void didRemoveFromEntity(@NotNull OSMEntity entity, boolean entityWasDeleted);
+    public abstract void containedEntityWasDeleted(@NotNull OSMEntity entity);
 
     /**
      * Deletes this entity, removing if from any containing entities
      * @return true if this entity needs to be deleted from the OSM server, false otherwise
      */
-    public boolean didDelete(OSMEntitySpace fromSpace) {
+    public boolean didDelete(@NotNull OSMEntitySpace fromSpace) {
         //remove from any containing relations
         for(final OSMRelation relation : getContainingRelations().values()) {
             relation.containedEntityWasDeleted(this);
@@ -99,7 +101,7 @@ public abstract class OSMEntity {
      * @param entityToCopy
      * @param idOverride: if specified, will use this id instead of entityToCopy's OSM id
      */
-    public OSMEntity(final OSMEntity entityToCopy, final Long idOverride) {
+    public OSMEntity(final @NotNull OSMEntity entityToCopy, final @Nullable Long idOverride) {
         if(idOverride == null) {
             osm_id = entityToCopy.osm_id;
         } else {
@@ -114,7 +116,7 @@ public abstract class OSMEntity {
 
         copyMetadata(entityToCopy, this);
     }
-    protected void upgradeCompletionStatus(final OSMEntity completeEntity) {
+    protected void upgradeCompletionStatus(final @NotNull OSMEntity completeEntity) {
         if(complete != CompletionStatus.incomplete || osm_id != completeEntity.osm_id) {
             System.out.println("BAD UPGRADE " + osm_id + "/" + completeEntity.osm_id);
             return;
@@ -150,17 +152,17 @@ public abstract class OSMEntity {
 
     /**
      * Copy the value of the given tag (if present) between entities
-     * @param from
-     * @param to
-     * @param name
+     * @param from the entity to copy from
+     * @param to the entity to copy to
+     * @param name the tag name
      */
-    public static void copyTag(final OSMEntity from, final OSMEntity to, final String name) {
+    public static void copyTag(final @NotNull OSMEntity from, final @NotNull OSMEntity to, final @NotNull String name) {
         final String fromValue = from.getTag(name);
         if(fromValue != null) {
             to.setTag(name, fromValue);
         }
     }
-    protected static void copyMetadata(final OSMEntity from, final OSMEntity to) {
+    protected static void copyMetadata(final @NotNull OSMEntity from, final @NotNull OSMEntity to) {
         to.uid = from.uid;
         to.version = from.version;
         to.changeset = from.changeset;
@@ -169,11 +171,11 @@ public abstract class OSMEntity {
     }
     /**
      * Sets the given tag on this entity, only if it doesn't already exist
-     * @param name
-     * @param value
+     * @param name the tag name
+     * @param value the value to associate with the tag
      * @throws InvalidArgumentException
      */
-    public void addTag(final String name, final String value) throws InvalidArgumentException {
+    public void addTag(final @NotNull String name, final @NotNull String value) throws InvalidArgumentException {
         if(complete == CompletionStatus.incomplete) { //can't set a tag on an incomplete entity
             return;
         }
@@ -190,10 +192,10 @@ public abstract class OSMEntity {
 
     /**
      * Sets the given tag on this entity, replacing the previous value (if present)
-     * @param name
-     * @param value
+     * @param name the tag name
+     * @param value the value to use.  Will remove the tag if null.
      */
-    public boolean setTag(final String name, final String value) {
+    public boolean setTag(final @NotNull String name, final @Nullable String value) {
         if(complete == CompletionStatus.incomplete) { //can't set a tag on an incomplete entity
             return false;
         }
@@ -217,12 +219,27 @@ public abstract class OSMEntity {
      * Sets the multiple tags on this entity, replacing the previous value (if present)
      * @param tags The key/values pairs of the tags to assign
      */
-    public void setTags(final Map<String, String> tags) {
+    public void setTags(final @NotNull Map<String, String> tags) {
         for(final Map.Entry<String, String> keyTag : tags.entrySet()) {
             setTag(keyTag.getKey(), keyTag.getValue());
         }
     }
-    public boolean removeTag(final String name) {
+
+    public static boolean compareTags(@NotNull OSMEntity entity1, @NotNull OSMEntity entity2, @NotNull String tag) {
+        final String entityVal1 = entity1.getTag(tag),
+                entityVal2 = entity2.getTag(tag);
+        if(entityVal1 == null || entityVal2 == null) {
+            return false;
+        }
+        return entityVal1.equalsIgnoreCase(entityVal2);
+    }
+
+    /**
+     * Removes the given tag from this entity's tags
+     * @param name the tag name
+     * @return true if the tag was present, false if not
+     */
+    public boolean removeTag(final @NotNull String name) {
         if(complete == CompletionStatus.incomplete) { //can't set a tag on an incomplete entity
             return false;
         }
@@ -242,7 +259,8 @@ public abstract class OSMEntity {
      * @param mergeStrategy
      * @return Any tags that conflict (if checkForConflicts is TRUE), null otherwise
      */
-    public Map<String, String> copyTagsFrom(final OSMEntity otherEntity, final TagMergeStrategy mergeStrategy) {
+    @Nullable
+    public Map<String, String> copyTagsFrom(final @NotNull OSMEntity otherEntity, final @NotNull TagMergeStrategy mergeStrategy) {
         if(complete == CompletionStatus.incomplete) { //can't set a tag on an incomplete entity
             return null;
         }
@@ -300,15 +318,17 @@ public abstract class OSMEntity {
     public void markAsDeleted() {
         action = ChangeAction.delete;
     }
+    @NotNull
     public ChangeAction getAction() {
         return action;
     }
     /**
      * Get the value of the current tag
-     * @param key
-     * @return
+     * @param key the key name
+     * @return the value
      */
-    public final String getTag(final String key) {
+    @Nullable
+    public final String getTag(final @Nullable String key) {
         if(tags == null) {
             return null;
         }
@@ -316,16 +336,17 @@ public abstract class OSMEntity {
     }
     /**
      * Gets the full list of tags for this entity
-     * @return
+     * @return HashMap of tags
      */
+    @Nullable
     public final Map<String, String> getTags() {
         return tags;
     }
-    public boolean hasTag(final String name) {
+    public boolean hasTag(final @Nullable String name) {
         return tags != null && tags.containsKey(name);
     }
 
-    protected void addContainingRelation(final OSMRelation relation) {
+    protected void addContainingRelation(final @NotNull OSMRelation relation) {
         if(containingRelations == null) { //lazy-init the containing relations
             containingRelations = new HashMap<>(4);
         }
@@ -335,10 +356,11 @@ public abstract class OSMEntity {
         }
     }
     protected void removeContainingRelation(final OSMRelation relation) {
-        if(containingRelations != null && containingRelations.containsKey(relation.osm_id)) {
+        if(containingRelations != null) {
             containingRelations.remove(relation.osm_id);
         }
     }
+    @NotNull
     public HashMap<Long, OSMRelation> getContainingRelations() {
         if(containingRelations == null) {
             return new HashMap<>();
@@ -378,7 +400,11 @@ public abstract class OSMEntity {
             this.complete = complete;
         }
     }
-    public static String escapeForXML(final String str){
+    @NotNull
+    public static String escapeForXML(final @Nullable String str){
+        if(str == null) {
+            return "";
+        }
         final StringBuilder result = new StringBuilder(str.length());
         final StringCharacterIterator iterator = new StringCharacterIterator(str);
         char character = iterator.current();
@@ -407,7 +433,7 @@ public abstract class OSMEntity {
         }
         return result.toString();
     }
-    protected static String actionTagAttribute(final ChangeAction action) {
+    protected static String actionTagAttribute(final @NotNull ChangeAction action) {
         return action != ChangeAction.none ? String.format(ACTION_ATTRIBUTE_FORMAT, action.name()) : "";
     }
 }

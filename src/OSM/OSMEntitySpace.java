@@ -577,7 +577,9 @@ public class OSMEntitySpace {
             for (final OSMWay containingWay : containingWays.values()) {
                 containingWay.replaceNode(withNode, targetNode);
             }
-            targetNode.setCoordinate(withNode.getCentroid());
+            Point nodeCentroid = withNode.getCentroid();
+            assert nodeCentroid != null;
+            targetNode.setCoordinate(nodeCentroid);
         }
 
         //also replace the incoming entity's relation memberships with the target entity

@@ -1,5 +1,8 @@
 package OSM;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -24,16 +27,17 @@ public class OSMNode extends OSMEntity {
 
     /**
      * Copy constructor
-     * @param nodeToCopy
+     * @param nodeToCopy the node to copy tags etc from
+     * @param idOverride the id to use instead of nodeToCopy's
      */
-    public OSMNode(final OSMNode nodeToCopy, final Long idOverride) {
+    public OSMNode(final @NotNull OSMNode nodeToCopy, final @Nullable Long idOverride) {
         super(nodeToCopy, idOverride);
         if(complete != CompletionStatus.incomplete) {
             setCoordinate(nodeToCopy.coordinate);
         }
     }
     @Override
-    protected void upgradeCompletionStatus(final OSMEntity completeEntity) {
+    protected void upgradeCompletionStatus(@NotNull final OSMEntity completeEntity) {
         super.upgradeCompletionStatus(completeEntity);
         setCoordinate(((OSMNode) completeEntity).coordinate);
 
@@ -51,13 +55,14 @@ public class OSMNode extends OSMEntity {
         coordinate = new Point(x, y);
         boundingBox = null; //invalidate the bounding box
     }
-    public void setCoordinate(final Point coordinate) {
+    public void setCoordinate(final @NotNull Point coordinate) {
         if(this.coordinate != null && Point.distance(this.coordinate, coordinate) > Double.MIN_VALUE) { //mark as modified if changing (vs initial assignment)
             markAsModified();
         }
         this.coordinate = new Point(coordinate);
         boundingBox = null; //invalidate the bounding box
     }
+    @NotNull
     public HashMap<Long, OSMWay> getContainingWays() {
         if(containingWays == null) {
             return new HashMap<>();
@@ -89,6 +94,7 @@ public class OSMNode extends OSMEntity {
         return containingWayCount;
     }
 
+    @NotNull
     @Override
     public OSMType getType() {
         return type;
@@ -110,6 +116,7 @@ public class OSMNode extends OSMEntity {
         return coordinate;
     }
 
+    @NotNull
     @Override
     public String toOSMXML() {
         if(debugEnabled) {
@@ -144,7 +151,7 @@ public class OSMNode extends OSMEntity {
     }
 
     @Override
-    public void didAddToEntity(OSMEntity entity) {
+    public void didAddToEntity(@NotNull OSMEntity entity) {
         if(entity instanceof OSMWay) {
             final OSMWay way = (OSMWay) entity;
             if(containingWays == null) { //lazy init the containing ways
@@ -160,10 +167,10 @@ public class OSMNode extends OSMEntity {
     }
 
     @Override
-    public void didRemoveFromEntity(OSMEntity entity, boolean entityWasDeleted) {
+    public void didRemoveFromEntity(@NotNull OSMEntity entity, boolean entityWasDeleted) {
         if(entity instanceof OSMWay) { //remove the way from the containedWays list
             final OSMWay way = (OSMWay) entity;
-            if(containingWays != null && containingWays.containsKey(way.osm_id)) {
+            if(containingWays != null) {
                 containingWays.remove(way.osm_id);
             }
         } else if(entity instanceof OSMRelation) {
@@ -172,12 +179,12 @@ public class OSMNode extends OSMEntity {
     }
 
     @Override
-    public void containedEntityWasDeleted(OSMEntity entity) {
+    public void containedEntityWasDeleted(@NotNull OSMEntity entity) {
         //nodes can't contain other entities
     }
 
     @Override
-    public boolean didDelete(OSMEntitySpace fromSpace) {
+    public boolean didDelete(@NotNull OSMEntitySpace fromSpace) {
         //remove this node from any containing ways
         for(final OSMWay way : getContainingWays().values()) {
             way.containedEntityWasDeleted(this);

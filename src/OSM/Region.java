@@ -1,10 +1,13 @@
 package OSM;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 /**
  * Created by nick on 10/29/15.
  */
 public class Region {
-    public Point origin, extent;
+    public @NotNull Point origin, extent;
 
     /**
      * Determines whether the regions intersect
@@ -12,7 +15,7 @@ public class Region {
      * @param region2
      * @return
      */
-    public static boolean intersects(final Region region1, final Region region2) {
+    public static boolean intersects(final @NotNull Region region1, final @NotNull Region region2) {
         return !(region1.extent.x < region2.origin.x ||
                 region1.origin.x > region2.extent.x ||
                 region1.extent.y < region2.origin.y ||
@@ -25,7 +28,7 @@ public class Region {
      * @param region2
      * @return
      */
-    public static boolean contains(final Region region1, final Region region2) {
+    public static boolean contains(final @NotNull Region region1, final @NotNull Region region2) {
         return region1.origin.y <= region2.origin.y &&
                 region1.extent.y >= region2.extent.y &&
                 region1.origin.x <= region2.origin.x &&
@@ -38,7 +41,8 @@ public class Region {
      * @param region2
      * @return
      */
-    public static Region union(final Region region1, final Region region2) {
+    @NotNull
+    public static Region union(final @NotNull Region region1, final @NotNull Region region2) {
         final Point unionOrigin = new Point(Math.min(region1.origin.x, region2.origin.x), Math.min(region1.origin.y, region2.origin.y));
         final Point unionExtent = new Point(Math.max(region1.extent.x, region2.extent.x), Math.max(region1.extent.y, region2.extent.y));
         return new Region(unionOrigin, unionExtent);
@@ -49,7 +53,8 @@ public class Region {
      * @param region2
      * @return
      */
-    public static Region intersection(final Region region1, final Region region2) {
+    @Nullable
+    public static Region intersection(final @NotNull Region region1, final @NotNull Region region2) {
         final double xmin = Math.max(region1.origin.y, region2.origin.y);
         final double xmax = Math.min(region1.extent.y, region2.extent.y);
         if (xmax > xmin) {
@@ -81,7 +86,7 @@ public class Region {
         maxLon = Math.max(region1.extent.x, region2.extent.x);
         return new Region(new Point(minLat, minLon), new Point(maxLat, maxLon));
     }*/
-    public Region(final Point origin, final Point extent) {
+    public Region(final @NotNull Point origin, final @NotNull Point extent) {
         this.origin = new Point(origin.x, origin.y);
         this.extent = new Point(extent.x, extent.y);
     }
@@ -89,7 +94,7 @@ public class Region {
         origin = new Point(x, y);
         extent = new Point(x + deltaX, y + deltaY);
     }
-    public Region(final Point[] includedPoints) {
+    public Region(final @NotNull Point[] includedPoints) {
         final Point point1 = includedPoints[0], point2 = includedPoints[1];
         origin = new Point(Math.min(point1.x, point2.x), Math.min(point1.y, point2.y));
         extent = new Point(Math.max(point1.x, point2.x), Math.max(point1.y, point2.y));
@@ -101,7 +106,7 @@ public class Region {
      * Copy constructor
      * @param regionToCopy the region to copy
      */
-    public Region(final Region regionToCopy) {
+    public Region(final @NotNull Region regionToCopy) {
         origin = new Point(regionToCopy.origin.x, regionToCopy.origin.y);
         extent = new Point(regionToCopy.extent.x, regionToCopy.extent.y);
     }
@@ -110,7 +115,7 @@ public class Region {
      * Expand this region to include the given point
      * @param point
      */
-    public void includePoint(final Point point) {
+    public void includePoint(final @NotNull Point point) {
         if(containsPoint(point)) { //bail if the point's already included within the region
             return;
         }
@@ -129,10 +134,7 @@ public class Region {
             extent = new Point(extent.x, point.y);
         }
     }
-    public void combinedBoxWithRegion(final Region otherRegion) {
-        if(otherRegion == null) {
-            return;
-        }
+    public void combinedBoxWithRegion(final @NotNull Region otherRegion) {
         double oY = Math.min(origin.y, otherRegion.origin.y), oX = Math.min(origin.x, otherRegion.origin.x);
         double eY = Math.max(extent.y, otherRegion.extent.y), eX = Math.max(extent.x, otherRegion.extent.x);
         origin = new Point(oX, oY);
@@ -151,7 +153,7 @@ public class Region {
      * @param point
      * @return
      */
-    public boolean containsPoint(final Point point) {
+    public boolean containsPoint(final @NotNull Point point) {
         return !(point.y < origin.y || point.y > extent.y || point.x < origin.x || point.x > extent.x);
     }
 
@@ -162,6 +164,7 @@ public class Region {
     public Region regionInset(final double bufferX, final double bufferY) {
         return new Region(origin.x + 0.5 * bufferX, origin.y + 0.5 * bufferY, extent.x - origin.x - bufferX, extent.y - origin.y - bufferY);
     }
+    @NotNull
     public Point getCentroid() {
         return new Point(0.5 * (origin.x + extent.x), 0.5 * (origin.y + extent.y));
     }
@@ -208,7 +211,8 @@ public class Region {
 
         return centroid;
     }*/
-    public static Point computeCentroid2(final Point[] vertices) {
+    @Nullable
+    public static Point computeCentroid2(final @NotNull Point[] vertices) {
         if(vertices.length < 2) {
             return null;
         }
