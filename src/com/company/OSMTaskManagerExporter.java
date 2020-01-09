@@ -182,7 +182,9 @@ public class OSMTaskManagerExporter {
                 //create a sub-box if the boxRegion contains at least one of the desired node types
                 final DividedBox box = new DividedBox(boxRegion);
                 for(final StopArea entity : filteredEntities) {
-                    if(Region.intersects(boxRegion, entity.getPlatform().getBoundingBox())) {
+                    Region platformRegion = entity.getPlatform().getBoundingBox();
+                    assert platformRegion != null;
+                    if(Region.intersects(boxRegion, platformRegion)) {
                         box.containedEntities.add(entity.getPlatform());
                     }
                 }
