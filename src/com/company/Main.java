@@ -5,6 +5,7 @@ import NewPathFinding.PathTree;
 import OSM.OSMEntity;
 import OSM.OSMEntitySpace;
 import OSM.OSMRelation;
+import Overpass.Exceptions;
 import Overpass.OverpassConverter;
 import org.xml.sax.SAXException;
 
@@ -41,6 +42,7 @@ public class Main {
 
         List<String> argList = new ArrayList<>(args.length);
         Collections.addAll(argList, args);
+
         ListIterator<String> argIterator = argList.listIterator();
         while(argIterator.hasNext()) {
             switch (argIterator.next()) {
@@ -54,7 +56,7 @@ public class Main {
                     break;
                 case "-r": //requested routes
                 case "--routes":
-                    String gtfsRoutes[] = argIterator.next().split(",");
+                    String[] gtfsRoutes = argIterator.next().split(",");
                     selectedRoutes = new ArrayList<>(gtfsRoutes.length);
                     Collections.addAll(selectedRoutes, gtfsRoutes);
                     break;
@@ -97,10 +99,10 @@ public class Main {
         try {
             Config.initWithConfigFile(configPath);
             //define the options for the comparison routines TODO load from config
-            matchingOptions.segmentSearchBoxSize = 30.0; //NOTE: higher values (60+ may result in false positives and "short-circuited" loops, depending on the routes)
+            matchingOptions.segmentSearchBoxSize = 40.0; //NOTE: higher values (60+ may result in false positives and "short-circuited" loops, depending on the routes)
             matchingOptions.maxSegmentLength = 10.0;
-            matchingOptions.setMaxSegmentAngle(50.0);
-            matchingOptions.setMaxFutureVectorAngle(75.0);
+            matchingOptions.setMaxSegmentAngle(85.0);
+            matchingOptions.setMaxFutureVectorAngle(85.0);
             matchingOptions.maxSegmentOrthogonalDistance = 15.0;
             matchingOptions.maxSegmentMidPointDistance = Math.sqrt(matchingOptions.maxSegmentOrthogonalDistance * matchingOptions.maxSegmentOrthogonalDistance + 4.0 * matchingOptions.maxSegmentLength * matchingOptions.maxSegmentLength);
         } catch (FileNotFoundException | FileSystemException e) {
@@ -175,7 +177,6 @@ public class Main {
                     importRouteMasterRelations.add(relation);
                 }
             }
-            allGTFSRoutesSpace = workingImportSpace = null; //import data no longer needed
 
             if(selectedRoutes.size() > 0) {
                 System.out.format("WARNING: No data found for routes: " + String.join(", ", selectedRoutes));
@@ -266,7 +267,7 @@ public class Main {
 
             //also output the full working space to a .osm file
             routeDataManager.outputXml(String.format("%s/workingspace_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
-        } catch (IOException | ParserConfigurationException | SAXException | InvalidArgumentException e) {
+        } catch (IOException | ParserConfigurationException | SAXException | InvalidArgumentException | Exceptions.UnknownOverpassError e) {
             e.printStackTrace();
         }
     }
