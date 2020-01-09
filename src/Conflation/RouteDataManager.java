@@ -1,6 +1,7 @@
 package Conflation;
 
 import OSM.*;
+import Overpass.Exceptions;
 import Overpass.OverpassConverter;
 import com.company.Config;
 import com.company.InvalidArgumentException;
@@ -23,7 +24,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
         name = "Working space";
     }
 
-    public boolean downloadRegionsForImportDataset(final List<RouteConflator> routeConflators, final RouteConflator.LineComparisonOptions wayMatchingOptions, final boolean cachingEnabled) throws InvalidArgumentException {
+    public boolean downloadRegionsForImportDataset(final List<RouteConflator> routeConflators, final RouteConflator.LineComparisonOptions wayMatchingOptions, final boolean cachingEnabled) throws InvalidArgumentException, Exceptions.UnknownOverpassError {
 
         //get a handle on the route path geometries for the subroutes
         final List<OSMWay> routePaths = new ArrayList<>(routeConflators.size() * 4);
@@ -309,7 +310,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
                     return;
             }
             converter.fetchFromOverpass(query, cachingEnabled);
-        } catch (InvalidArgumentException e) {
+        } catch (InvalidArgumentException | Exceptions.UnknownOverpassError e) {
             e.printStackTrace();
             return;
         }
