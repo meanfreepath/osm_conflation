@@ -3,12 +3,12 @@ package Overpass;
 import com.company.Config;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
@@ -19,14 +19,14 @@ import java.util.HashMap;
  * A simple Java wrapper for the OpenStreetMap Overpass API
  */
 public class ApiClient {
-    public final static int CONNECT_TIMEOUT = 5000, READ_TIMEOUT = 25000, MIN_QUERY_WAIT_TIME = 2000;
-    public final static String ENDPOINT_URL = "http://overpass-api.de/api/interpreter";
+    private final static int CONNECT_TIMEOUT = 5000, READ_TIMEOUT = 25000, MIN_QUERY_WAIT_TIME = 4000;
+    private final static String ENDPOINT_URL = "http://overpass-api.de/api/interpreter";
     private final static String QUERY_TEMPLATE = "[out:%s];%sout meta;", GEOJSON_QUERY_TEMPLATE = "[out:%s];%sout body geom;";
 
     /**
      * The maximum age (in ms) of cached data files
      */
-    private long maxCacheAge = 900000;
+    private long maxCacheAge = 1800000L;
 
     public enum ResponseFormat {
         json, xml
@@ -57,7 +57,7 @@ public class ApiClient {
     }
     private static String generateCacheFileName(final String query) throws NoSuchAlgorithmException {
         final MessageDigest md5 = MessageDigest.getInstance("MD5");
-        final byte[] digest = md5.digest(query.getBytes(Charset.forName("UTF-8")));
+        final byte[] digest = md5.digest(query.getBytes(StandardCharsets.UTF_8));
         return String.format("%s/cache_%s.txt", Config.sharedInstance.cacheDirectory, Base64.getUrlEncoder().encodeToString(digest));
     }
     /**
@@ -104,9 +104,7 @@ public class ApiClient {
 
             //wait a little before making the next request (avoid Overpass API query limitations)
             Thread.sleep(MIN_QUERY_WAIT_TIME);
-        } catch (Exceptions.OverpassError | IOException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
+        } catch (Exceptions.OverpassError | IOException | InterruptedException e) {
             e.printStackTrace();
         }
 
@@ -126,8 +124,8 @@ public class ApiClient {
      * @param featureType
      * @param regex
      */
-    public void search(String featureType, boolean regex) {
-        throw new NotImplementedException();
+    public void search(String featureType, boolean regex) throws Exception {
+        throw new Exception("Not implemented");
     }
     private String constructQLQuery(String userQuery, boolean asGeoJSON) {
         String rawQuery = userQuery;
@@ -156,8 +154,8 @@ public class ApiClient {
     private String getFromOverpass(String query) throws Exceptions.OverpassSyntaxError, Exceptions.MultipleRequestsError, Exceptions.ServerLoadError, Exceptions.UnknownOverpassError, IOException {
         HashMap<String, String> payload = new HashMap<>(1);
         payload.put("data", query);
+        System.out.println("Fetch " + query);
 
-        Charset charset = Charset.forName("UTF-8"); //use UTF-8 for all requests
         URL endpointUrl = new URL(ENDPOINT_URL);
         HttpURLConnection connection = (HttpURLConnection) endpointUrl.openConnection();
         connection.setDoInput(true);
@@ -168,13 +166,13 @@ public class ApiClient {
         connection.connect();
 
         OutputStream output = connection.getOutputStream();
-        output.write(query.getBytes(charset));
+        output.write(query.getBytes(StandardCharsets.UTF_8));
 
         status = connection.getResponseCode();
         switch (status) {
             case HttpURLConnection.HTTP_OK:
                 InputStream response = connection.getInputStream();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(response, charset));
+                BufferedReader reader = new BufferedReader(new InputStreamReader(response, StandardCharsets.UTF_8));
                 StringBuilder builder = new StringBuilder();
                 for (String line; (line = reader.readLine()) != null;) {
                     builder.append(line);
