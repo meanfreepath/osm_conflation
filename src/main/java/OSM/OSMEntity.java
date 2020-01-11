@@ -1,6 +1,6 @@
 package OSM;
 
-import com.company.InvalidArgumentException;
+import Importer.InvalidArgumentException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

@@ -1,6 +1,6 @@
 package OSM;
 
-import com.company.InvalidArgumentException;
+import Importer.InvalidArgumentException;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;

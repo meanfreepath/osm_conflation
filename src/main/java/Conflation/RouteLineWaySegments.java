@@ -1,10 +1,10 @@
 package Conflation;
 
+import Importer.InvalidArgumentException;
 import OSM.OSMNode;
 import OSM.OSMWay;
 import OSM.Point;
 import OSM.Region;
-import com.company.InvalidArgumentException;
 
 import java.lang.ref.WeakReference;
 import java.util.*;

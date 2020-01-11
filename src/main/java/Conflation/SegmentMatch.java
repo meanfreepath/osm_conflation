@@ -6,7 +6,7 @@ import OSM.OSMWay;
 import OSM.Point;
 import OSM.Region;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.zip.CRC32;
 
 /**
@@ -33,7 +33,7 @@ public class SegmentMatch {
 
     public static long idForParameters(final RouteLineSegment routeLineSegment, final OSMLineSegment osmLineSegment) {
         idGenerator.reset();
-        idGenerator.update(String.format("SM:%d:%d", routeLineSegment.id, osmLineSegment.id).getBytes(Charset.forName("ascii")));
+        idGenerator.update(String.format("SM:%d:%d", routeLineSegment.id, osmLineSegment.id).getBytes(StandardCharsets.US_ASCII));
         return idGenerator.getValue();
     }
     public SegmentMatch(final RouteLineSegment routeLineSegment, final OSMLineSegment osmLineSegment, final double orthDistance, final double midDistance, final double dotProduct, final RouteConflator.LineComparisonOptions options) {

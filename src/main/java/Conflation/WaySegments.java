@@ -1,10 +1,13 @@
 package Conflation;
 
+import Importer.InvalidArgumentException;
 import OSM.*;
-import com.company.InvalidArgumentException;
 
 import java.lang.ref.WeakReference;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.ListIterator;
 
 /**
  * Container for an OSM way and its calculated line segments

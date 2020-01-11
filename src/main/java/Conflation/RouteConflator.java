@@ -1,11 +1,13 @@
 package Conflation;
 
+import Importer.Config;
+import Importer.InvalidArgumentException;
 import NewPathFinding.PathTree;
-import OSM.*;
-import com.company.Config;
-import com.company.InvalidArgumentException;
+import OSM.OSMEntity;
+import OSM.OSMNode;
+import OSM.OSMRelation;
+import OSM.OSMWay;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.*;

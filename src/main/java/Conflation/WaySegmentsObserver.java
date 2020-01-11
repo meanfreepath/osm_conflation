@@ -1,7 +1,7 @@
 package Conflation;
 
+import Importer.InvalidArgumentException;
 import OSM.OSMNode;
-import com.company.InvalidArgumentException;
 
 /**
  * Created by nick on 2/7/16.

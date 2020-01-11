@@ -1,8 +1,11 @@
 package NewPathFinding;
 
 import Conflation.*;
-import OSM.*;
-import com.company.InvalidArgumentException;
+import Importer.InvalidArgumentException;
+import OSM.OSMEntity;
+import OSM.OSMEntitySpace;
+import OSM.OSMNode;
+import OSM.Point;
 
 import java.nio.charset.Charset;
 import java.util.*;

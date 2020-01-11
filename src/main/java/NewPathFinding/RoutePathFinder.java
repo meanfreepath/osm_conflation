@@ -1,9 +1,9 @@
 package NewPathFinding;
 
 import Conflation.*;
+import Importer.Config;
+import Importer.InvalidArgumentException;
 import OSM.*;
-import com.company.Config;
-import com.company.InvalidArgumentException;
 
 import java.io.IOException;
 import java.util.ArrayList;

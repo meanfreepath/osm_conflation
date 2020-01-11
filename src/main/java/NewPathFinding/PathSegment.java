@@ -1,10 +1,10 @@
 package NewPathFinding;
 
 import Conflation.*;
+import Importer.InvalidArgumentException;
 import OSM.OSMEntity;
 import OSM.OSMNode;
 import OSM.Point;
-import com.company.InvalidArgumentException;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;

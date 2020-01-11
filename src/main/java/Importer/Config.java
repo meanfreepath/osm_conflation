@@ -1,4 +1,4 @@
-package com.company;
+package Importer;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -29,7 +29,7 @@ public class Config {
         outputDirectory = "./output";
         cacheDirectory = "./cache";
 
-        String dirs[] = {outputDirectory, cacheDirectory};
+        String[] dirs = {outputDirectory, cacheDirectory};
         for(final String dir : dirs) {
             File workingDir = new File("./" + dir);
             if (!workingDir.exists() && !workingDir.mkdir()) {

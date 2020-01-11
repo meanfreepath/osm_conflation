@@ -1,7 +1,7 @@
 package Overpass;
 
+import Importer.InvalidArgumentException;
 import OSM.*;
-import com.company.InvalidArgumentException;
 import org.json.JSONArray;
 import org.json.JSONObject;
 

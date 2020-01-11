@@ -1,10 +1,10 @@
 package Conflation;
 
+import Importer.Config;
+import Importer.InvalidArgumentException;
 import OSM.*;
 import Overpass.Exceptions;
 import Overpass.OverpassConverter;
-import com.company.Config;
-import com.company.InvalidArgumentException;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;

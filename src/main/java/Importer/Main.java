@@ -1,4 +1,4 @@
-package com.company;
+package Importer;
 
 import Conflation.*;
 import NewPathFinding.PathTree;
@@ -18,16 +18,16 @@ public class Main {
     private static boolean debugEnabled = false;
     private static String getHelpText() {
         Main m = new Main();
-        InputStream f = m.getClass().getResourceAsStream("/cli_help.txt");
-        BufferedReader r = new BufferedReader(new InputStreamReader(f));
         StringBuilder helpBuffer = new StringBuilder(1024);
         try {
+            InputStream f = m.getClass().getResourceAsStream("cli_help.txt");
+            BufferedReader r = new BufferedReader(new InputStreamReader(f));
             for(int c; (c = r.read()) != -1;) {
                 helpBuffer.append((char) c);
             }
             r.close();
             f.close();
-        } catch (IOException e) {
+        } catch (IOException | NullPointerException e) {
             e.printStackTrace();
             return "Error loading help text!\n";
         }
@@ -85,12 +85,12 @@ public class Main {
         }
 
         if(selectedRoutes == null) {
-            System.out.format("FATAL: Please include at least 1 GTFS route id, using the -r option\n%s", getHelpText());
+            System.err.format("FATAL: Please include at least 1 GTFS route id, using the -r option\n%s", getHelpText());
             System.exit(1);
         }
         File importFile = new File(importFileName);
         if(!importFile.exists()) {
-            System.out.format("FATAL: Unable to open import file “%s”\n", importFileName);
+            System.err.format("FATAL: Unable to open import file “%s”\n", importFileName);
             System.exit(1);
         }
 
@@ -181,7 +181,7 @@ public class Main {
             if(selectedRoutes.size() > 0) {
                 System.out.format("WARNING: No data found for routes: " + String.join(", ", selectedRoutes));
                 if(importRouteMasterRelations.size() == 0) { //bail if no routes to process
-                    System.out.format("FATAL: No valid routes to process\n");
+                    System.err.format("FATAL: No valid routes to process\n");
                     System.exit(1);
                 }
             }
@@ -195,7 +195,7 @@ public class Main {
 
             //bail if no valid routes to process
             if(RouteConflator.allConflators.size() == 0) {
-                System.out.format("FATAL: no valid routes to process\n");
+                System.err.format("FATAL: no valid routes to process\n");
                 System.exit(1);
             }
 

@@ -3,7 +3,6 @@ package Conflation;
 import OSM.OSMNode;
 import OSM.Point;
 import OSM.Region;
-import OSM.SphericalMercator;
 
 import java.nio.charset.Charset;
 import java.text.DecimalFormat;

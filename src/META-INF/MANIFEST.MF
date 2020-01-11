@@ -1,3 +1,0 @@
-Manifest-Version: 1.0
-Class-Path: /Library/Java/JavaVirtualMachines/jdk1.8.0_51.jdk/Contents/Home/jre/lib/javaws.jar
-Main-Class: com.company.Main

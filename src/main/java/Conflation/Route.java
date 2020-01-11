@@ -1,10 +1,10 @@
 package Conflation;
 
+import Importer.Config;
+import Importer.InvalidArgumentException;
 import NewPathFinding.PathTree;
 import NewPathFinding.RoutePathFinder;
 import OSM.*;
-import com.company.Config;
-import com.company.InvalidArgumentException;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
