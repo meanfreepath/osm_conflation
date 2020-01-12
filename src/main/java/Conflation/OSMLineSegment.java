@@ -31,9 +31,4 @@ public class OSMLineSegment extends LineSegment {
     public String toString() {
         return String.format("OSMSeg #%d (way %d) #%d/%d [%.01f, %.01f], nd[%d/%d]",  id, parentSegments.way.osm_id, segmentIndex, nodeIndex, midPoint.x, midPoint.y, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
-    /*@Override
-    public void finalize() throws Throwable {
-        System.out.println("OSMSEGDELETE " + this);
-        super.finalize();
-    }*/
 }

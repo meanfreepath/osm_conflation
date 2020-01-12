@@ -29,11 +29,10 @@ public class SegmentMatch {
     public final short type;
     public final PathSegment.TravelDirection travelDirection;
 
-    public static int totalCount = 0;
-
     public static long idForParameters(final RouteLineSegment routeLineSegment, final OSMLineSegment osmLineSegment) {
         idGenerator.reset();
-        idGenerator.update(String.format("SM:%d:%d", routeLineSegment.id, osmLineSegment.id).getBytes(StandardCharsets.US_ASCII));
+        byte[] idBase = String.format("SM:%d:%d", routeLineSegment.id, osmLineSegment.id).getBytes(StandardCharsets.US_ASCII);
+        idGenerator.update(idBase, 0, idBase.length);
         return idGenerator.getValue();
     }
     public SegmentMatch(final RouteLineSegment routeLineSegment, final OSMLineSegment osmLineSegment, final double orthDistance, final double midDistance, final double dotProduct, final RouteConflator.LineComparisonOptions options) {
@@ -60,7 +59,6 @@ public class SegmentMatch {
             matchType |= matchTypeTravelDirection;
         }
         type = matchType;
-        totalCount++;
     }
 
     /**
@@ -205,11 +203,5 @@ public class SegmentMatch {
     @Override
     public String toString() {
         return String.format("SegMatch %s/%s::: O/M: %.01f/%.03f, DP %.03f, matchType: %d", mainSegment, matchingSegment, orthogonalDistance, midPointDistance, dotProduct, type);
-    }
-    @Override
-    public void finalize() throws Throwable {
-        totalCount--;
-      //  System.out.println("SMATCHDELETE " + this);
-        super.finalize();
     }
 }

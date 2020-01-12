@@ -255,9 +255,4 @@ public class RouteLineSegment extends LineSegment {
     public String toString() {
         return String.format("RLSeg #%d [%d/%d] [%.01f, %.01f], nd[%d/%d]", id, segmentIndex, nodeIndex, midPoint.x, midPoint.y, originNode != null ? originNode.osm_id : 0, destinationNode != null ? destinationNode.osm_id : 0);
     }
-    /*@Override
-    public void finalize() throws Throwable {
-        System.out.println("RLSEGDELETE " + this);
-        super.finalize();
-    }*/
 }

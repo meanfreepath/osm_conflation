@@ -314,11 +314,6 @@ public class PathSegment implements WaySegmentsObserver {
             return String.format("%s (%d): %d to %s going %s [status “%s”]", line.way.getTag(OSMEntity.KEY_NAME), line.way.osm_id, originNode.osm_id, endNode != null ? Long.toString(endNode.osm_id) : "NONE", travelDirection.toString(), processingStatus.toString());
         }
     }
-    /*z@Override
-    public void finalize() throws Throwable {
-        System.out.println("PATHSEGDESTROY " + this);
-        super.finalize();
-    }*/
 
     @Override
     public void waySegmentsWasSplit(WaySegments originalWaySegments, OSMNode[] splitNodes, WaySegments[] splitWaySegments) throws InvalidArgumentException {

@@ -173,11 +173,6 @@ public class Path {
         final String lastNodeId = lastPathSegment.getEndNode() != null ? Long.toString(lastPathSegment.getEndNode().osm_id) : "N/A";
         return String.format("Path[%d->%s] outcome %s: %s", firstPathSegment.getOriginNode().osm_id, lastNodeId, outcome.toString(), String.join("->", streets));
     }
-    /*@Override
-    public void finalize() throws Throwable {
-        System.out.println("PATHDESTROY " + this);
-        super.finalize();
-    }*/
     /**
      * Checks the PathSegments' originating/ending nodes and splits any ways that extend past them
      * Only needs to be called on the "best" path
