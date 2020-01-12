@@ -3,8 +3,10 @@ package Conflation;
 import OSM.OSMNode;
 import OSM.Point;
 import OSM.Region;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.util.zip.CRC32;
 
@@ -29,6 +31,7 @@ public abstract class LineSegment {
     public final double vectorX, vectorY, orthogonalVectorX, orthogonalVectorY, midPointX, midPointY;
     public final double vectorMagnitude;
     public final double length;
+    @NotNull
     public final Region boundingBox;
 
     /**
@@ -38,12 +41,13 @@ public abstract class LineSegment {
      * @param destination Origin point of the LineSegment
      * @return CRC32 hash of a string generated form origin/destination
      */
-    private static long generateIdForPoints(final Point origin, final Point destination) {
+    private static long generateIdForPoints(@NotNull Point origin, @NotNull Point destination) {
         idGenerator.reset();
-        idGenerator.update(String.format(ID_HASH_FORMAT, origin.y, origin.x, destination.y, destination.x).getBytes(Charset.forName("ascii")));
+        byte[] idData = String.format(ID_HASH_FORMAT, origin.y, origin.x, destination.y, destination.x).getBytes(StandardCharsets.US_ASCII);
+        idGenerator.update(idData, 0, idData.length);
         return idGenerator.getValue();
     }
-    protected LineSegment(final Point origin, final Point destination, final OSMNode originNode, final OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
+    protected LineSegment(@NotNull Point origin, @NotNull Point destination, @Nullable OSMNode originNode, @Nullable OSMNode destinationNode, final int segmentIndex, final int nodeIndex) {
         originPoint = origin;
         destinationPoint = destination;
         this.originNode = originNode;
@@ -106,10 +110,11 @@ public abstract class LineSegment {
 
     /**
      * Finds the closest point on this segment to the given point
-     * @param point
-     * @return
+     * @param point the point to check
+     * @return the closest point on this segment
      */
-    public Point closestPointToPoint(final Point point) {
+    @NotNull
+    public Point closestPointToPoint(@NotNull Point point) {
         final double apX = point.x - originPoint.x;
         final double apY = point.y - originPoint.y;
 

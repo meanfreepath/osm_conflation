@@ -16,11 +16,27 @@ import java.util.*;
 
 public class Main {
     private static boolean debugEnabled = false;
+    private final static String ANSI_RESET, ANSI_GREEN, ANSI_YELLOW, ANSI_RED, ANSI_BLUE;
+
+    static {
+        // enable terminal colors for Linux/Mac users
+        final String OS = System.getProperty("os.name").toLowerCase();
+        if(OS.contains("mac") || OS.contains("nix") || OS.contains("nux")) {
+            ANSI_RESET = "\u001B[0m";
+            ANSI_GREEN = "\u001B[32m";
+            ANSI_YELLOW = "\u001B[33m";
+            ANSI_RED = "\u001B[31m";
+            ANSI_BLUE = "\u001B[34m";
+        } else {
+            ANSI_RESET = ANSI_GREEN = ANSI_YELLOW = ANSI_RED = ANSI_BLUE = "";
+        }
+    }
+
     private static String getHelpText() {
         Main m = new Main();
         StringBuilder helpBuffer = new StringBuilder(1024);
         try {
-            InputStream f = m.getClass().getResourceAsStream("cli_help.txt");
+            InputStream f = m.getClass().getResourceAsStream("/cli_help.txt");
             BufferedReader r = new BufferedReader(new InputStreamReader(f));
             for(int c; (c = r.read()) != -1;) {
                 helpBuffer.append((char) c);
@@ -85,12 +101,12 @@ public class Main {
         }
 
         if(selectedRoutes == null) {
-            System.err.format("FATAL: Please include at least 1 GTFS route id, using the -r option\n%s", getHelpText());
+            System.err.format("%sFATAL: Please include at least 1 GTFS route id, using the -r option%s\n%s", ANSI_RED, ANSI_RESET, getHelpText());
             System.exit(1);
         }
         File importFile = new File(importFileName);
         if(!importFile.exists()) {
-            System.err.format("FATAL: Unable to open import file “%s”\n", importFileName);
+            System.err.format("%sFATAL: Unable to open import file “%s”%s\n",  ANSI_RED, importFileName, ANSI_RESET);
             System.exit(1);
         }
 
@@ -181,7 +197,7 @@ public class Main {
             if(selectedRoutes.size() > 0) {
                 System.out.format("WARNING: No data found for routes: " + String.join(", ", selectedRoutes));
                 if(importRouteMasterRelations.size() == 0) { //bail if no routes to process
-                    System.err.format("FATAL: No valid routes to process\n");
+                    System.err.format("%sFATAL: No valid routes to process%s\n", ANSI_RED, ANSI_RESET);
                     System.exit(1);
                 }
             }
@@ -195,7 +211,7 @@ public class Main {
 
             //bail if no valid routes to process
             if(RouteConflator.allConflators.size() == 0) {
-                System.err.format("FATAL: no valid routes to process\n");
+                System.err.format("%sFATAL: no valid routes to process%s\n", ANSI_RED, ANSI_RESET);
                 System.exit(1);
             }
 
@@ -211,7 +227,7 @@ public class Main {
                 stopPlatformSpace.setCanUpload(true);
                 final String stopsFileName = String.format("%s/routestops_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds));
                 stopPlatformSpace.outputXml(stopsFileName);
-                System.out.format("INFO: outputted stops data to %s\n", stopsFileName);
+                System.out.format("%sINFO: outputted stops data to %s%s\n", ANSI_GREEN, stopsFileName, ANSI_RESET);
                 System.exit(0);
             } else { //otherwise, fetch all ways from OSM that are within the routes' bounding boxes
                 routeDataManager.downloadRegionsForImportDataset(RouteConflator.allConflators, matchingOptions, overpassCachingEnabled);
@@ -231,6 +247,7 @@ public class Main {
             }
 
             //if all routes fully matched, add the completed route relation to the output file for review and upload
+            String workingImportSpaceFileName = String.format("%s/workingspace_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds));
             if(successfullyMatchedRouteMasters == RouteConflator.allConflators.size()) {
                 for (final RouteConflator routeConflator : RouteConflator.allConflators) {
                     relationSpace.addEntity(routeConflator.getExportRouteMaster(), OSMEntity.TagMergeStrategy.keepTags, null, true, 0);
@@ -262,11 +279,13 @@ public class Main {
                 relationSpace.setCanUpload(true);
                 final String uploadFileName = String.format("%s/relations_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds));
                 relationSpace.outputXml(uploadFileName);
-                System.out.format("INFO: SUCCESS! Outputted uploadable OSM file to %s\n", uploadFileName);
+                System.out.format("%sINFO: SUCCESS! Outputted uploadable OSM file to %s%s\n", ANSI_GREEN, uploadFileName, ANSI_RESET);
+            } else {
+                System.out.format("%sWARNING: Unable to import one or more routes: see the %s file for more details%s\n", ANSI_YELLOW, workingImportSpaceFileName, ANSI_RESET);
             }
 
             //also output the full working space to a .osm file
-            routeDataManager.outputXml(String.format("%s/workingspace_%s.osm", Config.sharedInstance.outputDirectory, String.join("_", routeIds)));
+            routeDataManager.outputXml(workingImportSpaceFileName);
         } catch (IOException | ParserConfigurationException | SAXException | InvalidArgumentException | Exceptions.UnknownOverpassError e) {
             e.printStackTrace();
         }

@@ -13,8 +13,8 @@ public class Graph {
         public final HashSet<Edge> outEdges;
         public Node(long osm_id) {
             this.osm_id = osm_id;
-            inEdges = new HashSet<Edge>();
-            outEdges = new HashSet<Edge>();
+            inEdges = new HashSet<>();
+            outEdges = new HashSet<>();
         }
         public Node addEdge(Node node){
             Edge e = new Edge(this, node);
@@ -72,7 +72,7 @@ public class Graph {
         ArrayList<Node> L = new ArrayList<>(relationNodes.size());
 
         //S <- Set of all nodes with no incoming edges
-        HashSet<Node> S = new HashSet<Node>();
+        HashSet<Node> S = new HashSet<>();
         for(Node n : relationNodes.values()){
             if(n.inEdges.size() == 0){
                 S.add(n);

@@ -1,6 +1,8 @@
 package Conflation;
 
 import OSM.*;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
@@ -24,26 +26,31 @@ public class RouteLineSegment extends LineSegment {
     /**
      * The parent line of this segment
      */
+    @NotNull
     public final RouteLineWaySegments parentSegments;
 
     /**
      * The OSMLineSegment matches, keyed by their way's OSM id
      */
+    @NotNull
     private final Map<Long, List<SegmentMatch>> matchingSegments;
 
     /**
      * The OSMLineSegment matches, keyed by the match's id
      */
+    @NotNull
     private final Map<Long, SegmentMatch> matchingSegmentsById;
 
     /**
      * A list of the best matches, keyed by their way's OSM id
      */
+    @NotNull
     public final Map<Long, SegmentMatch> bestMatchForLine;
 
     /**
      * The best overall match for this segment, based on distance and dot product
      */
+    @Nullable
     public SegmentMatch bestMatchOverall = null;
 
     /**
@@ -64,7 +71,7 @@ public class RouteLineSegment extends LineSegment {
      * @param segmentIndex the index of this segment within its parent
      * @param nodeIndex the index of this segment's originNode within its parent's way (will be same as previous segment if no origin node present)
      */
-    protected RouteLineSegment(RouteLineWaySegments parentSegments, Point origin, Point destination, OSMNode originNode, OSMNode destinationNode, int segmentIndex, int nodeIndex) {
+    protected RouteLineSegment(@NotNull RouteLineWaySegments parentSegments, @NotNull Point origin, @NotNull Point destination, @Nullable OSMNode originNode, @Nullable OSMNode destinationNode, int segmentIndex, int nodeIndex) {
         super(origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
         this.parentSegments = parentSegments;
 
@@ -99,7 +106,7 @@ public class RouteLineSegment extends LineSegment {
      * @param match
      * @return true if added, false if a duplicate or other error
      */
-    public boolean addMatch(final SegmentMatch match) {
+    public boolean addMatch(@NotNull SegmentMatch match) {
         //prevent duplicate matches from being added (happens on RouteLineSegments located near Cell boundaries)
         if(matchingSegmentsById.containsKey(match.id)) {
            // System.out.println("DUPLICATE MATCH FOR " + match.mainSegment + "::" + SphericalMercator.mercatorToLatLon(match.mainSegment.midPoint));
@@ -111,7 +118,7 @@ public class RouteLineSegment extends LineSegment {
         updateMatchesByLine(match);
         return true;
     }
-    private void updateMatchesByLine(final SegmentMatch match) {
+    private void updateMatchesByLine(@NotNull SegmentMatch match) {
         final long osmWayId = match.matchingSegment.getParent().way.osm_id;
         List<SegmentMatch> matchesForLine = matchingSegments.get(osmWayId);
         if(matchesForLine == null) {
@@ -126,7 +133,7 @@ public class RouteLineSegment extends LineSegment {
      * @param match the match to remove
      * @return true if removed, false if not
      */
-    public boolean removeMatch(final SegmentMatch match) {
+    public boolean removeMatch(@NotNull SegmentMatch match) {
         if(!matchingSegmentsById.containsKey(match.id)) {
             return false;
         }
@@ -137,7 +144,7 @@ public class RouteLineSegment extends LineSegment {
         matchesForLine.remove(match);
         return true;
     }
-    protected void resyncMatchesForWay(final OSMWay oldWay) {
+    protected void resyncMatchesForWay(@NotNull OSMWay oldWay) {
         final List<SegmentMatch> oldMatchesForLine = matchingSegments.get(oldWay.osm_id);
         if(oldMatchesForLine != null) {
             final ArrayList<SegmentMatch> oldMatchesForLineCopy = new ArrayList<>(oldMatchesForLine);
@@ -175,7 +182,8 @@ public class RouteLineSegment extends LineSegment {
 
         summarized = true;
     }
-    private SegmentMatch chooseBestMatchForMatchType(final List<SegmentMatch> matches, final short matchMask) {
+    @Nullable
+    private SegmentMatch chooseBestMatchForMatchType(@NotNull List<SegmentMatch> matches, final short matchMask) {
         double minScore = Double.MAX_VALUE, matchScore, absDotProduct;
         SegmentMatch bestMatch = null;
         final List<SegmentMatch> matchList = new ArrayList<>(matches.size());
@@ -210,13 +218,15 @@ public class RouteLineSegment extends LineSegment {
     }
 
     @Override
+    @NotNull
     public WaySegments getParent() {
         return parentSegments;
     }
     @Override
-    public void setParent(WaySegments newParent) {
+    public void setParent(@NotNull WaySegments newParent) {
         throw new RuntimeException("Can’t set parent for RouteLineSegment");
     }
+    @NotNull
     public Map<Long, List<SegmentMatch>> getMatchingSegments(final short matchMask) {
         if (matchMask == SegmentMatch.matchTypeNone) {
             return matchingSegments;
@@ -233,6 +243,7 @@ public class RouteLineSegment extends LineSegment {
         }
         return filteredMatchingSegments;
     }
+    @Nullable
     public List<SegmentMatch> getMatchingSegmentsForLine(final long wayOsmId, final short matchMask) {
         final List<SegmentMatch> matchingSegmentsForLine = matchingSegments.get(wayOsmId);
         if(matchingSegmentsForLine != null) {

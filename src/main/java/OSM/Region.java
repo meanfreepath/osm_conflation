@@ -11,11 +11,14 @@ public class Region {
 
     /**
      * Determines whether the regions intersect
-     * @param region1
-     * @param region2
-     * @return
+     * @param region1 the first region
+     * @param region2 the second region
+     * @return true if the regions intersect, false if not, or if either is null
      */
-    public static boolean intersects(final @NotNull Region region1, final @NotNull Region region2) {
+    public static boolean intersects(final @Nullable Region region1, final @Nullable Region region2) {
+        if(region1 == null || region2 == null) {
+            return false;
+        }
         return !(region1.extent.x < region2.origin.x ||
                 region1.origin.x > region2.extent.x ||
                 region1.extent.y < region2.origin.y ||
@@ -24,11 +27,14 @@ public class Region {
 
     /**
      * Determines whether region1 contains region2
-     * @param region1
-     * @param region2
-     * @return
+     * @param region1 the first region
+     * @param region2 the second region
+     * @return true if region1 contains region2, false if not, or if either is null
      */
-    public static boolean contains(final @NotNull Region region1, final @NotNull Region region2) {
+    public static boolean contains(final @Nullable Region region1, final @Nullable Region region2) {
+        if(region1 == null || region2 == null) {
+            return false;
+        }
         return region1.origin.y <= region2.origin.y &&
                 region1.extent.y >= region2.extent.y &&
                 region1.origin.x <= region2.origin.x &&

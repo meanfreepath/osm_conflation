@@ -2,6 +2,7 @@ package Conflation;
 
 import Importer.InvalidArgumentException;
 import OSM.*;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
@@ -258,7 +259,7 @@ public class StopArea implements WaySegmentsObserver {
         for(final List<StopWayMatch> osmMatches : stopMatchesByOSMWayId.values()) {
             bestWayMatches.add(new SummarizedMatch(osmMatches));
         }
-        Collections.sort(bestWayMatches, STOP_WAY_MATCH_COMPARATOR);
+        bestWayMatches.sort(STOP_WAY_MATCH_COMPARATOR);
         bestWayMatch = bestWayMatches.get(0);
     }
     public OSMEntity getPlatform() {
@@ -302,7 +303,7 @@ public class StopArea implements WaySegmentsObserver {
     }
 
     @Override
-    public void waySegmentsWasSplit(final WaySegments originalWaySegments, OSMNode[] splitNodes, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
+    public void waySegmentsWasSplit(@NotNull final WaySegments originalWaySegments, @NotNull OSMNode[] splitNodes, @NotNull final WaySegments[] splitWaySegments) throws InvalidArgumentException {
         if(originalWaySegments instanceof OSMWaySegments) {
             //TODO: implement
             /*//first find the match to the original way
@@ -350,11 +351,11 @@ public class StopArea implements WaySegmentsObserver {
     }
 
     @Override
-    public void waySegmentsWasDeleted(WaySegments waySegments) {
+    public void waySegmentsWasDeleted(@NotNull WaySegments waySegments) {
 
     }
     @Override
-    public void waySegmentsAddedSegment(final WaySegments originalWaySegments, final LineSegment oldSegment, final LineSegment[] newSegments) {
+    public void waySegmentsAddedSegment(@NotNull final WaySegments originalWaySegments, @NotNull final LineSegment oldSegment, @NotNull final LineSegment[] newSegments) {
         if(originalWaySegments instanceof RouteLineWaySegments) { //i.e. when inserting a stop position on the RouteLine
             //Update the closest RouteLineSegment property on all proximity matches, to ensure it's not referring to oldSegment
             final Map<Long, StopWayMatch> routeWayMatches = wayMatches.get(originalWaySegments.way.osm_id);

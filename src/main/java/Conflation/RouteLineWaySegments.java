@@ -5,6 +5,7 @@ import OSM.OSMNode;
 import OSM.OSMWay;
 import OSM.Point;
 import OSM.Region;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.ref.WeakReference;
 import java.util.*;
@@ -248,9 +249,7 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
 
             //remove the LineMatch from the index keyed by the RouteLineSegment's id
             final Map<Long, LineMatch> rlSegmentLineMatches = lineMatchesByRouteLineSegmentId.get(match.mainSegment.id);
-            if(rlSegmentLineMatches.containsKey(candidateLine.way.osm_id)) {
-                rlSegmentLineMatches.remove(candidateLine.way.osm_id);
-            }
+            rlSegmentLineMatches.remove(candidateLine.way.osm_id);
 
             //and remove the entry for the RouteLineSegment if no more LineMatches for it
             if(rlSegmentLineMatches.size() == 0) {
@@ -305,7 +304,7 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
     }
 
     @Override
-    public void waySegmentsWasSplit(WaySegments originalWaySegments, OSMNode[] splitNodes, WaySegments[] splitWaySegments) throws InvalidArgumentException {
+    public void waySegmentsWasSplit(@NotNull WaySegments originalWaySegments, @NotNull OSMNode[] splitNodes, @NotNull WaySegments[] splitWaySegments) throws InvalidArgumentException {
         if(originalWaySegments instanceof RouteLineWaySegments) { //case when the RouteLine is split
             //TODO unimplemented
         } else if(originalWaySegments instanceof OSMWaySegments) {
@@ -347,12 +346,12 @@ public class RouteLineWaySegments extends WaySegments implements WaySegmentsObse
     }
 
     @Override
-    public void waySegmentsWasDeleted(WaySegments waySegments) throws InvalidArgumentException {
+    public void waySegmentsWasDeleted(@NotNull WaySegments waySegments) throws InvalidArgumentException {
 
     }
 
     @Override
-    public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment oldSegment, LineSegment[] newSegments) {
+    public void waySegmentsAddedSegment(@NotNull WaySegments waySegments, @NotNull LineSegment oldSegment, @NotNull LineSegment[] newSegments) {
         if(waySegments instanceof RouteLineWaySegments) { //case when the RouteLine has been updated
             //argument casting
             final RouteLineSegment oldRouteLineSegment = (RouteLineSegment) oldSegment;

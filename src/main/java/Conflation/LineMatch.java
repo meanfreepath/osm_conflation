@@ -1,5 +1,8 @@
 package Conflation;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,7 +24,7 @@ public class LineMatch {
 
     private double avgDotProduct, avgDistance;
 
-    public LineMatch(final RouteLineWaySegments routeLine, final OSMWaySegments osmLine) {
+    public LineMatch(@NotNull RouteLineWaySegments routeLine, @NotNull OSMWaySegments osmLine) {
         this.routeLine = routeLine;
         this.osmLine = osmLine;
         matchingSegments = new ArrayList<>(routeLine.segments.size());
@@ -31,10 +34,10 @@ public class LineMatch {
     }
 
     /**
-     * Add a match to the
-     * @param match
+     * Add a SegmentMatch to this line match
+     * @param match the match to add
      */
-    protected void addMatch(final SegmentMatch match) {
+    protected void addMatch(@NotNull SegmentMatch match) {
         if(match.matchingSegment.getParent() != osmLine) {
             throw new RuntimeException("Tried to add match for different line: " + this.toString());
         }
@@ -63,8 +66,8 @@ public class LineMatch {
         }
         osmLineBySegment.add(match);
     }
-    protected void removeMatch(final SegmentMatch oldMatch) {
-        if(!matchingSegments.contains(oldMatch)) {
+    protected void removeMatch(@Nullable SegmentMatch oldMatch) {
+        if(oldMatch == null || !matchingSegments.contains(oldMatch)) {
             System.out.println("MATCH DOESN'T EXIST " + oldMatch);
             return;
         }
@@ -90,7 +93,7 @@ public class LineMatch {
         }
     }
 
-    private static List<SegmentMatch> applyMask(final List<SegmentMatch> segmentMatches, final short matchMask) {
+    private static List<SegmentMatch> applyMask(@NotNull List<SegmentMatch> segmentMatches, final short matchMask) {
         if(matchMask == SegmentMatch.matchTypeNone) {
             return segmentMatches;
         } else {
@@ -105,11 +108,12 @@ public class LineMatch {
     }
     /**
      * Returns the SegmentMatches for the RouteLineSegments that matched with this line and given segment id
-     * @param osmSegment
+     * @param osmSegment the segment to check for
      * @param matchMask
      * @return
      */
-    public List<SegmentMatch> getRouteLineMatchesForSegment(final OSMLineSegment osmSegment, final short matchMask) {
+    @NotNull
+    public List<SegmentMatch> getRouteLineMatchesForSegment(@NotNull OSMLineSegment osmSegment, final short matchMask) {
         final List<SegmentMatch> bySegment = matchedSegmentsByOSMLineSegmentId.get(osmSegment.id);
         if(bySegment == null) {
             return new ArrayList<>();
@@ -122,7 +126,8 @@ public class LineMatch {
      * @param matchMask
      * @return
      */
-    public List<SegmentMatch> getOSMLineMatchesForSegment(final RouteLineSegment routeLineSegment, final short matchMask) {
+    @NotNull
+    public List<SegmentMatch> getOSMLineMatchesForSegment(@NotNull RouteLineSegment routeLineSegment, final short matchMask) {
         final List<SegmentMatch> bySegment = matchedSegmentsByRouteLineSegmentId.get(routeLineSegment.id);
         if(bySegment == null) {
             return new ArrayList<>();

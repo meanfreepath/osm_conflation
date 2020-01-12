@@ -5,6 +5,7 @@ import Importer.InvalidArgumentException;
 import OSM.*;
 import Overpass.Exceptions;
 import Overpass.OverpassConverter;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -80,7 +81,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
         //also fetch all route relations of the appropriate type, along with any parent route_master relations in the area
         final OverpassConverter relationConverter = new OverpassConverter();
         final LatLonRegion routePathsRegionLL = SphericalMercator.mercatorToLatLon(routePathsBoundingBox);
-        final String relationQueryComponents[] = {
+        final String[] relationQueryComponents = {
                 String.format("relation[\"type\"=\"route\"][\"route\"=\"%s\"](%.07f,%.07f,%.07f,%.07f)", routeType, routePathsRegionLL.origin.latitude, routePathsRegionLL.origin.longitude, routePathsRegionLL.extent.latitude, routePathsRegionLL.extent.longitude),
         };
         final String relationQuery = "(" + String.join(";", relationQueryComponents) + ";rel(br););";
@@ -223,7 +224,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
 
             if(virginRegion) { //init the region
                 assert lastNode != null;
-                final Point points[] = {lastNode.getCentroid(), node.getCentroid()};
+                final Point[] points = {lastNode.getCentroid(), node.getCentroid()};
                 curRegion = new Region(points);
             }
 
@@ -239,7 +240,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
                 regions.add(testRegion); //add to the regions list
 
                 //and create a new region with the last and current nodes
-                final Point points[] = {lastNode.getCentroid(), node.getCentroid()};
+                final Point[] points = {lastNode.getCentroid(), node.getCentroid()};
                 curRegion = new Region(points);
             } else { //otherwise, just include the current point
                 curRegion.includePoint(node.getCentroid());
@@ -524,7 +525,7 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
     }
 
     @Override
-    public void waySegmentsWasSplit(final WaySegments originalWaySegments, OSMNode[] splitNodes, final WaySegments[] splitWaySegments) throws InvalidArgumentException {
+    public void waySegmentsWasSplit(@NotNull final WaySegments originalWaySegments, @NotNull OSMNode[] splitNodes, @NotNull final WaySegments[] splitWaySegments) throws InvalidArgumentException {
         for(final WaySegments ws : splitWaySegments) {
             if(ws != originalWaySegments) {
                 candidateLines.put(ws.way.osm_id, (OSMWaySegments) ws);
@@ -532,11 +533,11 @@ public class RouteDataManager extends OSMEntitySpace implements WaySegmentsObser
         }
     }
     @Override
-    public void waySegmentsWasDeleted(final WaySegments waySegments) {
+    public void waySegmentsWasDeleted(@NotNull final WaySegments waySegments) {
         candidateLines.remove(waySegments.way.osm_id);
     }
     @Override
-    public void waySegmentsAddedSegment(final WaySegments waySegments, final LineSegment oldSegment, final LineSegment[] newSegments) {
+    public void waySegmentsAddedSegment(@NotNull final WaySegments waySegments, @NotNull final LineSegment oldSegment, @NotNull final LineSegment[] newSegments) {
 
     }
 }

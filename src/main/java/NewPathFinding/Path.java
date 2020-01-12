@@ -198,14 +198,12 @@ public class Path {
         PathSegment previousSegment = previousPath != null ? previousPath.lastPathSegment : null;
         //default the currentLine to the previous path's last segment's line
         OSMWaySegments currentLine = previousPath != null ? previousPath.lastPathSegment.getLine() : firstPathSegment.getLine();
-        for (int segmentIndex = 0; segmentIndex < pathSegments.size(); segmentIndex++) {
-            final PathSegment pathSegment = pathSegments.get(segmentIndex);
-
+        for (final PathSegment pathSegment : pathSegments) {
             //if the current line has changed, split it if necessary
-            if(currentLine != pathSegment.getLine()) {
+            if (currentLine != pathSegment.getLine()) {
                 //if the current line doesn't begin or end at the new PathSegment's origin, it needs to be split there
                 final OSMNode originNode = pathSegment.getOriginNode();
-                if(currentLine.way.isClosed() || currentLine.way.getFirstNode() != originNode && currentLine.way.getLastNode() != originNode) {
+                if (currentLine.way.isClosed() || currentLine.way.getFirstNode() != originNode && currentLine.way.getLastNode() != originNode) {
                     if (debugEnabled) {
                         System.out.format("DEBUG:\tSPLIT PREVIOUS PS at %d: %s\n", originNode.osm_id, previousSegment);
                     }
@@ -213,7 +211,7 @@ public class Path {
                 }
 
                 //now run the split on the currentLine if needed
-                if(newSplitNodes.size() > 0) {
+                if (newSplitNodes.size() > 0) {
                     runSplit(entitySpace, currentLine, newSplitNodes);
                 }
 
@@ -221,7 +219,7 @@ public class Path {
                 currentLine = pathSegment.getLine();
 
                 //and check if it begins or ends at the current PathSegment's origin; if not it needs to be split there
-                if(currentLine.way.isClosed() && pathSegment.getOriginNode() != pathSegment.getEndNode() || currentLine.way.getFirstNode() != originNode && currentLine.way.getLastNode() != originNode) {
+                if (currentLine.way.isClosed() && pathSegment.getOriginNode() != pathSegment.getEndNode() || currentLine.way.getFirstNode() != originNode && currentLine.way.getLastNode() != originNode) {
                     if (debugEnabled) {
                         System.out.format("DEBUG:\tSPLIT CURRENT PS at %d: %s\n", originNode.osm_id, pathSegment);
                     }

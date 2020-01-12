@@ -5,6 +5,7 @@ import Importer.InvalidArgumentException;
 import OSM.OSMEntity;
 import OSM.OSMNode;
 import OSM.Point;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -107,7 +108,7 @@ public class PathSegment implements WaySegmentsObserver {
          * Check the future vector to see if it has a good component with the first-traveled segment.
          * if not, mark as pending advance and wait for the RouteLine to pass it (which isn't guaranteed)
          */
-        final double futureVector[] = {0.0, 0.0};
+        final double[] futureVector = {0.0, 0.0};
         calculateFutureVector(routeLineSegmentsToConsider, futureVector);
         final double futureVectorMagnitude = Math.sqrt(futureVector[0] * futureVector[0] + futureVector[1] * futureVector[1]), futureVectorDotProduct;
         if(travelDirection == TravelDirection.forward) {
@@ -316,7 +317,7 @@ public class PathSegment implements WaySegmentsObserver {
     }
 
     @Override
-    public void waySegmentsWasSplit(WaySegments originalWaySegments, OSMNode[] splitNodes, WaySegments[] splitWaySegments) throws InvalidArgumentException {
+    public void waySegmentsWasSplit(@NotNull WaySegments originalWaySegments, @NotNull OSMNode[] splitNodes, @NotNull WaySegments[] splitWaySegments) throws InvalidArgumentException {
         //check whether this PathSegment needs to update its line property
         if(processingStatus == ProcessingStatus.complete || processingStatus == ProcessingStatus.reachedDestination) {
             //create an ArrayList containing the split ways
@@ -366,12 +367,12 @@ public class PathSegment implements WaySegmentsObserver {
     }
 
     @Override
-    public void waySegmentsWasDeleted(WaySegments waySegments) throws InvalidArgumentException {
+    public void waySegmentsWasDeleted(@NotNull WaySegments waySegments) throws InvalidArgumentException {
 
     }
 
     @Override
-    public void waySegmentsAddedSegment(final WaySegments waySegments, final LineSegment oldSegment, final LineSegment[] newSegments) {
+    public void waySegmentsAddedSegment(@NotNull final WaySegments waySegments, @NotNull final LineSegment oldSegment, @NotNull final LineSegment[] newSegments) {
 
     }
 

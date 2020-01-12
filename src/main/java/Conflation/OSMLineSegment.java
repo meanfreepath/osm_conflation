@@ -2,14 +2,17 @@ package Conflation;
 
 import OSM.OSMNode;
 import OSM.Point;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Created by nick on 9/30/16.
  */
 public class OSMLineSegment extends LineSegment {
-    public WaySegments parentSegments = null;
+    @NotNull
+    private WaySegments parentSegments;
 
-    public OSMLineSegment(WaySegments parentSegments, Point origin, Point destination, OSMNode originNode, OSMNode destinationNode, int segmentIndex, int nodeIndex) {
+    public OSMLineSegment(@NotNull WaySegments parentSegments, @NotNull Point origin, @NotNull Point destination, @Nullable OSMNode originNode, @Nullable OSMNode destinationNode, int segmentIndex, int nodeIndex) {
         super(origin, destination, originNode, destinationNode, segmentIndex, nodeIndex);
         this.parentSegments = parentSegments;
     }
@@ -19,11 +22,12 @@ public class OSMLineSegment extends LineSegment {
     }
 
     @Override
+    @NotNull
     public WaySegments getParent() {
         return parentSegments;
     }
     @Override
-    public void setParent(WaySegments newParent) {
+    public void setParent(@NotNull WaySegments newParent) {
         parentSegments = newParent;
     }
 

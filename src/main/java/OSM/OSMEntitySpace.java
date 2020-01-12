@@ -38,7 +38,7 @@ public class OSMEntitySpace {
             return o1.nodeIndex > o2.nodeIndex ? 1 : -1;
         }
     };
-    private class NodeIndexer {
+    private static class NodeIndexer {
         public final OSMNode node;
         public final int nodeIndex;
         public NodeIndexer(final OSMNode node, final int nodeIndex) {

@@ -5,6 +5,7 @@ import OSM.OSMNode;
 import OSM.Point;
 import OSM.Region;
 import OSM.SphericalMercator;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,20 +45,20 @@ class Cell implements WaySegmentsObserver {
         return cell;
     }
 
-    public final Region boundingBox, expandedBoundingBox;
-    public final List<OSMWaySegments> containedLines = new ArrayList<>(1024); //contains OSM ways only
+    public final @NotNull Region boundingBox, expandedBoundingBox;
+    public final @NotNull List<OSMWaySegments> containedLines = new ArrayList<>(1024); //contains OSM ways only
 
     private Cell(final Point origin) {
         boundingBox = new Region(origin, new Point(origin.x + cellSize, origin.y + cellSize));
         expandedBoundingBox = boundingBox.regionInset(searchBuffer, searchBuffer);
     }
-    protected void addWay(final OSMWaySegments entity) {
+    protected void addWay(@NotNull OSMWaySegments entity) {
         if(!containedLines.contains(entity)) {
             containedLines.add(entity);
             entity.addObserver(this);
         }
     }
-    protected boolean removeWay(final OSMWaySegments entity) {
+    protected boolean removeWay(@NotNull OSMWaySegments entity) {
         if(containedLines.contains(entity)) {
             entity.removeObserver(this);
             return containedLines.remove(entity);
@@ -76,7 +77,7 @@ class Cell implements WaySegmentsObserver {
     }
 
     @Override
-    public void waySegmentsWasSplit(WaySegments originalWaySegments, OSMNode[] splitNodes, WaySegments[] splitWaySegments) throws InvalidArgumentException {
+    public void waySegmentsWasSplit(@NotNull WaySegments originalWaySegments, @NotNull OSMNode[] splitNodes, @NotNull WaySegments[] splitWaySegments) throws InvalidArgumentException {
         for(final WaySegments splitLine : splitWaySegments) {
             if(splitLine == originalWaySegments) { //remove the original line if it no longer intersects this Cell
                 if(!Region.intersects(boundingBox, splitLine.way.getBoundingBox())) {
@@ -91,12 +92,12 @@ class Cell implements WaySegmentsObserver {
     }
 
     @Override
-    public void waySegmentsWasDeleted(WaySegments waySegments) throws InvalidArgumentException {
+    public void waySegmentsWasDeleted(@NotNull WaySegments waySegments) {
         removeWay((OSMWaySegments) waySegments);
     }
 
     @Override
-    public void waySegmentsAddedSegment(WaySegments waySegments, LineSegment oldSegment, LineSegment[] newSegments) {
+    public void waySegmentsAddedSegment(@NotNull WaySegments waySegments, @NotNull LineSegment oldSegment, @NotNull LineSegment[] newSegments) {
         //No updates needed for this action
     }
 }

@@ -23,7 +23,7 @@ public class RoutePathFinder {
     public enum RouteLogType {
         info, notice, warning, error
     }
-    private class RouteLog {
+    private static class RouteLog {
         public final RouteLogType type;
         public final String message;
         public final Date logTime;
@@ -53,7 +53,7 @@ public class RoutePathFinder {
         int pathTreeIndex = 0, endIndex = route.stops.size() - 1;
         Point closestPointOnRouteLineToPlatform, lastFoundPoint = null;
         NewPathFinding.PathTree lastLeg = null;
-        Point relevantPoints[] = {null, null};
+        Point[] relevantPoints = {null, null};
         for(final StopArea curStop: route.stops) {
             //get the closest point on the routeLine to the stop
             relevantPoints[0] = null; //reset the closest point
@@ -257,7 +257,7 @@ public class RoutePathFinder {
     public void logEvent(final RouteLogType type, final String message, final Object sender) {
         logs.add(new RouteLog(type, message, sender));
     }
-    public List<RouteLog> eventLogsForObject(final Object object, final RouteLogType types[]) {
+    public List<RouteLog> eventLogsForObject(final Object object, final RouteLogType[] types) {
         final List<RouteLog> matchingLogs = new ArrayList<>(logs.size());
         for(final RouteLog log : logs) {
             if(log.sender == object) {

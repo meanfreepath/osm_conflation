@@ -8,6 +8,7 @@ import OSM.OSMNode;
 import OSM.Point;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.CRC32;
 
@@ -51,7 +52,8 @@ public class PathTree {
 
     public static long idForParameters(final int index, final StopArea fromStop, final StopArea toStop) {
         idGenerator.reset();
-        idGenerator.update(String.format("PT:%d:%d:%d", index, fromStop != null ? fromStop.getPlatform().osm_id : 0, toStop != null ? toStop.getPlatform().osm_id : 0).getBytes(Charset.forName("ascii")));
+        byte[] idBytes = String.format("PT:%d:%d:%d", index, fromStop != null ? fromStop.getPlatform().osm_id : 0, toStop != null ? toStop.getPlatform().osm_id : 0).getBytes(StandardCharsets.US_ASCII);
+        idGenerator.update(idBytes, 0, idBytes.length);
         return idGenerator.getValue();
     }
     public PathTree(final Route route, final StopArea originStop, final Point originRouteLinePoint, final PathTree previousPath, final int pathTreeIndex, final RoutePathFinder parentPathFinder) {
@@ -107,7 +109,7 @@ public class PathTree {
             }
         }
 
-        final long debugRlSegIdsRaw[] = {2183985599L, 1707782496L, 1936162033L, 1917356142L, 133202163L, 1161896790L, 1789482644L, 1336691900L, 2162494158L};
+        final long[] debugRlSegIdsRaw = {2183985599L, 1707782496L, 1936162033L, 1917356142L, 133202163L, 1161896790L, 1789482644L, 1336691900L, 2162494158L};
         final List<Long> debugRlSegIds = new ArrayList<>(debugRlSegIdsRaw.length);
         for(final long rlId : debugRlSegIdsRaw) {
             debugRlSegIds.add(rlId);

@@ -1,5 +1,7 @@
 package Conflation;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -16,10 +18,10 @@ public class StreetNameMatcher {
             return o1.levenshteinDistance > o2.levenshteinDistance ? -1 : 1;
         }
     };
-    public class StreetNameMatch {
-        public final String streetName1, streetName2;
-        public final int levenshteinDistance;
-        public StreetNameMatch(final String street1, final String street2) {
+    private static class StreetNameMatch {
+        final String streetName1, streetName2;
+        final int levenshteinDistance;
+        StreetNameMatch(@NotNull String street1, @NotNull String street2) {
             streetName1 = street1;
             streetName2 = street2;
             levenshteinDistance = damerauLevenshteinDistance(street1, street2, 128);
@@ -153,7 +155,7 @@ public class StreetNameMatcher {
 
         return expandedName;*/
     }
-    public static int damerauLevenshteinDistance (final String a, final String b, final int alphabetLength) {
+    public static int damerauLevenshteinDistance (@NotNull String a, @NotNull String b, final int alphabetLength) {
         final int INFINITY = a.length() + b.length();
         int[][] H = new int[a.length()+2][b.length()+2];
         H[0][0] = INFINITY;

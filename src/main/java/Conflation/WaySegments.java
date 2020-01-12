@@ -2,6 +2,8 @@ package Conflation;
 
 import Importer.InvalidArgumentException;
 import OSM.*;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -25,10 +27,15 @@ public abstract class WaySegments {
     };
     public final static long debugWayId = 0L;//244322295L;//157766372L
 
+    @NotNull
     public final OSMWay way;
+    @NotNull
     public final ArrayList<LineSegment> segments;
+    @NotNull
     public final OneWayDirection oneWayDirection;
+    @Nullable
     protected List<WeakReference<WaySegmentsObserver>> observers = null;
+    @NotNull
     protected final RouteConflator.LineComparisonOptions wayMatchingOptions;
 
     /**
@@ -36,7 +43,9 @@ public abstract class WaySegments {
      * @param way the way to use
      * @param wayMatchingOptions the options used for matching ways
      */
-    public WaySegments(final OSMWay way, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
+    public WaySegments(@NotNull OSMWay way, @NotNull RouteConflator.LineComparisonOptions wayMatchingOptions) {
+        assert way.getNodes().size() >= 2; // Ways must have 2 or more nodes to be valid
+
         this.way = way;
         this.wayMatchingOptions = wayMatchingOptions;
         final double maxSegmentLength = wayMatchingOptions.maxSegmentLength;
@@ -87,7 +96,7 @@ public abstract class WaySegments {
             nodeIndex++;
         }
     }
-    protected WaySegments(final WaySegments originalSegments, final OSMWay splitWay, final List<LineSegment> splitSegments) {
+    protected WaySegments(@NotNull WaySegments originalSegments, @NotNull final OSMWay splitWay, @NotNull List<LineSegment> splitSegments) {
         this.way = splitWay;
         this.oneWayDirection = originalSegments.oneWayDirection;
         this.segments = new ArrayList<>(splitSegments);
@@ -151,7 +160,8 @@ public abstract class WaySegments {
      * @param way
      * @return
      */
-    public static OneWayDirection determineOneWayDirection(final OSMWay way) {
+    @NotNull
+    public static OneWayDirection determineOneWayDirection(@NotNull OSMWay way) {
         final String oneWayTag = way.getTag("oneway");
 
         //check the oneway status of the way
@@ -171,7 +181,7 @@ public abstract class WaySegments {
      * @param node
      * @throws InvalidArgumentException
      */
-    public void appendNode(final OSMNode node) throws InvalidArgumentException {
+    public void appendNode(@NotNull OSMNode node) throws InvalidArgumentException {
         if(segments.size() == 0) {
             throw new InvalidArgumentException("No existing line segments!");
         }
@@ -182,7 +192,7 @@ public abstract class WaySegments {
         segments.add(newSegment);
         way.appendNode(node);
     }
-    public boolean addObserver(final WaySegmentsObserver observer) {
+    public boolean addObserver(@NotNull WaySegmentsObserver observer) {
         if(observers == null) {
             observers = new ArrayList<>(32);
         }
@@ -194,7 +204,7 @@ public abstract class WaySegments {
         }
         return observers.add(new WeakReference<>(observer));
     }
-    public boolean removeObserver(final WaySegmentsObserver observer) {
+    public boolean removeObserver(@NotNull WaySegmentsObserver observer) {
         if(observers != null) {
             for(final WeakReference<WaySegmentsObserver> observerReference : observers) {
                 if(observerReference.get() == observer) {
@@ -204,7 +214,8 @@ public abstract class WaySegments {
         }
         return false;
     }
-    public static String outputSegments(final List<LineSegment> segments) {
+    @NotNull
+    public static String outputSegments(@NotNull List<LineSegment> segments) {
         final List<String> segs = new ArrayList<>(segments.size());
         for(final LineSegment segment : segments) {
             segs.add(segment.toString());
@@ -217,11 +228,12 @@ public abstract class WaySegments {
 
     /**
      * Returns the segment which is closest to the given point
-     * @param point
+     * @param point the point to check
      * @param maxSearchDistance - the maximum distance to search, in meters
      * @return the closest LineSegment
      */
-    public final LineSegment closestSegmentToPoint(final Point point, final double maxSearchDistance) {
+    @Nullable
+    public final LineSegment closestSegmentToPoint(@NotNull Point point, final double maxSearchDistance) {
         double minDistance = maxSearchDistance, curDistance;
         LineSegment closestSegment = null;
         Point closestPointOnSegment;
@@ -235,7 +247,8 @@ public abstract class WaySegments {
         }
         return closestSegment;
     }
-    public WaySegments[] split(final OSMNode[] splitNodes, final OSMEntitySpace entitySpace) throws InvalidArgumentException {
+    @NotNull
+    public WaySegments[] split(@NotNull OSMNode[] splitNodes, @NotNull OSMEntitySpace entitySpace) throws InvalidArgumentException {
         //run the split on the underlying way
         final OSMWay[] splitWays = entitySpace.splitWay(way, splitNodes);
 
@@ -255,9 +268,9 @@ public abstract class WaySegments {
             boolean inWay = false;
             ListIterator<LineSegment> segmentListIterator = originalLineSegments.listIterator();
             for(;;) {
-                /**
-                 * reset the list iterator if we've reached the end of the original segment list without finding the end of the splitWay
-                 * (i.e. when the first/last nodes change when splitting a closed way)
+                /*
+                  reset the list iterator if we've reached the end of the original segment list without finding the end of the splitWay
+                  (i.e. when the first/last nodes change when splitting a closed way)
                  */
                 if(!segmentListIterator.hasNext()) {
                     segmentListIterator = originalLineSegments.listIterator();
@@ -322,7 +335,7 @@ public abstract class WaySegments {
      * @param segments the list of LineSegment objects to calculate the indexes for
      * @param parent the new parent WaySegments to assign the the segments (set to NULL to avoid assignment)
      */
-    private static void recalculateSegmentIndexes(final List<LineSegment> segments, final WaySegments parent) {
+    private static void recalculateSegmentIndexes(@NotNull List<LineSegment> segments, @Nullable WaySegments parent) {
         int newSegmentIndex = 0, newNodeIndex = 0;
         for(final LineSegment segment : segments) {
             if(parent != null) {
@@ -336,6 +349,6 @@ public abstract class WaySegments {
         }
     }
     public String toString() {
-        return String.format("WaySegments @%d: way #%d (%s): [%d->%d], %d segments", hashCode(), way.osm_id, way.getTag(OSMEntity.KEY_NAME), way.getFirstNode().osm_id, way.getLastNode().osm_id, segments.size());
+        return String.format("WaySegments @%d: way #%d (%s): [%d->%d], %d segments", hashCode(), way.osm_id, way.getTag(OSMEntity.KEY_NAME), way.getFirstNode() != null ? way.getFirstNode().osm_id : 0, way.getLastNode() != null ? way.getLastNode().osm_id : 0, segments.size());
     }
 }

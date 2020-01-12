@@ -436,7 +436,7 @@ public class OSMWay extends OSMEntity {
         if(complete != CompletionStatus.incomplete) {
             final List<String> nodeIds = new ArrayList<>(nodes.size());
             for(final OSMNode node : nodes) {
-                nodeIds.add(Long.toString(node.osm_id) + (node.complete != CompletionStatus.incomplete ? "" : "*"));
+                nodeIds.add(node.osm_id + (node.complete != CompletionStatus.incomplete ? "" : "*"));
             }
             return String.format("way@%d (id %d): %d/%d nodes [%s] (%s) [%s/%s]", hashCode(), osm_id, getCompletedNodeCount(), nodes.size(), String.join(",", nodeIds), getTag(OSMEntity.KEY_NAME), complete, action.toString().toUpperCase());
         } else {

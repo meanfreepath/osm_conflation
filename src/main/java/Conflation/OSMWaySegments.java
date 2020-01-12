@@ -2,6 +2,7 @@ package Conflation;
 
 import OSM.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
@@ -11,7 +12,7 @@ import java.util.List;
 public class OSMWaySegments extends WaySegments {
     public @NotNull final Region boundingBoxForStopMatching, boundingBoxForSegmentMatching;
 
-    protected OSMWaySegments(OSMWay way, final RouteConflator.LineComparisonOptions wayMatchingOptions) {
+    protected OSMWaySegments(@NotNull OSMWay way, @NotNull RouteConflator.LineComparisonOptions wayMatchingOptions) {
         super(way, wayMatchingOptions);
 
         //set up the various bounding boxes
@@ -22,7 +23,7 @@ public class OSMWaySegments extends WaySegments {
         boundingBoxForStopMatching = wayRegion.regionInset(platformDistanceBuffer, platformDistanceBuffer);
         boundingBoxForSegmentMatching = wayRegion.regionInset(segmentSearchBuffer, segmentSearchBuffer);
     }
-    protected OSMWaySegments(final OSMWaySegments originalSegments, final OSMWay splitWay, final List<LineSegment> splitSegments) {
+    protected OSMWaySegments(@NotNull OSMWaySegments originalSegments, @NotNull OSMWay splitWay, @NotNull List<LineSegment> splitSegments) {
         super(originalSegments, splitWay, splitSegments);
 
         //set up the various bounding boxes
@@ -34,11 +35,11 @@ public class OSMWaySegments extends WaySegments {
         boundingBoxForSegmentMatching = wayRegion.regionInset(segmentSearchBuffer, segmentSearchBuffer);
     }
     @Override
-    protected LineSegment createLineSegment(final Point miniOrigin, final Point miniDestination, final OSMNode miniOriginNode, final OSMNode miniDestinationNode, int segmentIndex, int nodeIndex) {
+    protected LineSegment createLineSegment(@NotNull Point miniOrigin, @NotNull Point miniDestination, @Nullable OSMNode miniOriginNode, @Nullable OSMNode miniDestinationNode, int segmentIndex, int nodeIndex) {
         return new OSMLineSegment(this, miniOrigin, miniDestination, miniOriginNode, miniDestinationNode, segmentIndex, nodeIndex);
     }
     @Override
-    protected LineSegment copyLineSegment(final LineSegment segmentToCopy, final Point destination, final OSMNode destinationNode) {
+    protected LineSegment copyLineSegment(@NotNull LineSegment segmentToCopy, @NotNull Point destination, @Nullable OSMNode destinationNode) {
         return new OSMLineSegment((OSMLineSegment) segmentToCopy, destination, destinationNode);
     }
 }
