@@ -8,7 +8,7 @@ Usage: LineConflator [OPTIONS] -r [ROUTE IDS]
  -h, --help
  -n, --nocache      Don't use the locally cached data when fetching from Overpass.  Also flushes existing
                     cached data for the selected routes.
- -r, --routes       Comma-separated list of GTFS route ids
+ -r, --routes       Comma-separated list of one or more GTFS route ids (can be found in the routes.txt file)
  -s, --stopsonly    Downloads and conflates all existing stops for the provided routes only, outputting them
                     to a .osm file for review and upload.
  -t, --taskmgr      Downloads and conflates all existing stops in the area covered by the GTFS file
