@@ -18,8 +18,8 @@ import java.util.HashMap;
  * A simple Java wrapper for the OpenStreetMap Overpass API
  */
 public class ApiClient {
-    private final static int CONNECT_TIMEOUT = 5000, READ_TIMEOUT = 25000, MIN_QUERY_WAIT_TIME = 4000;
-    private final static String ENDPOINT_URL = "http://overpass-api.de/api/interpreter";
+    private final static int CONNECT_TIMEOUT = 5000, READ_TIMEOUT = 25000, MIN_QUERY_WAIT_TIME = 1000;
+    private final static String ENDPOINT_URL = "https://overpass-api.de/api/interpreter";
     private final static String QUERY_TEMPLATE = "[out:%s];%sout meta;", GEOJSON_QUERY_TEMPLATE = "[out:%s];%sout body geom;";
 
     /**
@@ -64,7 +64,7 @@ public class ApiClient {
      */
     public JSONArray get(String query, boolean asGeoJSON, boolean cachingEnabled) throws Exceptions.UnknownOverpassError {
         final String fullQuery = constructQLQuery(query, asGeoJSON);
-
+        System.out.format("DEBUG: Checking Overpass for '%s'… ", query);
         File cacheFile = null;
         try {
             final String fileName = generateCacheFileName(fullQuery);
@@ -80,6 +80,7 @@ public class ApiClient {
                         contents.append(in.readLine());
                     }
                     JSONObject response = new JSONObject(contents.toString());
+                    System.out.println("CACHED");
                     return response.getJSONArray("elements");
                 } else {
                     cacheFile.delete();
@@ -90,21 +91,35 @@ public class ApiClient {
         }
 
         JSONObject response = null;
-        try {
-            String rawResponse = getFromOverpass(fullQuery);
-            response = new JSONObject(rawResponse);
+        boolean requestPending = true;
+        long queryWaitTime = MIN_QUERY_WAIT_TIME;
+        while(requestPending) {
+            try {
+                System.out.print("Fetching… ");
+                String rawResponse = getFromOverpass(fullQuery);
+                response = new JSONObject(rawResponse);
 
-            //write the data to cache
-            if(cacheFile != null) {
-                BufferedWriter writer = new BufferedWriter(new FileWriter(cacheFile));
-                writer.write(rawResponse);
-                writer.close();
+                //write the data to cache
+                if (cacheFile != null) {
+                    BufferedWriter writer = new BufferedWriter(new FileWriter(cacheFile));
+                    writer.write(rawResponse);
+                    writer.close();
+                }
+                requestPending = false;
+            } catch (Exceptions.MultipleRequestsError e) { // exponential backoff if we get this error
+                System.out.print("Retrying… ");
+                queryWaitTime *= 2;
+            } catch (Exceptions.OverpassError | IOException e) {
+                e.printStackTrace();
+                requestPending = false;
             }
 
             //wait a little before making the next request (avoid Overpass API query limitations)
-            Thread.sleep(MIN_QUERY_WAIT_TIME);
-        } catch (Exceptions.OverpassError | IOException | InterruptedException e) {
-            e.printStackTrace();
+            try {
+                Thread.sleep(queryWaitTime);
+            } catch (InterruptedException e) {
+                break;
+            }
         }
 
         if(response == null || !response.has("elements")) {
@@ -153,7 +168,6 @@ public class ApiClient {
     private String getFromOverpass(String query) throws Exceptions.OverpassSyntaxError, Exceptions.MultipleRequestsError, Exceptions.ServerLoadError, Exceptions.UnknownOverpassError, IOException {
         HashMap<String, String> payload = new HashMap<>(1);
         payload.put("data", query);
-        System.out.println("Fetch " + query);
 
         URL endpointUrl = new URL(ENDPOINT_URL);
         HttpURLConnection connection = (HttpURLConnection) endpointUrl.openConnection();
@@ -176,12 +190,16 @@ public class ApiClient {
                 for (String line; (line = reader.readLine()) != null;) {
                     builder.append(line);
                 }
+                System.out.println("OK");
                 return builder.toString();
             case HttpURLConnection.HTTP_BAD_REQUEST: //400
+                System.out.println("BAD REQUEST");
                 throw new Exceptions.OverpassSyntaxError(query);
             case 429:
+                System.out.println("MULTIPLE REQUESTS");
                 throw new Exceptions.MultipleRequestsError();
             case HttpURLConnection.HTTP_GATEWAY_TIMEOUT: //504
+                System.out.println("TIMEOUT");
                 throw new Exceptions.ServerLoadError(READ_TIMEOUT);
             default:
                 throw new Exceptions.UnknownOverpassError("The request returned status code " + status);
