@@ -55,13 +55,13 @@ If the route doesn't match, there are a few possible causes:
 - OpenStreetMap and the GTFS path differ in how they represent a street, i.e. OpenStreetMap has a dual carriageway but GTFS doesn't or vice versa.  Or at complicated intersections where OpenStreetMap may have primary_links by the GTFS doesn't.  Either fix the gtfsroute_*.osm file, or edit OpenStreetMap, depending on which is the best option.
 - There's a bug in the importer (see Known Issues).  If you run into this, send me a message and I'll have a look at it.
 
-###Caching
+### Caching
 All downloads from Overpass are cached for 15 minutes.  If you upload any changes in a route's area to OpenStreetMap, I recommend waiting several minutes, then re-run using the "-n" option to avoid getting stale data and possible conflicts.  There's no need to clear the cache when you edit the gtfsroute_*.osm files.
 
-#Tips
+# Tips
 To save download and waiting time, you can process several routes using a comma-separated list (-r 100215,100224).  This is best done for routes that are in the same geographic area.
 
-#Known Issues
+# Known Issues
 The program doesn't properly handle splitting of looping ways (i.e. roundabouts, circular driveways, Route 62 is an example).
 While it's technically possible to use this program for streetcar and light rail routes, it hasn't been tested yet.
 Routes that use a ferry (i.e. the Vashon Island route) haven't been tested
