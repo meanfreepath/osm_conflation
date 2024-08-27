@@ -3,20 +3,17 @@ plugins {
     id 'application'
 }
 
-version '1.0-SNAPSHOT'
-
 sourceCompatibility = 1.8
 
 //create a single Jar with all dependencies
-task outputJar(type: Jar) {
+jar {
+    archiveVersion = '1.0'
+    archiveBaseName = project.name
     manifest {
         attributes 'Implementation-Title': 'GTFSOSM_Importer',
-                'Implementation-Version': version,
+                'Implementation-Version': archiveVersion,
                 'Main-Class': 'Importer.Main'
     }
-    baseName = project.name + '-all'
-    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
-    with jar
 }
 
 repositories {
@@ -24,12 +21,12 @@ repositories {
 }
 
 dependencies {
-    implementation('org.json:json:20210307')
+    implementation('org.json:json:20231013')
     implementation('org.jetbrains:annotations:22.0.0')
-    testImplementation group: 'junit', name: 'junit', version: '4.12'
+    testImplementation group: 'junit', name: 'junit', version: '4.13.1'
 }
 
 application {
-    mainClassName = 'Importer.Main'
+    mainClass.set('Importer.Main')
 }
 
